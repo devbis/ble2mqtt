@@ -1,0 +1,7 @@
+venv
+.idea
+ble2mqtt.json
+build
+dist
+*.egg-info
+tmp
