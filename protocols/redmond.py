@@ -8,6 +8,8 @@ from enum import Enum
 
 from bleak import BleakClient
 
+from devices.base import BaseDevice
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,15 +96,15 @@ class Kettle200State:
         )
 
 
-class RedmondKettle200Protocol:
+class RedmondKettle200Protocol(BaseDevice):
     MAGIC_START = 0x55
     MAGIC_END = 0xaa
 
     RX_CHAR = None
     TX_CHAR = None
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self._cmd_counter = 0
         self.wait_event: ty.Optional[aio.Event] = None
         self.received_data = None
@@ -112,7 +114,7 @@ class RedmondKettle200Protocol:
         self.client = client
 
     def notification_handler(self, sender, data):
-        logger.debug("Notification: {0:04x}: {1}".format(
+        logger.debug("Notification: {0}: {1}".format(
             sender,
             ' '.join(format(x, '02x') for x in data),
         ))
@@ -120,24 +122,31 @@ class RedmondKettle200Protocol:
             self.received_data = data
             self.wait_event.set()
 
-    async def start(self):
+    async def protocol_start(self):
         assert self.RX_CHAR and self.TX_CHAR
-        logger.debug('Connecting')
-        await self.client.connect()
-        await self.client.is_connected()
-        logger.info('Start notification...')
-        await self.client.start_notify(self.RX_CHAR, self.notification_handler)
+        logger.info(f'Enable BLE notifications from [{self.client.address}]')
+        async with self.bt_lock:
+            await self.client.start_notify(
+                self.RX_CHAR,
+                self.notification_handler,
+            )
         # send this to receive responses
-        await self.client.write_gatt_char(self.TX_CHAR, bytearray([1, 0]), True)
+        async with self.bt_lock:
+            await self.client.write_gatt_char(
+                self.TX_CHAR,
+                bytearray([1, 0]),
+                True,
+            )
 
     async def close(self):
-        await self.client.stop_notify(self.RX_CHAR)
+        async with self.bt_lock:
+            await self.client.stop_notify(self.RX_CHAR)
         await self.client.disconnect()
 
     @staticmethod
     def _check_success(response,
                        error_msg="Command was not completed successfully"):
-        success = response[0]
+        success = response and response[0]
         if not success:
             raise ValueError(error_msg)
 
@@ -155,7 +164,7 @@ class RedmondKettle200Protocol:
         return bytearray(b'%b%b%b' % (container[:3], payload, container[3:]))
 
     async def send_command(self, cmd: Command, payload: bytes = b'',
-                           wait_reply=True):
+                           wait_reply=True, timeout=5):
         command = self._get_command(cmd.value, payload)
         logger.debug(
             f'... send cmd {cmd.value:04x} ['
@@ -163,17 +172,38 @@ class RedmondKettle200Protocol:
             f'{" ".join(format(x, "02x") for x in command)}',
         )
         self.wait_event = aio.Event()
-        cmd_resp = await self.client.write_gatt_char(
-            self.TX_CHAR,
-            command,
-            True,
-        )
-        if wait_reply:
-            await self.wait_event.wait()
-            # extract payload from container
-            cmd_resp = bytes(self.received_data[3:-1])
-            self.wait_event = None
-            self.received_data = None
+        async with self.bt_lock:
+            try:
+                cmd_resp = await aio.wait_for(
+                    aio.ensure_future(
+                        self.client.write_gatt_char(
+                            self.TX_CHAR,
+                            command,
+                            True,
+                        ),
+                        loop=self._loop,
+                    ),
+                    timeout=timeout,
+                    loop=self._loop,
+                )
+            except (aio.TimeoutError, AttributeError) as e:
+                raise ConnectionError('Cannot connect to device') from e
+            if wait_reply:
+                try:
+                    await aio.wait_for(
+                        aio.ensure_future(
+                            self.wait_event.wait(),
+                            loop=self._loop,
+                        ),
+                        timeout=timeout,
+                        loop=self._loop,
+                    )
+                except (aio.TimeoutError, AttributeError) as e:
+                    raise ConnectionError('Cannot connect to device') from e
+                # extract payload from container
+                cmd_resp = bytes(self.received_data[3:-1])
+                self.wait_event = None
+                self.received_data = None
         return cmd_resp
 
     async def login(self, key):

@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 VERSION = '0.1.0a0'
 
+CONFIG_MQTT_NAMESPACE = 'homeassistant'
+
 
 class Ble2Mqtt:
     TOPIC_ROOT = 'ble2mqtt'
@@ -36,6 +38,13 @@ class Ble2Mqtt:
         self._loop = loop or aio.get_event_loop()
         self._client = aio_mqtt.Client(loop=self._loop)
         self._tasks = []
+        self._device_handles = {}
+
+        self.availability_topic = '/'.join((
+            self.TOPIC_ROOT,
+            self.BRIDGE_TOPIC,
+            'state',
+        ))
 
         self.device_registry: ty.List[Device] = []
 
@@ -43,8 +52,6 @@ class Ble2Mqtt:
         self._tasks = [
             self._loop.create_task(self._connect_forever()),
             self._loop.create_task(self._handle_messages()),
-            # self._loop.create_task(self._periodic_publish()),
-            # self._loop.create_task(self._handle_buttons()),
         ]
 
     async def close(self) -> None:
@@ -60,7 +67,7 @@ class Ble2Mqtt:
             await self._client.disconnect()
 
     def _get_topic(self, dev_id, subtopic):
-        return f'{self.TOPIC_ROOT}/{dev_id}/{subtopic}'
+        return '/'.join((self.TOPIC_ROOT, dev_id, subtopic))
 
     def register(self, device: Device):
         if not device:
@@ -70,7 +77,7 @@ class Ble2Mqtt:
     @property
     def subscribed_topics(self):
         return [
-            f'{self.TOPIC_ROOT}/{topic}'
+            '/'.join((self.TOPIC_ROOT, topic))
             for device in self.device_registry
             for topic in device.subscribed_topics
         ]
@@ -89,7 +96,7 @@ class Ble2Mqtt:
         async for message in self._client.delivered_messages(
             f'{self.TOPIC_ROOT}/#'
         ):
-            print(message)
+            logger.debug(message)
             while True:
                 if message.topic_name not in self.subscribed_topics:
                     continue
@@ -103,6 +110,13 @@ class Ble2Mqtt:
                         break
                 else:
                     raise NotImplementedError('Unknown topic')
+                if not await device.client.is_connected():
+                    logger.warning(
+                        f'Received topic {topic_wo_prefix} '
+                        f'with {message.payload} '
+                        f' but {device.client} is offline',
+                    )
+                    continue
 
                 try:
                     value = json.loads(message.payload)
@@ -118,76 +132,139 @@ class Ble2Mqtt:
 
             await aio.sleep(1)
 
-    async def send_config(self):
-        async def start_and_send(d: Device):
-            await d.init()
-            device_info = {
-                'identifiers': [
-                    d.unique_id,
-                ],
-                'name': d.unique_id,
-                'sw_version': d.version,
-                'model': d.model,
-                'manufacturer': d.manufacturer,
+    async def send_device_config(self, device: Device):
+        device_info = {
+            'identifiers': [
+                device.unique_id,
+            ],
+            'name': device.unique_id,
+            'sw_version': device.version,
+            'model': device.model,
+            'manufacturer': device.manufacturer,
+        }
+
+        def get_generic_vals(entity: dict):
+            name = entity.pop('name')
+            result = {
+                'name': f'{name}_{device.dev_id}',
+                'unique_id': f'{name}_{device.dev_id}',
+                'device': device_info,
             }
+            icon = entity.pop('icon', None)
+            if icon:
+                result['icon'] = f'mdi:{icon}'
+            result.update(entity)
+            return result
 
-            def get_generic_vals(entity: dict):
-                result = {
-                    'name': f'{entity["name"]}_{d.dev_id}',
-                    'unique_id': f'{entity["name"]}_{d.dev_id}',
-                    'device': device_info,
-                }
-                if 'icon' in entity:
-                    result['icon'] = f'mdi:{entity["icon"]}'
-                return result
+        for cls, entities in device.entities.items():
+            if cls == 'switch':
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    command_topic = '/'.join((state_topic, device.SET_POSTFIX))
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        device.dev_id,
+                        entity_name,
+                        'config',
+                    ))
+                    payload = json.dumps({
+                        **get_generic_vals(entity),
+                        'state_topic': state_topic,
+                        'command_topic': command_topic,
+                    })
+                    logger.debug(
+                        f'Publish config {config_topic=}: {payload=}',
+                    )
+                    await self._client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+                    # TODO: remove test send
+                    logger.debug(f'Publish initial state {state_topic=}')
+                    await self._client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=state_topic,
+                            payload='OFF',
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                        ),
+                    )
+            if cls == 'sensor':
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        device.dev_id,
+                        entity_name,
+                        'config',
+                    ))
+                    payload = json.dumps({
+                        **get_generic_vals(entity),
+                        'state_topic': state_topic,
+                        'value_template': f'{{{{ value_json.{entity_name} }}}}',
+                    })
+                    logger.debug(
+                        f'Publish config {config_topic=}: {payload=}',
+                    )
+                    await self._client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
 
-            for cls, entities in d.entities.items():
-                if cls == 'switch':
-                    for entity in entities:
-                        entity_name = entity['name']
-                        state_topic = self._get_topic(d.unique_id, entity_name)
-                        command_topic = f'{state_topic}/{d.SET_POSTFIX}'
-                        config_topic = (
-                            f'homeassistant/{cls}/{d.dev_id}/'
-                            f'{entity_name}/config'
-                        )
-                        payload = json.dumps({
-                            **get_generic_vals(entity),
-                            'state_topic': state_topic,
-                            'command_topic': command_topic,
-                        })
-                        logger.debug(f'Publish config {config_topic=}: {payload=}')
-                        await self._client.publish(
-                            aio_mqtt.PublishableMessage(
-                                topic_name=config_topic,
-                                payload=payload,
-                                qos=aio_mqtt.QOSLevel.QOS_1,
-                                retain=True,
-                            ),
-                        )
-                        # TODO: remove test send
-                        logger.debug(f'Publish initial state {state_topic=}')
-                        await self._client.publish(
-                            aio_mqtt.PublishableMessage(
-                                topic_name=state_topic,
-                                payload='OFF',
-                                qos=aio_mqtt.QOSLevel.QOS_1,
-                            ),
-                        )
-
-        coros = []
-        for device in self.device_registry:
-            coros.append(start_and_send(device))
-
-        await aio.gather(*coros)
-
-    async def _periodic_publish(self, period=1):
+    async def manage_device(self, device: Device):
         while True:
-            if not self._client.is_connected():
-                await aio.sleep(1)
+            try:
+                logger.debug(f'Connect to {device=}')
+                await device.connect()
+            except Exception as e:
+                logger.exception(str(e))
+                await aio.sleep(10)
                 continue
 
-            await aio.sleep(period)
+            try:
+                await self.send_device_config(device)
+                await device.init()
+                await self._client.subscribe(*[
+                    (
+                        '/'.join((self.TOPIC_ROOT, topic)),
+                        aio_mqtt.QOSLevel.QOS_1,
+                    )
+                    for topic in device.subscribed_topics
+                ])
+                logger.debug('Start device handle task')
+                self._device_handles[device] = self._loop.create_task(
+                    device.handle(self.publish_topic_callback),
+                )
+                logger.debug('Waiting for disconnect...')
+                await device.disconnected_future
+                logger.debug('Disconnected!')
+            finally:
+                task = self._device_handles.pop(device)
+                if task:
+                    if task.done():
+                        continue
+                    task.cancel()
+                    try:
+                        await task
+                    except aio.CancelledError:
+                        pass
+
+                await self._client.unsubscribe(*[
+                    '/'.join((self.TOPIC_ROOT, topic))
+                    for topic in device.subscribed_topics
+                ])
+            await aio.sleep(3)
 
     async def _connect_forever(self) -> None:
         while True:
@@ -197,14 +274,27 @@ class Ble2Mqtt:
                     port=self._mqtt_port,
                     username=self._mqtt_user,
                     password=self._mqtt_password,
+                    will_message=aio_mqtt.PublishableMessage(
+                        topic_name=self.availability_topic,
+                        payload='offline',
+                        qos=aio_mqtt.QOSLevel.QOS_1,
+                        retain=True,
+                    ),
                 )
                 logger.info("Connected")
+                await self._client.publish(
+                    aio_mqtt.PublishableMessage(
+                        topic_name=self.availability_topic,
+                        payload='online',
+                        qos=aio_mqtt.QOSLevel.QOS_1,
+                        retain=True,
+                    ),
+                )
 
-                await self._client.subscribe(*[
-                    (topic, aio_mqtt.QOSLevel.QOS_1)
-                    for topic in self.subscribed_topics
-                ])
-                await self.send_config()
+                for dev in self.device_registry:
+                    self._tasks.append(
+                        self._loop.create_task(self.manage_device(dev)),
+                    )
 
                 logger.info("Wait for network interruptions...")
                 await connect_result.disconnect_reason
@@ -231,17 +321,36 @@ class Ble2Mqtt:
                     "Unhandled exception during connecting",
                     exc_info=e,
                 )
+                try:
+                    await self._client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=self.availability_topic,
+                            payload='offline',
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+                except Exception:
+                    pass
                 return
-
             else:
+                try:
+                    await self._client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=self.availability_topic,
+                            payload='offline',
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+                except Exception:
+                    pass
                 logger.info("Disconnected")
                 return
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        level='DEBUG'
-    )
+    logging.basicConfig(level='INFO')
     loop = aio.new_event_loop()
 
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')
@@ -276,7 +385,9 @@ if __name__ == '__main__':
         except (ValueError, IndexError):
             continue
         klass = registered_device_types[typ]
+
         server.register(klass(
+            loop=loop,
             mac=mac,
             **device,
         ))

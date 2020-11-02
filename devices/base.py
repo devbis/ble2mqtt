@@ -1,3 +1,10 @@
+import asyncio as aio
+import logging
+
+from bleak import BleakClient
+
+
+logger = logging.getLogger(__name__)
 registered_device_types = {}
 
 
@@ -6,16 +13,43 @@ class RegisteredType(type):
         newclass = type.__new__(cls, clsname, superclasses, attributedict)
         # condition to prevent base class registration
         if superclasses:
-            assert newclass.NAME is not None
-            registered_device_types[newclass.NAME] = newclass
+            if newclass.NAME is not None:
+                registered_device_types[newclass.NAME] = newclass
         return newclass
 
 
-class Device(metaclass=RegisteredType):
+class BaseDevice(metaclass=RegisteredType):
+    NAME = None
+
+    def __init__(self, loop, *args, **kwargs):
+        self._loop = loop
+        self.bt_lock = aio.Lock()
+
+
+class Device(BaseDevice):
     MQTT_VALUES = None
     ON_OFF = False
     SET_POSTFIX = 'set'
-    NAME = None
+
+    def __init__(self, loop, *args, **kwargs) -> None:
+        super().__init__(loop)
+        self.client: BleakClient = None
+        self.disconnected_future = None
+
+    async def connect(self):
+        self.disconnected_future = self._loop.create_future()
+        try:
+            async with self.bt_lock:
+                await self.client.connect()
+            self.client.set_disconnected_callback(self.on_disconnect)
+            logger.info(f'Connected to {self.client.address}')
+        except Exception:
+            self.client.set_disconnected_callback(None)
+            raise
+
+    def on_disconnect(self, client, *args):
+        logger.info(f'Client {client.address} disconnected')
+        self.disconnected_future.set_result(client.address)
 
     def get_entity_from_topic(self, topic: str):
         return topic.removesuffix(self.SET_POSTFIX).removeprefix(
@@ -24,7 +58,7 @@ class Device(metaclass=RegisteredType):
 
     @staticmethod
     def transform_value(value):
-        vl = value.lower()
+        vl = value.lower() if isinstance(value, str) else value
         if vl in ['0', 'off', 'no']:
             return 'OFF'
         elif vl in ['1', 'on', 'yes']:
@@ -70,3 +104,6 @@ class Device(metaclass=RegisteredType):
     @property
     def entities(self):
         return {}
+
+    async def handle(self, *args, **kwargs):
+        raise NotImplementedError()
