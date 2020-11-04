@@ -233,38 +233,52 @@ class Ble2Mqtt:
                 continue
 
             try:
-                await self.send_device_config(device)
+                # retrieve version and details
                 await device.init()
-                await self._client.subscribe(*[
-                    (
-                        '/'.join((self.TOPIC_ROOT, topic)),
-                        aio_mqtt.QOSLevel.QOS_1,
-                    )
-                    for topic in device.subscribed_topics
-                ])
-                logger.debug('Start device handle task')
-                self._device_handles[device] = self._loop.create_task(
-                    device.handle(self.publish_topic_callback),
-                )
-                logger.debug('Waiting for disconnect...')
-                await device.disconnected_future
-                logger.debug('Disconnected!')
-            finally:
-                task = self._device_handles.pop(device)
-                if task:
-                    if task.done():
-                        continue
-                    task.cancel()
-                    try:
-                        await task
-                    except aio.CancelledError:
-                        pass
+                await self.send_device_config(device)
+                if device.subscribed_topics:
+                    await self._client.subscribe(*[
+                        (
+                            '/'.join((self.TOPIC_ROOT, topic)),
+                            aio_mqtt.QOSLevel.QOS_1,
+                        )
+                        for topic in device.subscribed_topics
+                    ])
 
-                await self._client.unsubscribe(*[
-                    '/'.join((self.TOPIC_ROOT, topic))
-                    for topic in device.subscribed_topics
-                ])
-            await aio.sleep(3)
+                # if device requires full connection
+                # we are waiting for disconnected_future for reconnection.
+                # Otherwise we don't need to reconnect and just allow
+                # .handle method do all stuff
+                if device.REQUIRE_CONNECTION:
+                    logger.debug('Start device handle task')
+                    self._device_handles[device] = self._loop.create_task(
+                        device.handle(self.publish_topic_callback),
+                    )
+                    logger.debug('Waiting for disconnect...')
+                    await device.disconnected_future
+                    logger.debug(f'{device=} disconnected')
+                else:
+                    await device.handle(self.publish_topic_callback)
+            except Exception as e:
+                logger.exception(e)
+            finally:
+                if device.REQUIRE_CONNECTION:
+                    task = self._device_handles.pop(device, None)
+                    if task:
+                        if task.done():
+                            continue
+                        task.cancel()
+                        try:
+                            await task
+                        except aio.CancelledError:
+                            pass
+
+                if device.subscribed_topics:
+                    await self._client.unsubscribe(*[
+                        '/'.join((self.TOPIC_ROOT, topic))
+                        for topic in device.subscribed_topics
+                    ])
+            await aio.sleep(device.RECONNECTION_TIMEOUT)
 
     async def _connect_forever(self) -> None:
         while True:
@@ -310,7 +324,7 @@ class Ble2Mqtt:
                     self._reconnection_interval,
                     exc_info=e,
                 )
-                await aio.sleep(self._reconnection_interval, loop=self._loop)
+                await aio.sleep(self._reconnection_interval)
 
             except aio_mqtt.ConnectionCloseForcedError as e:
                 logger.error("Connection close forced", exc_info=e)

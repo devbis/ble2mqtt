@@ -20,6 +20,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
     RX_CHAR = UUID_NORDIC_RX
+    REQUIRE_CONNECTION = True
 
     UPDATE_PERIOD = 5  # seconds when boiling
     STANDBY_UPDATE_PERIOD_MULTIPLIER = 12  # 15 * 5 seconds in standby mode
@@ -34,6 +35,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         self._version = None
         self._state = None
         self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
+        self.initial_status_sent = False
 
         self.client = BleakClient(mac, address_type='random')
         self.protocol_init(client=self.client)
@@ -45,14 +47,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     @property
     def manufacturer(self):
         return 'Redmond'
-
-    @property
-    def model(self):
-        return self._model
-
-    @property
-    def version(self):
-        return self._version
 
     @property
     def entities(self):
@@ -82,6 +76,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         if state:
             self._state = state
             self.update_multiplier()
+            self.initial_status_sent = False
         await self.set_time()
 
     def update_multiplier(self, state: Kettle200State = None):
@@ -113,11 +108,13 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             # if boiling notify every 5 seconds, 60 sec otherwise
             try:
                 new_state = await self.get_mode()
-                if new_state.state != self._state.state:
+                if new_state.state != self._state.state or \
+                        not self.initial_status_sent:
                     await publish_topic(
                         topic='/'.join((self.unique_id, 'kettle')),
                         value=new_state.state.name,
                     )
+                    self.initial_status_sent = True
                     self._state = new_state
                     await self._notify_state(publish_topic)
                 else:

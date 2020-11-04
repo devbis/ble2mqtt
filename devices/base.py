@@ -1,8 +1,7 @@
 import asyncio as aio
 import logging
 
-from bleak import BleakClient
-
+from bleak import BleakClient, BleakError
 
 logger = logging.getLogger(__name__)
 registered_device_types = {}
@@ -30,11 +29,15 @@ class Device(BaseDevice):
     MQTT_VALUES = None
     ON_OFF = False
     SET_POSTFIX = 'set'
+    RECONNECTION_TIMEOUT = 3
+    REQUIRE_CONNECTION = False
 
     def __init__(self, loop, *args, **kwargs) -> None:
         super().__init__(loop)
         self.client: BleakClient = None
         self.disconnected_future = None
+        self._model = None
+        self._version = None
 
     async def connect(self):
         self.disconnected_future = self._loop.create_future()
@@ -43,7 +46,7 @@ class Device(BaseDevice):
                 await self.client.connect()
             self.client.set_disconnected_callback(self.on_disconnect)
             logger.info(f'Connected to {self.client.address}')
-        except Exception:
+        except BleakError:
             self.client.set_disconnected_callback(None)
             raise
 
@@ -80,14 +83,14 @@ class Device(BaseDevice):
 
     @property
     def model(self):
-        return None
-
-    @property
-    def dev_id(self):
-        return None
+        return self._model
 
     @property
     def version(self):
+        return self._version
+
+    @property
+    def dev_id(self):
         return None
 
     @property

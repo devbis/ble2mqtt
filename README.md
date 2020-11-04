@@ -24,9 +24,14 @@ The configuration file is a JSON with the following content:
             "address": "11:22:33:aa:bb:cc",
             "model": "RK-G213S",
             "type": "redmond200"
+        },
+		{
+            "address": "11:22:33:aa:bb:dd",
+            "type": "xiaomihtv1"
         }
     ]
 }
 ```
 
-For now only Redmond kettles G2xx are supported. 
+For now only Redmond kettles G2xx and 
+Humidity/Temperature sensors Xiaomi MJ_HT_V1 are supported. 
