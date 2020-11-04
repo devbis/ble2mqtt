@@ -2,7 +2,6 @@ import asyncio as aio
 import logging
 import struct
 import time
-import typing as ty
 from dataclasses import dataclass
 from enum import Enum
 
@@ -106,9 +105,12 @@ class RedmondKettle200Protocol(BaseDevice):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
-        self.wait_event: ty.Optional[aio.Event] = None
+        self.wait_event = aio.Event()
         self.received_data = None
         self.client = None
+
+        # TODO: better handle attaching notification
+        # self.notification_started = False
 
     def protocol_init(self, client: BleakClient):
         self.client = client
@@ -118,18 +120,25 @@ class RedmondKettle200Protocol(BaseDevice):
             sender,
             ' '.join(format(x, '02x') for x in data),
         ))
-        if self.wait_event:
+        if not self.wait_event.is_set():
             self.received_data = data
             self.wait_event.set()
 
     async def protocol_start(self):
         assert self.RX_CHAR and self.TX_CHAR
+        # if not self.notification_started:
         logger.info(f'Enable BLE notifications from [{self.client.address}]')
         async with self.bt_lock:
+            try:
+                await self.client.stop_notify(self.RX_CHAR)
+            except Exception as e:
+                logger.exception(e)
             await self.client.start_notify(
                 self.RX_CHAR,
                 self.notification_handler,
             )
+        # self.notification_started = True
+
         # send this to receive responses
         async with self.bt_lock:
             await self.client.write_gatt_char(
@@ -171,7 +180,7 @@ class RedmondKettle200Protocol(BaseDevice):
             f'{"".join(format(x, "02x") for x in payload)} ] '
             f'{" ".join(format(x, "02x") for x in command)}',
         )
-        self.wait_event = aio.Event()
+        self.wait_event.clear()
         async with self.bt_lock:
             try:
                 cmd_resp = await aio.wait_for(
@@ -202,7 +211,7 @@ class RedmondKettle200Protocol(BaseDevice):
                     raise ConnectionError('Cannot connect to device') from e
                 # extract payload from container
                 cmd_resp = bytes(self.received_data[3:-1])
-                self.wait_event = None
+                self.wait_event.clear()
                 self.received_data = None
         return cmd_resp
 

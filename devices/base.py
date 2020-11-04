@@ -1,5 +1,6 @@
 import asyncio as aio
 import logging
+import typing as ty
 
 from bleak import BleakClient, BleakError
 
@@ -35,24 +36,30 @@ class Device(BaseDevice):
     def __init__(self, loop, *args, **kwargs) -> None:
         super().__init__(loop)
         self.client: BleakClient = None
-        self.disconnected_future = None
+        self.disconnected_future: ty.Optional[aio.Future] = None
         self._model = None
         self._version = None
+        self.connection_event = aio.Event()
 
     async def connect(self):
         self.disconnected_future = self._loop.create_future()
         try:
             async with self.bt_lock:
                 await self.client.connect()
+                self.connection_event.set()
             self.client.set_disconnected_callback(self.on_disconnect)
             logger.info(f'Connected to {self.client.address}')
         except BleakError:
+            self.connection_event.clear()
             self.client.set_disconnected_callback(None)
             raise
 
     def on_disconnect(self, client, *args):
         logger.info(f'Client {client.address} disconnected')
-        self.disconnected_future.set_result(client.address)
+        self.connection_event.clear()
+        if not self.disconnected_future.done() and \
+                not self.disconnected_future.cancelled():
+            self.disconnected_future.set_result(client.address)
 
     def get_entity_from_topic(self, topic: str):
         return topic.removesuffix(self.SET_POSTFIX).removeprefix(
@@ -110,3 +117,9 @@ class Device(BaseDevice):
 
     async def handle(self, *args, **kwargs):
         raise NotImplementedError()
+
+    def __str__(self):
+        return self.unique_id
+
+    def __repr__(self):
+        return f'<Device:{str(self)}>'

@@ -223,6 +223,7 @@ class Ble2Mqtt:
                     )
 
     async def manage_device(self, device: Device):
+        logger.info(f'Start managing {device=}')
         while True:
             try:
                 logger.debug(f'Connect to {device=}')
@@ -250,7 +251,7 @@ class Ble2Mqtt:
                 # Otherwise we don't need to reconnect and just allow
                 # .handle method do all stuff
                 if device.REQUIRE_CONNECTION:
-                    logger.debug('Start device handle task')
+                    logger.info(f'Start device {device=} handle task')
                     self._device_handles[device] = self._loop.create_task(
                         device.handle(self.publish_topic_callback),
                     )
@@ -265,13 +266,12 @@ class Ble2Mqtt:
                 if device.REQUIRE_CONNECTION:
                     task = self._device_handles.pop(device, None)
                     if task:
-                        if task.done():
-                            continue
-                        task.cancel()
-                        try:
-                            await task
-                        except aio.CancelledError:
-                            pass
+                        if not task.done():
+                            task.cancel()
+                            try:
+                                await task
+                            except aio.CancelledError:
+                                pass
 
                 if device.subscribed_topics:
                     await self._client.unsubscribe(*[
@@ -365,7 +365,8 @@ class Ble2Mqtt:
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    loop = aio.new_event_loop()
+    # logging.getLogger('protocols.redmond').setLevel(logging.DEBUG)
+    loop = aio.get_event_loop()
 
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')
     config = {}

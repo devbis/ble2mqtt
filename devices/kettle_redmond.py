@@ -164,9 +164,15 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                             topic='/'.join((self.unique_id, entity_name)),
                             value=self.transform_value(value),
                         ),
-                        self._notify_state(publish_topic)
+                        self._notify_state(publish_topic),
+                        loop=self._loop,
                     )
                     break
                 except ConnectionError as e:
                     logger.exception(str(e))
                     await aio.sleep(30)
+
+    def on_disconnect(self, client, *args):
+        super().on_disconnect(client, *args)
+        # TODO: stop notification on disconnect
+        # self._loop.create_task(self.client.stop_notify(self.RX_CHAR))

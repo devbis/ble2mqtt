@@ -19,8 +19,8 @@ FIRMWARE_VERSION = '00002a26-0000-1000-8000-00805f9b34fb'
 HARDWARE_VERSION = '00002a27-0000-1000-8000-00805f9b34fb'
 MANUFACTURER_NAME = '00002a29-0000-1000-8000-00805f9b34fb'
 
-# LYWSD02_DATA = 'EBE0CCC1-7A0A-4B0C-8A1A-6FF2997DA3A6'
-# CGG_DATA = '00000100-0000-1000-8000-00805f9b34fb'
+LYWSD02_DATA = 'EBE0CCC1-7A0A-4B0C-8A1A-6FF2997DA3A6'
+CGG_DATA = '00000100-0000-1000-8000-00805f9b34fb'
 MJHT_DATA = uuid.UUID('226caa55-6476-4566-7562-66734470666d')
 MJHT_BATTERY = uuid.UUID('00002a19-0000-1000-8000-00805f9b34fb')
 
@@ -115,7 +115,6 @@ class XiaomiHumidityTemperature(Device):
 
     async def _notify_state(self, publish_topic):
         logger.info(f'[{self._mac}] send state {self._state=}')
-        # state_temperature = 'temperature'
         coros = []
         for sensor_name, value in (
                 ('temperature', self._state.temperature),
@@ -141,7 +140,9 @@ class XiaomiHumidityTemperature(Device):
             sender,
             ' '.join(format(x, '02x') for x in data),
         ))
-        if sender == 0xd:
+        # sender is 0xd or several requests it becomes
+        # /org/bluez/hci0/dev_58_2D_34_32_E0_69/service000c/char000d
+        if sender == 0xd or isinstance(sender, str) and sender.endswith('000d'):
             # b'T=23.6 H=39.6\x00'
             self._stack.put_nowait(data)
 
@@ -150,22 +151,23 @@ class XiaomiHumidityTemperature(Device):
         await self.client.start_notify(MJHT_DATA, self.notification_handler)
         while True:
             try:
-                if await self.client.is_connected():
-                    battery = await self._read_with_timeout(MJHT_BATTERY)
-                    data_bytes = await self._stack.get()
-                    # clear queue
-                    while not self._stack.empty():
-                        self._stack.get_nowait()
+                logger.info(f'Wait {self} for connecting...')
+                await aio.wait_for(
+                    self.connection_event.wait(),
+                    timeout=30,
+                )
+                logger.info(f'{self} connected!')
+                battery = await self._read_with_timeout(MJHT_BATTERY)
+                data_bytes = await self._stack.get()
+                # clear queue
+                while not self._stack.empty():
+                    self._stack.get_nowait()
+                self._state = SensorState.from_data(data_bytes, battery)
 
-                    logger.info(f'Queue is {self._stack.empty() = }')
-                    self._state = SensorState.from_data(
-                        data_bytes,
-                        battery,
-                    )
             except ValueError as e:
                 logger.exception(f'Cannot read values {str(e)}')
             else:
+                await self._notify_state(publish_topic)
                 if await self.client.is_connected():
-                    await self._notify_state(publish_topic)
-                    await aio.sleep(25)
+                    await aio.sleep(5)
             await aio.sleep(1)
