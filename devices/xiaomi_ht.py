@@ -49,11 +49,8 @@ class XiaomiHumidityTemperature(Device):
     REQUIRE_CONNECTION = True
     RECONNECTION_TIMEOUT = 60
 
-    def __init__(self, loop, mac, *args, **kwargs):
-        super().__init__(loop, *args, **kwargs)
-        self._mac = mac
-        self.client = BleakClient(mac, address_type='public')
-
+    def __init__(self, mac, *args, loop, **kwargs):
+        super().__init__(mac, *args, loop=loop, **kwargs)
         self._state = None
         self._model = None
         self._version = None
@@ -89,7 +86,11 @@ class XiaomiHumidityTemperature(Device):
             ],
         }
 
-    async def init(self):
+    async def get_client(self):
+        return BleakClient(self._mac, address_type='public')
+
+    async def get_device_data(self):
+        await self.client.start_notify(MJHT_DATA, self.notification_handler)
         version = await self._read_with_timeout(FIRMWARE_VERSION)
         if isinstance(version, (bytes, bytearray)):
             self._version = version.decode()
@@ -129,9 +130,9 @@ class XiaomiHumidityTemperature(Device):
                     publish_topic(
                         topic='/'.join((self.unique_id, sensor_name)),
                         value=json.dumps({
-                            sensor_name: self.transform_value(value)
+                            sensor_name: self.transform_value(value),
                         }),
-                    )
+                    ),
                 )
         await aio.gather(*coros)
 
@@ -147,8 +148,6 @@ class XiaomiHumidityTemperature(Device):
             self._stack.put_nowait(data)
 
     async def handle(self, publish_topic, *args, **kwargs):
-        # TODO: subscribe to advertisement ?
-        await self.client.start_notify(MJHT_DATA, self.notification_handler)
         while True:
             try:
                 logger.info(f'Wait {self} for connecting...')

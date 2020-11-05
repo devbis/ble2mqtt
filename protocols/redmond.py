@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
-from bleak import BleakClient
+from bleak.backends.bluezdbus.client import RemoteError
 
 from devices.base import BaseDevice
 
@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 BOIL_TIME_RELATIVE_DEFAULT = 0x80
+
+
+class RedmondError(ValueError):
+    pass
 
 
 class Command(Enum):
@@ -107,15 +111,8 @@ class RedmondKettle200Protocol(BaseDevice):
         self._cmd_counter = 0
         self.wait_event = aio.Event()
         self.received_data = None
-        self.client = None
 
-        # TODO: better handle attaching notification
-        # self.notification_started = False
-
-    def protocol_init(self, client: BleakClient):
-        self.client = client
-
-    def notification_handler(self, sender, data):
+    def notification_handler(self, sender: int, data: bytearray):
         logger.debug("Notification: {0}: {1}".format(
             sender,
             ' '.join(format(x, '02x') for x in data),
@@ -125,39 +122,42 @@ class RedmondKettle200Protocol(BaseDevice):
             self.wait_event.set()
 
     async def protocol_start(self):
+        # we assume that every time protocol starts it uses new blank
+        # BleakClient to avoid multiple char notifications on every restart
+        # bug ?
+
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
+        assert await self.client.is_connected()
+        # check for fresh client
+        assert not self.client._notification_callbacks
         logger.info(f'Enable BLE notifications from [{self.client.address}]')
         async with self.bt_lock:
             try:
-                await self.client.stop_notify(self.RX_CHAR)
-            except Exception as e:
-                logger.exception(e)
-            await self.client.start_notify(
-                self.RX_CHAR,
-                self.notification_handler,
-            )
-        # self.notification_started = True
+                await self.client.write_gatt_char(
+                    self.TX_CHAR,
+                    bytearray(0x01.to_bytes(2, byteorder="little")),
+                    True,
+                )
+                await self.client.start_notify(
+                    self.RX_CHAR,
+                    self.notification_handler,
+                )
+            except Exception:
+                await self.client._cleanup_all()
+                raise
 
-        # send this to receive responses
-        async with self.bt_lock:
-            await self.client.write_gatt_char(
-                self.TX_CHAR,
-                bytearray([1, 0]),
-                True,
-            )
-
-    async def close(self):
+    async def protocol_stop(self):
+        # NB: not used for now as we don't disconnect from our side
         async with self.bt_lock:
             await self.client.stop_notify(self.RX_CHAR)
-        await self.client.disconnect()
 
     @staticmethod
     def _check_success(response,
                        error_msg="Command was not completed successfully"):
         success = response and response[0]
         if not success:
-            raise ValueError(error_msg)
+            raise RedmondError(error_msg)
 
     def _get_command(self, cmd: int, payload: bytes):
         container = struct.pack(
@@ -177,7 +177,7 @@ class RedmondKettle200Protocol(BaseDevice):
         command = self._get_command(cmd.value, payload)
         logger.debug(
             f'... send cmd {cmd.value:04x} ['
-            f'{"".join(format(x, "02x") for x in payload)} ] '
+            f'{"".join(format(x, "02x") for x in payload)}] '
             f'{" ".join(format(x, "02x") for x in command)}',
         )
         self.wait_event.clear()
@@ -195,7 +195,7 @@ class RedmondKettle200Protocol(BaseDevice):
                     timeout=timeout,
                     loop=self._loop,
                 )
-            except (aio.TimeoutError, AttributeError) as e:
+            except (aio.TimeoutError, AttributeError, RemoteError) as e:
                 raise ConnectionError('Cannot connect to device') from e
             if wait_reply:
                 try:
@@ -207,7 +207,7 @@ class RedmondKettle200Protocol(BaseDevice):
                         timeout=timeout,
                         loop=self._loop,
                     )
-                except (aio.TimeoutError, AttributeError) as e:
+                except (aio.TimeoutError, AttributeError, RemoteError) as e:
                     raise ConnectionError('Cannot connect to device') from e
                 # extract payload from container
                 cmd_resp = bytes(self.received_data[3:-1])
@@ -238,7 +238,8 @@ class RedmondKettle200Protocol(BaseDevice):
             Command.SET_TIME,
             struct.pack('<ii', ts, -offset * 60 * 60),
         )
-        assert resp == b'\x00'
+        if resp != b'\x00':
+            raise RedmondError('Cannot set time')
 
     async def get_mode(self):
         logger.debug('Get mode...')
@@ -253,7 +254,7 @@ class RedmondKettle200Protocol(BaseDevice):
         )
         success = resp[0]
         if not success:
-            raise ValueError("Cannot set mode")
+            raise RedmondError('Cannot set mode')
 
     async def run(self):
         logger.debug('Run mode')

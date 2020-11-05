@@ -25,20 +25,19 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     UPDATE_PERIOD = 5  # seconds when boiling
     STANDBY_UPDATE_PERIOD_MULTIPLIER = 12  # 15 * 5 seconds in standby mode
 
-    def __init__(self, loop, mac, model,
-                 key=b'\xff\xff\xff\xff\xff\xff\xff\xff', *args, **kwargs):
-        super().__init__(loop, *args, **kwargs)
+    def __init__(self, mac, model, key=b'\xff\xff\xff\xff\xff\xff\xff\xff',
+                 *args, loop, **kwargs):
+        super().__init__(mac, *args, loop=loop, **kwargs)
         assert isinstance(key, bytes) and len(key) == 8
-        self._mac = mac
         self._key = key
         self._model = model
-        self._version = None
         self._state = None
+
         self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
         self.initial_status_sent = False
 
-        self.client = BleakClient(mac, address_type='random')
-        self.protocol_init(client=self.client)
+    async def get_client(self):
+        return BleakClient(self._mac, address_type='random')
 
     @property
     def dev_id(self):
@@ -66,7 +65,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             ],
         }
 
-    async def init(self):
+    async def get_device_data(self):
         await super().protocol_start()
         await self.login(self._key)
         version = await self.get_version()
@@ -98,7 +97,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 topic='/'.join((self.unique_id, 'temperature')),
                 value=json.dumps({
                     state_temperature:
-                        self.transform_value(self._state.temperature)
+                        self.transform_value(self._state.temperature),
                 }),
             )
 
@@ -120,8 +119,10 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 else:
                     self._state = new_state
                 self.update_multiplier()
+            # except Exception as e:  # try to wrap all backend errors in
+            # ConnectionError
             except ConnectionError as e:
-                logger.exception(str(e))
+                logger.exception(e)
                 await aio.sleep(10)
                 continue
             counter += 1
@@ -155,7 +156,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             entity_name = self.get_entity_from_topic(message['topic'])
             if entity_name == 'kettle':
                 value = self.transform_value(value)
-                logger.info(f'[{self._mac}] switch kettle {entity_name=} {value=}')
+                logger.info(
+                    f'[{self._mac}] switch kettle {entity_name=} {value=}',
+                )
                 while True:
                     try:
                         await self._switch_kettle(value)
@@ -173,8 +176,3 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     except ConnectionError as e:
                         logger.exception(str(e))
                     await aio.sleep(5)
-
-    def on_disconnect(self, client, *args):
-        super().on_disconnect(client, *args)
-        # TODO: stop notification on disconnect
-        # self._loop.create_task(self.client.stop_notify(self.RX_CHAR))

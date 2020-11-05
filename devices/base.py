@@ -23,6 +23,7 @@ class BaseDevice(metaclass=RegisteredType):
 
     def __init__(self, loop, *args, **kwargs):
         self._loop = loop
+        self.client: BleakClient = None
         self.bt_lock = aio.Lock()
 
 
@@ -33,34 +34,15 @@ class Device(BaseDevice):
     RECONNECTION_TIMEOUT = 3
     REQUIRE_CONNECTION = False
 
-    def __init__(self, loop, *args, **kwargs) -> None:
+    def __init__(self, mac, *args, loop, **kwargs) -> None:
         super().__init__(loop)
-        self.client: BleakClient = None
         self.disconnected_future: ty.Optional[aio.Future] = None
         self.message_queue = aio.Queue()
+        self._mac = mac
         self._model = None
         self._version = None
+        self._manufacturer = None
         self.connection_event = aio.Event()
-
-    async def connect(self):
-        self.disconnected_future = self._loop.create_future()
-        try:
-            async with self.bt_lock:
-                await self.client.connect()
-                self.connection_event.set()
-            self.client.set_disconnected_callback(self.on_disconnect)
-            logger.info(f'Connected to {self.client.address}')
-        except BleakError:
-            self.connection_event.clear()
-            self.client.set_disconnected_callback(None)
-            raise
-
-    def on_disconnect(self, client, *args):
-        logger.info(f'Client {client.address} disconnected')
-        self.connection_event.clear()
-        if not self.disconnected_future.done() and \
-                not self.disconnected_future.cancelled():
-            self.disconnected_future.set_result(client.address)
 
     def get_entity_from_topic(self, topic: str):
         return topic.removesuffix(self.SET_POSTFIX).removeprefix(
@@ -69,7 +51,9 @@ class Device(BaseDevice):
 
     @staticmethod
     def transform_value(value):
-        vl = value.lower() if isinstance(value, str) else value
+        if not isinstance(value, str):
+            return value
+        vl = value.lower()
         if vl in ['0', 'off', 'no']:
             return 'OFF'
         elif vl in ['1', 'on', 'yes']:
@@ -87,7 +71,7 @@ class Device(BaseDevice):
 
     @property
     def manufacturer(self):
-        return None
+        return self._manufacturer
 
     @property
     def model(self):
@@ -99,15 +83,12 @@ class Device(BaseDevice):
 
     @property
     def dev_id(self):
-        return None
+        return self._mac
 
     @property
     def unique_id(self):
         parts = [self.manufacturer, self.model, self.dev_id]
         return '_'.join([p for p in parts if p])
-
-    async def init(self):
-        pass
 
     @property
     def entities(self):
@@ -124,3 +105,39 @@ class Device(BaseDevice):
 
     def __repr__(self):
         return f'<Device:{str(self)}>'
+
+    async def add_incoming_message(self, topic: str, value):
+        await self.message_queue.put({
+            'topic': topic,
+            'value': value,
+        })
+
+    async def get_device_data(self):
+        """Here put the initial configuration for the device"""
+        pass
+
+    async def get_client(self) -> BleakClient:
+        raise NotImplementedError()
+
+    async def connect(self):
+        self.client = await self.get_client()
+        self.disconnected_future = self._loop.create_future()
+        try:
+            async with self.bt_lock:
+                await self.client.connect()
+                self.connection_event.set()
+            self.client.set_disconnected_callback(self.on_disconnect)
+        except BleakError:
+            self.connection_event.clear()
+            self.client.set_disconnected_callback(None)
+            raise
+        logger.info(f'Connected to {self.client.address}')
+
+    def on_disconnect(self, client, *args):
+        logger.info(f'Client {client.address} disconnected')
+        self.connection_event.clear()
+        if not self.disconnected_future.done() and \
+                not self.disconnected_future.cancelled():
+            self.disconnected_future.set_result(client.address)
+            self.client.set_disconnected_callback(None)
+            self.client = None
