@@ -37,6 +37,7 @@ class Device(BaseDevice):
         super().__init__(loop)
         self.client: BleakClient = None
         self.disconnected_future: ty.Optional[aio.Future] = None
+        self.message_queue = aio.Queue()
         self._model = None
         self._version = None
         self.connection_event = aio.Event()
@@ -108,15 +109,15 @@ class Device(BaseDevice):
     async def init(self):
         pass
 
-    async def process_topic(self, topic: str, value, *args, **kwargs):
-        raise NotImplementedError()
-
     @property
     def entities(self):
         return {}
 
     async def handle(self, *args, **kwargs):
         raise NotImplementedError()
+
+    async def handle_messages(self, *args, **kwargs):
+        return
 
     def __str__(self):
         return self.unique_id

@@ -131,46 +131,48 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 counter = 0
             await aio.sleep(1)
 
-    async def process_topic(self, topic: str, value, *args, **kwargs):
-        publish_topic = kwargs['publish_topic']
-        entity_name = self.get_entity_from_topic(topic)
-        if entity_name == 'kettle':
-            value = self.transform_value(value)
-            logger.info(f'[{self._mac}] switch kettle {entity_name=} {value=}')
-            while True:
-                try:
-                    if value == 'ON':
-                        try:
-                            await self.set_mode(Kettle200State(
-                                mode=Mode.BOIL,
-                            ))
-                        except ValueError:
-                            # if the MODE is already BOIL then it returns
-                            # en error. Treat it as normal
-                            pass
-                        await self.run()
-                        self.update_multiplier(Kettle200State(
-                            state=RunState.ON,
-                        ))
-                    elif value == 'OFF':
-                        await self.stop()
-                        self.update_multiplier(Kettle200State(
-                            state=RunState.OFF,
-                        ))
-                    # update state to real values
-                    await self.get_mode()
-                    await aio.gather(
-                        publish_topic(
-                            topic='/'.join((self.unique_id, entity_name)),
-                            value=self.transform_value(value),
-                        ),
-                        self._notify_state(publish_topic),
-                        loop=self._loop,
-                    )
-                    break
-                except ConnectionError as e:
-                    logger.exception(str(e))
-                    await aio.sleep(30)
+    async def _switch_kettle(self, value):
+        if value == RunState.ON.name:
+            try:
+                await self.set_mode(Kettle200State(
+                    mode=Mode.BOIL,
+                ))
+            except ValueError:
+                # if the MODE is already BOIL then it returns
+                # en error. Treat it as normal
+                pass
+            await self.run()
+            next_state = RunState.ON
+        else:
+            await self.stop()
+            next_state = RunState.OFF
+        self.update_multiplier(Kettle200State(state=next_state))
+
+    async def handle_messages(self, publish_topic, *args, **kwargs):
+        while True:
+            message = await self.message_queue.get()
+            value = message['value']
+            entity_name = self.get_entity_from_topic(message['topic'])
+            if entity_name == 'kettle':
+                value = self.transform_value(value)
+                logger.info(f'[{self._mac}] switch kettle {entity_name=} {value=}')
+                while True:
+                    try:
+                        await self._switch_kettle(value)
+                        # update state to real values
+                        await self.get_mode()
+                        await aio.gather(
+                            publish_topic(
+                                topic='/'.join((self.unique_id, entity_name)),
+                                value=self.transform_value(value),
+                            ),
+                            self._notify_state(publish_topic),
+                            loop=self._loop,
+                        )
+                        break
+                    except ConnectionError as e:
+                        logger.exception(str(e))
+                    await aio.sleep(5)
 
     def on_disconnect(self, client, *args):
         super().on_disconnect(client, *args)

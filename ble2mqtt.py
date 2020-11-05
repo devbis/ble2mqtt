@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import typing as ty
+from collections import defaultdict
 
 import aio_mqtt
 
@@ -38,7 +39,7 @@ class Ble2Mqtt:
         self._loop = loop or aio.get_event_loop()
         self._client = aio_mqtt.Client(loop=self._loop)
         self._tasks = []
-        self._device_handles = {}
+        self._device_handles = defaultdict(list)
 
         self.availability_topic = '/'.join((
             self.TOPIC_ROOT,
@@ -123,11 +124,10 @@ class Ble2Mqtt:
                 except ValueError:
                     value = message.payload.decode()
 
-                await device.process_topic(
-                    topic=topic_wo_prefix,
-                    value=value,
-                    publish_topic=self.publish_topic_callback,
-                )
+                await device.message_queue.put({
+                    'topic': topic_wo_prefix,
+                    'value': value,
+                })
                 break
 
             await aio.sleep(1)
@@ -252,9 +252,12 @@ class Ble2Mqtt:
                 # .handle method do all stuff
                 if device.REQUIRE_CONNECTION:
                     logger.info(f'Start device {device=} handle task')
-                    self._device_handles[device] = self._loop.create_task(
+                    self._device_handles[device].append(self._loop.create_task(
                         device.handle(self.publish_topic_callback),
-                    )
+                    ))
+                    self._device_handles[device].append(self._loop.create_task(
+                        device.handle_messages(self.publish_topic_callback),
+                    ))
                     logger.debug('Waiting for disconnect...')
                     await device.disconnected_future
                     logger.debug(f'{device=} disconnected')
@@ -264,14 +267,15 @@ class Ble2Mqtt:
                 logger.exception(e)
             finally:
                 if device.REQUIRE_CONNECTION:
-                    task = self._device_handles.pop(device, None)
-                    if task:
-                        if not task.done():
-                            task.cancel()
-                            try:
-                                await task
-                            except aio.CancelledError:
-                                pass
+                    tasks = self._device_handles.pop(device)
+                    for task in tasks:
+                        if task:
+                            if not task.done():
+                                task.cancel()
+                                try:
+                                    await task
+                                except aio.CancelledError:
+                                    pass
 
                 if device.subscribed_topics:
                     await self._client.unsubscribe(*[
