@@ -74,7 +74,7 @@ class XiaomiHumidityTemperature(Device):
                 {
                     'name': 'temperature',
                     'device_class': 'temperature',
-                    'unit_of_measurement': 'ºC',
+                    'unit_of_measurement': '\u00b0C',
                 },
                 {
                     'name': 'humidity',
