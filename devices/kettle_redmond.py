@@ -105,26 +105,20 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         counter = 0
         while True:
             # if boiling notify every 5 seconds, 60 sec otherwise
-            try:
-                new_state = await self.get_mode()
-                if new_state.state != self._state.state or \
-                        not self.initial_status_sent:
-                    await publish_topic(
-                        topic='/'.join((self.unique_id, 'kettle')),
-                        value=new_state.state.name,
-                    )
-                    self.initial_status_sent = True
-                    self._state = new_state
-                    await self._notify_state(publish_topic)
-                else:
-                    self._state = new_state
-                self.update_multiplier()
-            # except Exception as e:  # try to wrap all backend errors in
-            # ConnectionError
-            except ConnectionError as e:
-                logger.exception(e)
-                await aio.sleep(10)
-                continue
+            new_state = await self.get_mode()
+            if new_state.state != self._state.state or \
+                    not self.initial_status_sent:
+                await publish_topic(
+                    topic='/'.join((self.unique_id, 'kettle')),
+                    value=new_state.state.name,
+                )
+                self.initial_status_sent = True
+                self._state = new_state
+                await self._notify_state(publish_topic)
+            else:
+                self._state = new_state
+            self.update_multiplier()
+
             counter += 1
 
             if counter > self.UPDATE_PERIOD * self._update_period_multiplier:

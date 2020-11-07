@@ -3,9 +3,9 @@ import json
 import logging
 import os
 import typing as ty
-from collections import defaultdict
 
 import aio_mqtt
+from bleak import BleakError
 
 from devices import registered_device_types
 from devices.base import Device
@@ -40,7 +40,6 @@ class Ble2Mqtt:
         self._client = aio_mqtt.Client(loop=self._loop)
         self._root_tasks = []
 
-        self._device_handles = defaultdict(list)
         self._device_manage_tasks = {}
 
         self.availability_topic = '/'.join((
@@ -65,7 +64,7 @@ class Ble2Mqtt:
         try:
             await task
         except aio.CancelledError:
-            pass
+            logger.debug(f'{task} is now cancelled')
 
     async def close(self) -> None:
         for task in self._root_tasks:
@@ -231,86 +230,93 @@ class Ble2Mqtt:
         logger.info(f'Start managing {device=}')
         while True:
             try:
-                try:
-                    logger.info(f'Connecting to {device=}')
-                    await device.connect()
-                except Exception:
-                    logger.exception(f'Error while connecting to {device=}')
-                    await aio.sleep(10)
-                    continue
+                logger.info(f'Connecting to {device=}')
+                # don't use wait_for, it stucks forever
+                await device.connect()
+            except BleakError as e:
+                logger.warning(e)
+                await aio.sleep(10)
+                continue
+            except aio.TimeoutError:
+                logger.exception(f'Error while connecting to {device=}')
+                await aio.sleep(10)
+                continue
 
+            try:
+                # retrieve version and details
+                logger.debug(f'get_device_data {device=}')
+                await device.get_device_data()
+            except BleakError:
+                logger.exception(f'Cannot get initial info {device=}')
+                await device.client.disconnect()
+                continue
+
+            try:
+                await self.send_device_config(device)
+
+                if device.subscribed_topics:
+                    await self._client.subscribe(*[
+                        (
+                            '/'.join((self.TOPIC_ROOT, topic)),
+                            aio_mqtt.QOSLevel.QOS_1,
+                        )
+                        for topic in device.subscribed_topics
+                    ])
+            except aio_mqtt.Error:
+                logger.exception(f'Cannot subscribe to topics {device=}')
+                await device.client.disconnect()
+                continue
+
+            try:
+                logger.info(
+                    f'Start device {device=} handle task and wait '
+                    f'for disconnect',
+                )
+                finished, unfinished = await aio.wait(
+                    [
+                        device.disconnected_future,
+                        self._loop.create_task(
+                            device.handle(self.publish_topic_callback),
+                        ),
+                        self._loop.create_task(
+                            device.handle_messages(self.publish_topic_callback),
+                        ),
+                    ],
+                    return_when=aio.FIRST_COMPLETED,
+                )
+                logger.info(
+                    f'Handle tasks finished. {device=} disconnected. '
+                    f'{finished=} {unfinished}',
+                )
+                for t in unfinished:
+                    await self.stop_task(t)
+            except ConnectionError as e:
+                logger.error(str(e))
+                continue
+            except Exception as e:
+                logger.exception(e)
+            finally:
                 try:
-                    # retrieve version and details
-                    await device.get_device_data()
-                    await self.send_device_config(device)
                     if device.subscribed_topics:
-                        await self._client.subscribe(*[
-                            (
-                                '/'.join((self.TOPIC_ROOT, topic)),
-                                aio_mqtt.QOSLevel.QOS_1,
-                            )
+                        await self._client.unsubscribe(*[
+                            '/'.join((self.TOPIC_ROOT, topic))
                             for topic in device.subscribed_topics
                         ])
+                except aio_mqtt.ConnectionClosedError:
+                    logger.exception(
+                        'Stop manage task on MQTT connection error',
+                    )
+                    return
 
-                    # if device requires full connection
-                    # we are waiting for disconnected_future for reconnection.
-                    # Otherwise we don't need to reconnect and just allow
-                    # .handle method do all stuff
-                    if device.REQUIRE_CONNECTION:
-                        logger.info(f'Start device {device=} handle task')
-                        self._device_handles[device].append(
-                            self._loop.create_task(
-                                device.handle(self.publish_topic_callback),
-                            ),
-                        )
-                        self._device_handles[device].append(
-                            self._loop.create_task(
-                                device.handle_messages(
-                                    self.publish_topic_callback,
-                                ),
-                            ),
-                        )
-                        logger.debug('Waiting for disconnect...')
-                        await device.disconnected_future
-                        logger.info(f'{device=} disconnected')
-                    else:
-                        await device.handle(self.publish_topic_callback)
                 except Exception as e:
-                    logger.exception(e)
-                finally:
-                    try:
-                        if device.REQUIRE_CONNECTION:
-                            tasks = self._device_handles.pop(device, [])
-                            for task in tasks:
-                                if task:
-                                    if not task.done():
-                                        task.cancel()
-                                        try:
-                                            await task
-                                        except aio.CancelledError:
-                                            pass
-
-                        if device.subscribed_topics:
-                            await self._client.unsubscribe(*[
-                                '/'.join((self.TOPIC_ROOT, topic))
-                                for topic in device.subscribed_topics
-                            ])
-                    except aio_mqtt.ConnectionClosedError:
-                        logger.exception(
-                            'Stop manage task on MQTT connection error',
-                        )
-                        return
-                    except Exception as e:
-                        logger.exception(
-                            f'Couldn\'t stop all tasks for {device=} {e}',
-                        )
-                logger.info(
-                    f'Sleep for {device.RECONNECTION_TIMEOUT} secs to '
-                    f'reconnect to {device=}',
-                )
-                await aio.sleep(device.RECONNECTION_TIMEOUT)
-            except Exception as e:
-                logger.exception(f'FATAL manage_device exception! {e}')
+                    logger.exception(
+                        f'Couldn\'t stop all tasks for {device=} {e}',
+                    )
+            logger.info(
+                f'Sleep for {device.RECONNECTION_TIMEOUT} secs to '
+                f'reconnect to {device=}',
+            )
+            await aio.sleep(device.RECONNECTION_TIMEOUT)
 
     async def create_device_manage_tasks(self):
         for dev in self.device_registry:
@@ -409,7 +415,7 @@ class Ble2Mqtt:
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    logging.getLogger('protocols.redmond').setLevel(logging.DEBUG)
+    # logging.getLogger('protocols.redmond').setLevel(logging.DEBUG)
     loop = aio.get_event_loop()
 
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')

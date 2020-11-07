@@ -98,19 +98,16 @@ class XiaomiHumidityTemperature(Device):
         if isinstance(name, (bytes, bytearray)):
             self._model = name.decode()
 
-    async def _read_with_timeout(self, char):
+    async def _read_with_timeout(self, char, timeout=5):
         try:
             result = await aio.wait_for(
-                aio.ensure_future(
-                    self.client.read_gatt_char(char),
-                    loop=self._loop,
-                ),
-                timeout=5,
+                self.client.read_gatt_char(char),
+                timeout=timeout,
                 loop=self._loop,
             )
         # except (aio.TimeoutError, AttributeError):
         except Exception as e:
-            logger.exception(f'{str(e)}: Cannot connect to device')
+            logger.error(f'{str(e)}: Cannot connect to device')
             result = None
         return result
 
@@ -150,11 +147,17 @@ class XiaomiHumidityTemperature(Device):
     async def handle(self, publish_topic, *args, **kwargs):
         while True:
             try:
-                logger.info(f'Wait {self} for connecting...')
+                logger.debug(f'Wait {self} for connecting...')
                 await aio.wait_for(
                     self.connection_event.wait(),
-                    timeout=30,
+                    timeout=1,
                 )
+            except aio.CancelledError:
+                return
+            except aio.TimeoutError:
+                continue
+
+            try:
                 logger.info(f'{self} connected!')
                 battery = await self._read_with_timeout(MJHT_BATTERY)
                 data_bytes = await self._stack.get()
@@ -164,9 +167,9 @@ class XiaomiHumidityTemperature(Device):
                 self._state = SensorState.from_data(data_bytes, battery)
 
             except ValueError as e:
-                logger.exception(f'Cannot read values {str(e)}')
+                logger.error(f'Cannot read values {str(e)}')
             else:
                 await self._notify_state(publish_topic)
-                if await self.client.is_connected():
+                if await self.connection_event.wait():
                     await aio.sleep(5)
             await aio.sleep(1)

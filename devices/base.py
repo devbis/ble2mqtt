@@ -98,7 +98,8 @@ class Device(BaseDevice):
         raise NotImplementedError()
 
     async def handle_messages(self, *args, **kwargs):
-        return
+        while True:
+            await aio.sleep(1)
 
     def __str__(self):
         return self.unique_id

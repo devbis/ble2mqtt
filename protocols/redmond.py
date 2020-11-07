@@ -184,31 +184,25 @@ class RedmondKettle200Protocol(BaseDevice):
         async with self.bt_lock:
             try:
                 cmd_resp = await aio.wait_for(
-                    aio.ensure_future(
-                        self.client.write_gatt_char(
-                            self.TX_CHAR,
-                            command,
-                            True,
-                        ),
-                        loop=self._loop,
+                    self.client.write_gatt_char(
+                        self.TX_CHAR,
+                        command,
+                        True,
                     ),
                     timeout=timeout,
                     loop=self._loop,
                 )
-            except (aio.TimeoutError, AttributeError, RemoteError) as e:
-                raise ConnectionError('Cannot connect to device') from e
+            except (aio.TimeoutError, AttributeError, RemoteError):
+                raise ConnectionError('Cannot connect to device') from None
             if wait_reply:
                 try:
                     await aio.wait_for(
-                        aio.ensure_future(
-                            self.wait_event.wait(),
-                            loop=self._loop,
-                        ),
+                        self.wait_event.wait(),
                         timeout=timeout,
                         loop=self._loop,
                     )
-                except (aio.TimeoutError, AttributeError, RemoteError) as e:
-                    raise ConnectionError('Cannot connect to device') from e
+                except (aio.TimeoutError, AttributeError, RemoteError):
+                    raise ConnectionError('Cannot connect to device') from None
                 # extract payload from container
                 cmd_resp = bytes(self.received_data[3:-1])
                 self.wait_event.clear()
