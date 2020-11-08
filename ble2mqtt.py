@@ -201,7 +201,7 @@ class Ble2Mqtt:
             if cls == 'sensor':
                 for entity in entities:
                     entity_name = entity['name']
-                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    state_topic = self._get_topic(device.unique_id, 'state')
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
@@ -235,11 +235,14 @@ class Ble2Mqtt:
                 connect_task = self._loop.create_task(device.connect())
                 finished, unfinished = await aio.wait(
                     [connect_task],
-                    timeout=10,
+                    timeout=15,
                 )
                 if connect_task not in finished:
                     await self.stop_task(connect_task)
                     continue
+                else:
+                    t, = finished
+                    t.result()
             except BleakError as e:
                 logger.warning(e)
                 await aio.sleep(10)
@@ -274,6 +277,7 @@ class Ble2Mqtt:
                 await device.client.disconnect()
                 continue
 
+            unfinished = []
             try:
                 logger.info(
                     f'Start device {device=} handle task and wait '
@@ -295,14 +299,16 @@ class Ble2Mqtt:
                     f'Handle tasks finished. {device=} disconnected. '
                     f'{finished=} {unfinished}',
                 )
-                for t in unfinished:
-                    await self.stop_task(t)
+                for t in finished:
+                    t.result()
             except ConnectionError as e:
                 logger.error(str(e))
                 continue
             except Exception as e:
                 logger.exception(e)
             finally:
+                for t in unfinished:
+                    await self.stop_task(t)
                 try:
                     if device.subscribed_topics:
                         await self._client.unsubscribe(*[
