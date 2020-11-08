@@ -232,7 +232,14 @@ class Ble2Mqtt:
             try:
                 logger.info(f'Connecting to {device=}')
                 # don't use wait_for, it stucks forever
-                await device.connect()
+                connect_task = self._loop.create_task(device.connect())
+                finished, unfinished = await aio.wait(
+                    [connect_task],
+                    timeout=10,
+                )
+                if connect_task not in finished:
+                    await self.stop_task(connect_task)
+                    continue
             except BleakError as e:
                 logger.warning(e)
                 await aio.sleep(10)
@@ -415,7 +422,7 @@ class Ble2Mqtt:
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    # logging.getLogger('protocols.redmond').setLevel(logging.DEBUG)
+    logging.getLogger('protocols.redmond').setLevel(logging.DEBUG)
     loop = aio.get_event_loop()
 
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')
