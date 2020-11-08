@@ -88,18 +88,22 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
     async def _notify_state(self, publish_topic):
         logger.info(f'[{self._mac}] send state {self._state=}')
-        state_temperature = 'temperature'
-        if any(
-                x['name'] == state_temperature
-                for x in self.entities.get('sensor', [])
+        state = {}
+        for sensor_name, value in (
+                ('temperature', self._state.temperature),
         ):
+            if any(
+                    x['name'] == sensor_name
+                    for x in self.entities.get('sensor', [])
+            ):
+                state[sensor_name] = self.transform_value(value)
+
+        if state:
             await publish_topic(
-                topic='/'.join((self.unique_id, 'temperature')),
-                value=json.dumps({
-                    state_temperature:
-                        self.transform_value(self._state.temperature),
-                }),
+                topic='/'.join((self.unique_id, 'state')),
+                value=json.dumps(state),
             )
+
 
     async def handle(self, publish_topic, *args, **kwargs):
         counter = 0

@@ -113,7 +113,7 @@ class XiaomiHumidityTemperature(Device):
 
     async def _notify_state(self, publish_topic):
         logger.info(f'[{self._mac}] send state {self._state=}')
-        coros = []
+        state = {}
         for sensor_name, value in (
                 ('temperature', self._state.temperature),
                 ('humidity', self._state.humidity),
@@ -123,15 +123,13 @@ class XiaomiHumidityTemperature(Device):
                     x['name'] == sensor_name
                     for x in self.entities.get('sensor', [])
             ):
-                coros.append(
-                    publish_topic(
-                        topic='/'.join((self.unique_id, sensor_name)),
-                        value=json.dumps({
-                            sensor_name: self.transform_value(value),
-                        }),
-                    ),
-                )
-        await aio.gather(*coros)
+                state[sensor_name] = self.transform_value(value)
+
+        if state:
+            await publish_topic(
+                topic='/'.join((self.unique_id, 'state')),
+                value=json.dumps(state),
+            )
 
     def notification_handler(self, sender, data):
         logger.debug("Notification: {0}: {1}".format(
