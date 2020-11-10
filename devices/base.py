@@ -133,12 +133,21 @@ class Device(BaseDevice):
             self.client.set_disconnected_callback(None)
             raise
         logger.info(f'Connected to {self.client.address}')
+        return self.disconnected_future
 
     def on_disconnect(self, client, *args):
-        logger.info(f'Client {client.address} disconnected')
+        logger.info(f'Client {client.address} disconnected, device={self}')
         self.connection_event.clear()
-        if not self.disconnected_future.done() and \
-                not self.disconnected_future.cancelled():
-            self.disconnected_future.set_result(client.address)
-            self.client.set_disconnected_callback(None)
-            self.client = None
+        if self.disconnected_future.done() or \
+                self.disconnected_future.cancelled():
+            raise NotImplementedError(
+                f'disconnected_future for device={self} is '
+                f'{self.disconnected_future}',
+            )
+        self.disconnected_future.set_result(client.address)
+        self.client.set_disconnected_callback(None)
+        self.client = None
+
+    async def close(self):
+        if self.client and await self.client.is_connected():
+            await self.client.disconnect()

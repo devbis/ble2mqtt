@@ -6,6 +6,7 @@ import typing as ty
 
 import aio_mqtt
 from bleak import BleakError
+from txdbus.error import RemoteError  # noqa
 
 from devices import registered_device_types
 from devices.base import Device
@@ -16,6 +17,13 @@ VERSION = '0.1.0a0'
 
 CONFIG_MQTT_NAMESPACE = 'homeassistant'
 
+
+ListOfConnectionErrors = (
+    ConnectionError,
+    BleakError,
+    RemoteError,
+    aio.TimeoutError,
+)
 
 class Ble2Mqtt:
     TOPIC_ROOT = 'ble2mqtt'
@@ -58,13 +66,12 @@ class Ble2Mqtt:
 
     @staticmethod
     async def stop_task(task):
-        if task.done():
-            return
+        logger.warning(f'stop_task {task=}')
         task.cancel()
         try:
             await task
         except aio.CancelledError:
-            logger.debug(f'{task} is now cancelled')
+            logger.info(f'{task} is now cancelled')
 
     async def close(self) -> None:
         for task in self._root_tasks:
@@ -229,36 +236,33 @@ class Ble2Mqtt:
     async def manage_device(self, device: Device):
         logger.info(f'Start managing {device=}')
         while True:
+            logger.info(f'Connecting to {device=}')
+            connect_task = self._loop.create_task(device.connect())
+            finished, unfinished = await aio.wait(
+                [connect_task],
+                timeout=15,
+            )
             try:
-                logger.info(f'Connecting to {device=}')
-                # don't use wait_for, it stucks forever
-                connect_task = self._loop.create_task(device.connect())
-                finished, unfinished = await aio.wait(
-                    [connect_task],
-                    timeout=15,
-                )
                 if connect_task not in finished:
+                    logger.info(f'Stop task {connect_task=} {device=}')
+                    # connect_task.cancel()
                     await self.stop_task(connect_task)
-                    continue
+                    raise ConnectionError(f'Task is timed out {device=}')
                 else:
                     t, = finished
-                    t.result()
-            except BleakError as e:
-                logger.warning(e)
-                await aio.sleep(10)
-                continue
-            except aio.TimeoutError:
-                logger.exception(f'Error while connecting to {device=}')
-                await aio.sleep(10)
+                    disconnect_fut = t.result()
+            except ListOfConnectionErrors as e:
+                logger.warning(f'Error while connecting to {device=} {e}')
+                await device.close()
                 continue
 
             try:
                 # retrieve version and details
                 logger.debug(f'get_device_data {device=}')
                 await device.get_device_data()
-            except BleakError:
+            except ListOfConnectionErrors:
                 logger.exception(f'Cannot get initial info {device=}')
-                await device.client.disconnect()
+                await device.close()
                 continue
 
             try:
@@ -277,7 +281,6 @@ class Ble2Mqtt:
                 await device.client.disconnect()
                 continue
 
-            unfinished = []
             try:
                 logger.info(
                     f'Start device {device=} handle task and wait '
@@ -285,7 +288,7 @@ class Ble2Mqtt:
                 )
                 finished, unfinished = await aio.wait(
                     [
-                        device.disconnected_future,
+                        disconnect_fut,
                         self._loop.create_task(
                             device.handle(self.publish_topic_callback),
                         ),
@@ -300,15 +303,17 @@ class Ble2Mqtt:
                     f'{finished=} {unfinished}',
                 )
                 for t in finished:
-                    t.result()
-            except ConnectionError as e:
-                logger.error(str(e))
-                continue
+                    logger.info(f'Fetching result {device=} {t=}')
+                    logger.info(t.result())
+                for t in unfinished:
+                    t.cancel()
+                logger.info(f'wait for cancelling tasks for {device=}')
+                await aio.wait(unfinished)
             except Exception as e:
                 logger.exception(e)
             finally:
-                for t in unfinished:
-                    await self.stop_task(t)
+                await device.close()
+                logger.info(f'Unsubscribing topics {device=}')
                 try:
                     if device.subscribed_topics:
                         await self._client.unsubscribe(*[
@@ -332,15 +337,19 @@ class Ble2Mqtt:
             await aio.sleep(device.RECONNECTION_TIMEOUT)
 
     async def create_device_manage_tasks(self):
+        tasks = []
         for dev in self.device_registry:
-            self._device_manage_tasks[dev] = \
-                self._loop.create_task(self.manage_device(dev))
+            task = self._loop.create_task(self.manage_device(dev))
+            self._device_manage_tasks[dev] = task
+            tasks.append(task)
+        return tasks
 
     async def stop_device_manage_tasks(self):
         for dev in list(self._device_manage_tasks.keys()):
             logger.info(f'Stopping manage task for {dev=}')
             task = self._device_manage_tasks.pop(dev)
-            await self.stop_task(task)
+            task.cancel()
+            await aio.wait([task])
 
     async def _connect_forever(self) -> None:
         while True:
@@ -366,9 +375,26 @@ class Ble2Mqtt:
                         retain=True,
                     ),
                 )
-                await self.create_device_manage_tasks()
+                tasks = await self.create_device_manage_tasks()
                 logger.info("Wait for network interruptions...")
-                await connect_result.disconnect_reason
+                finished, unfinished = await aio.wait(
+                    [
+                        connect_result.disconnect_reason,
+                        *tasks,
+                    ],
+                    return_when=aio.FIRST_COMPLETED,
+                )
+                for t in finished:
+                    try:
+                        t.result()
+                    except Exception:
+                        logger.exception(f'Root task raised and exeption')
+                for t in unfinished:
+                    t.cancel()
+                try:
+                    await aio.wait(unfinished)
+                except aio.CancelledError:
+                    pass
             except aio.CancelledError:
                 raise
 
@@ -428,7 +454,6 @@ class Ble2Mqtt:
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
-    logging.getLogger('protocols.redmond').setLevel(logging.DEBUG)
     loop = aio.get_event_loop()
 
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')

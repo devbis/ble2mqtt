@@ -104,7 +104,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 value=json.dumps(state),
             )
 
-
     async def handle(self, publish_topic, *args, **kwargs):
         counter = 0
         while True:

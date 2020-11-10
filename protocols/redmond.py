@@ -5,8 +5,6 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
-from bleak.backends.bluezdbus.client import RemoteError
-
 from devices.base import BaseDevice
 
 logger = logging.getLogger(__name__)
@@ -190,19 +188,15 @@ class RedmondKettle200Protocol(BaseDevice):
                         True,
                     ),
                     timeout=timeout,
-                    loop=self._loop,
                 )
-            except (aio.TimeoutError, AttributeError, RemoteError):
+            except aio.TimeoutError:
                 raise ConnectionError('Cannot connect to device') from None
             if wait_reply:
-                try:
-                    await aio.wait_for(
-                        self.wait_event.wait(),
-                        timeout=timeout,
-                        loop=self._loop,
-                    )
-                except (aio.TimeoutError, AttributeError, RemoteError):
-                    raise ConnectionError('Cannot connect to device') from None
+                await aio.wait_for(
+                    self.wait_event.wait(),
+                    timeout,
+                )
+
                 # extract payload from container
                 cmd_resp = bytes(self.received_data[3:-1])
                 self.wait_event.clear()
