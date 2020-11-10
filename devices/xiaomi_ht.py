@@ -156,7 +156,7 @@ class XiaomiHumidityTemperature(Device):
                 continue
 
             try:
-                logger.info(f'{self} connected!')
+                logger.debug(f'{self} connected!')
                 battery = await self._read_with_timeout(MJHT_BATTERY)
                 data_bytes = await self._stack.get()
                 # clear queue

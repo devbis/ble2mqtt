@@ -66,12 +66,12 @@ class Ble2Mqtt:
 
     @staticmethod
     async def stop_task(task):
-        logger.warning(f'stop_task {task=}')
+        logger.debug(f'stop_task {task=}')
         task.cancel()
         try:
             await task
         except aio.CancelledError:
-            logger.info(f'{task} is now cancelled')
+            logger.debug(f'{task} is now cancelled')
 
     async def close(self) -> None:
         for task in self._root_tasks:
@@ -234,9 +234,9 @@ class Ble2Mqtt:
                     )
 
     async def manage_device(self, device: Device):
-        logger.info(f'Start managing {device=}')
+        logger.debug(f'Start managing {device=}')
         while True:
-            logger.info(f'Connecting to {device=}')
+            logger.debug(f'Connecting to {device=}')
             connect_task = self._loop.create_task(device.connect())
             finished, unfinished = await aio.wait(
                 [connect_task],
@@ -244,7 +244,7 @@ class Ble2Mqtt:
             )
             try:
                 if connect_task not in finished:
-                    logger.info(f'Stop task {connect_task=} {device=}')
+                    logger.debug(f'Stop task {connect_task=} {device=}')
                     # connect_task.cancel()
                     await self.stop_task(connect_task)
                     raise ConnectionError(f'Task is timed out {device=}')
@@ -252,7 +252,7 @@ class Ble2Mqtt:
                     t, = finished
                     disconnect_fut = t.result()
             except ListOfConnectionErrors as e:
-                logger.warning(f'Error while connecting to {device=} {e}')
+                logger.warning(f'Error while connecting to {device=}, {e}')
                 await device.close()
                 continue
 
@@ -298,22 +298,22 @@ class Ble2Mqtt:
                     ],
                     return_when=aio.FIRST_COMPLETED,
                 )
-                logger.info(
+                logger.debug(
                     f'Handle tasks finished. {device=} disconnected. '
                     f'{finished=} {unfinished}',
                 )
                 for t in finished:
-                    logger.info(f'Fetching result {device=} {t=}')
-                    logger.info(t.result())
+                    logger.debug(f'Fetching result {device=} {t=}')
+                    t.result()
                 for t in unfinished:
                     t.cancel()
-                logger.info(f'wait for cancelling tasks for {device=}')
+                logger.debug(f'wait for cancelling tasks for {device=}')
                 await aio.wait(unfinished)
             except Exception as e:
                 logger.exception(e)
             finally:
                 await device.close()
-                logger.info(f'Unsubscribing topics {device=}')
+                logger.debug(f'unsubscribe from topics for {device=}')
                 try:
                     if device.subscribed_topics:
                         await self._client.unsubscribe(*[
@@ -366,7 +366,7 @@ class Ble2Mqtt:
                         retain=True,
                     ),
                 )
-                logger.info("Connected")
+                logger.info(f'Connected to {self._mqtt_host}')
                 await self._client.publish(
                     aio_mqtt.PublishableMessage(
                         topic_name=self.availability_topic,
@@ -376,7 +376,7 @@ class Ble2Mqtt:
                     ),
                 )
                 tasks = await self.create_device_manage_tasks()
-                logger.info("Wait for network interruptions...")
+                logger.debug("Wait for network interruptions...")
                 finished, unfinished = await aio.wait(
                     [
                         connect_result.disconnect_reason,
@@ -388,7 +388,7 @@ class Ble2Mqtt:
                     try:
                         t.result()
                     except Exception:
-                        logger.exception(f'Root task raised and exeption')
+                        logger.exception(f'Root task raised and exception')
                 for t in unfinished:
                     t.cancel()
                 try:
