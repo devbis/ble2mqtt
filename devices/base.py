@@ -21,10 +21,28 @@ class RegisteredType(type):
 class BaseDevice(metaclass=RegisteredType):
     NAME = None
 
-    def __init__(self, loop, *args, **kwargs):
+    def __init__(self, *args, loop, **kwargs):
         self._loop = loop
         self.client: BleakClient = None
         self.bt_lock = aio.Lock()
+
+    async def close(self):
+        pass
+
+    @staticmethod
+    def transform_value(value):
+        if not isinstance(value, str):
+            return value
+        vl = value.lower()
+        if vl in ['0', 'off', 'no']:
+            return 'OFF'
+        elif vl in ['1', 'on', 'yes']:
+            return 'ON'
+        return value
+
+    @property
+    def unique_id(self):
+        raise None
 
 
 class Device(BaseDevice):
@@ -34,8 +52,8 @@ class Device(BaseDevice):
     RECONNECTION_TIMEOUT = 3
     REQUIRE_CONNECTION = False
 
-    def __init__(self, mac, *args, loop, **kwargs) -> None:
-        super().__init__(loop)
+    def __init__(self, mac, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.disconnected_future: ty.Optional[aio.Future] = None
         self.message_queue = aio.Queue()
         self._mac = mac
@@ -48,17 +66,6 @@ class Device(BaseDevice):
         return topic.removesuffix(self.SET_POSTFIX).removeprefix(
             self.unique_id,
         ).strip('/')
-
-    @staticmethod
-    def transform_value(value):
-        if not isinstance(value, str):
-            return value
-        vl = value.lower()
-        if vl in ['0', 'off', 'no']:
-            return 'OFF'
-        elif vl in ['1', 'on', 'yes']:
-            return 'ON'
-        return value
 
     @property
     def subscribed_topics(self):
