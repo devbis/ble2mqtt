@@ -90,7 +90,7 @@ class Device(BaseDevice):
 
     @property
     def dev_id(self):
-        return self._mac
+        return self._mac.replace(':', '').lower()
 
     @property
     def unique_id(self):

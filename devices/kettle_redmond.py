@@ -40,10 +40,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         return BleakClient(self._mac, address_type='random')
 
     @property
-    def dev_id(self):
-        return self._mac.replace(':', '').lower()
-
-    @property
     def manufacturer(self):
         return 'Redmond'
 

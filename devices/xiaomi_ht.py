@@ -50,10 +50,6 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
     def manufacturer(self):
         return 'Xiaomi'
 
-    @property
-    def dev_id(self):
-        return self._mac.replace(':', '').lower()
-
     async def get_client(self):
         return BleakClient(self._mac, address_type='public')
 
