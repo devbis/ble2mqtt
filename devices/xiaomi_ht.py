@@ -2,8 +2,6 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from bleak import BleakClient
-
 from .base import Device
 from .xiaomi_base import XiaomiHumidityTemperature
 
@@ -39,19 +37,6 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
     DATA_CHAR = MJHT_DATA
     BATTERY_CHAR = MJHT_BATTERY
     SENSOR_CLASS = SensorState
-
-    def __init__(self, mac, *args, **kwargs):
-        super().__init__(mac, *args, **kwargs)
-        self._state = None
-        self._model = None
-        self._version = None
-
-    @property
-    def manufacturer(self):
-        return 'Xiaomi'
-
-    async def get_client(self):
-        return BleakClient(self._mac, address_type='public')
 
     def filter_notifications(self, sender):
         # sender is 0xd or several requests it becomes

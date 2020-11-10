@@ -51,6 +51,8 @@ class Device(BaseDevice):
     SET_POSTFIX = 'set'
     RECONNECTION_TIMEOUT = 3
     REQUIRE_CONNECTION = False
+    MAC_TYPE = 'public'
+    MANUFACTURER = None
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -59,7 +61,7 @@ class Device(BaseDevice):
         self._mac = mac
         self._model = None
         self._version = None
-        self._manufacturer = None
+        self._manufacturer = self.MANUFACTURER
         self.connection_event = aio.Event()
 
     def get_entity_from_topic(self, topic: str):
@@ -125,7 +127,8 @@ class Device(BaseDevice):
         pass
 
     async def get_client(self) -> BleakClient:
-        raise NotImplementedError()
+        assert self.MAC_TYPE in ('public', 'random')
+        return BleakClient(self._mac, address_type=self.MAC_TYPE)
 
     async def connect(self):
         self.client = await self.get_client()

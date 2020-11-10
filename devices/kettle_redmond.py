@@ -3,8 +3,6 @@ import json
 import logging
 import uuid
 
-from bleak import BleakClient
-
 from protocols.redmond import (Kettle200State, Mode, RedmondKettle200Protocol,
                                RunState)
 
@@ -17,10 +15,12 @@ UUID_NORDIC_RX = uuid.UUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
 
 
 class RedmondKettle(RedmondKettle200Protocol, Device):
+    MAC_TYPE = 'random'
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
     RX_CHAR = UUID_NORDIC_RX
     REQUIRE_CONNECTION = True
+    MANUFACTURER = 'Redmond'
 
     UPDATE_PERIOD = 5  # seconds when boiling
     STANDBY_UPDATE_PERIOD_MULTIPLIER = 12  # 15 * 5 seconds in standby mode
@@ -35,13 +35,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
         self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
         self.initial_status_sent = False
-
-    async def get_client(self):
-        return BleakClient(self._mac, address_type='random')
-
-    @property
-    def manufacturer(self):
-        return 'Redmond'
 
     @property
     def entities(self):

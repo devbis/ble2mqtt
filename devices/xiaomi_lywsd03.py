@@ -3,8 +3,6 @@ import struct
 import uuid
 from dataclasses import dataclass
 
-from bleak import BleakClient
-
 from .base import Device
 from .xiaomi_base import XiaomiHumidityTemperature
 
@@ -36,16 +34,3 @@ class XiaomiHumidityTemperatureLYWSD(XiaomiHumidityTemperature, Device):
     DATA_CHAR = LYWSD_DATA
     BATTERY_CHAR = LYWSD_BATTERY
     SENSOR_CLASS = SensorState
-
-    def __init__(self, mac, *args, loop, **kwargs):
-        super().__init__(mac, *args, loop=loop, **kwargs)
-        self._state = None
-        self._model = None
-        self._version = None
-
-    @property
-    def manufacturer(self):
-        return 'Xiaomi'
-
-    async def get_client(self):
-        return BleakClient(self._mac, address_type='public')

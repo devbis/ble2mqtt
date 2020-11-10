@@ -14,6 +14,7 @@ class XiaomiPoller(BaseDevice):
     DATA_CHAR: uuid.UUID = None
     BATTERY_CHAR: uuid.UUID = None
     RECONNECTION_TIMEOUT = 60
+    MANUFACTURER = 'Xiaomi'
 
     def __init__(self, *args, loop, **kwargs):
         super().__init__(*args, loop=loop, **kwargs)
