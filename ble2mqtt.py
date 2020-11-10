@@ -29,6 +29,8 @@ ListOfConnectionErrors = (
     BleakError,
     RemoteError,
     aio.TimeoutError,
+    # AttributeError: 'NoneType' object has no attribute 'callRemote'
+    AttributeError,
 )
 
 
@@ -247,7 +249,7 @@ class Ble2Mqtt:
             connect_task = self._loop.create_task(device.connect())
             finished, unfinished = await aio.wait(
                 [connect_task],
-                timeout=15,
+                timeout=20,
             )
             try:
                 if connect_task not in finished:
@@ -317,7 +319,7 @@ class Ble2Mqtt:
                 logger.debug(f'wait for cancelling tasks for {device=}')
                 await aio.wait(unfinished)
             except Exception as e:
-                logger.exception(e)
+                logger.exception(f'{device=} raised an error')
             finally:
                 await device.close()
                 logger.debug(f'unsubscribe from topics for {device=}')
@@ -414,7 +416,10 @@ class Ble2Mqtt:
                     aio_mqtt.ConnectionClosedError,
                     aio_mqtt.ServerDiedError,
             ) as e:
-                await self.stop_device_manage_tasks()
+                try:
+                    await self.stop_device_manage_tasks()
+                except Exception as e:
+                    logger.exception(e)
                 logger.error(
                     "Connection lost. Will retry in %d seconds",
                     self._reconnection_interval,
