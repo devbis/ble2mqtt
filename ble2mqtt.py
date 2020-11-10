@@ -6,10 +6,16 @@ import typing as ty
 
 import aio_mqtt
 from bleak import BleakError
-from txdbus.error import RemoteError  # noqa
 
 from devices import registered_device_types
 from devices.base import Device
+
+# linux only but don't crash on other systems
+try:
+    from txdbus.error import RemoteError  # noqa
+except ImportError:
+    RemoteError = BleakError
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +30,7 @@ ListOfConnectionErrors = (
     RemoteError,
     aio.TimeoutError,
 )
+
 
 class Ble2Mqtt:
     TOPIC_ROOT = 'ble2mqtt'
@@ -388,7 +395,7 @@ class Ble2Mqtt:
                     try:
                         t.result()
                     except Exception:
-                        logger.exception(f'Root task raised and exception')
+                        logger.exception('Root task has raised an exception')
                 for t in unfinished:
                     t.cancel()
                 try:

@@ -9,8 +9,8 @@ registered_device_types = {}
 
 
 class RegisteredType(type):
-    def __new__(cls, clsname, superclasses, attributedict):
-        newclass = type.__new__(cls, clsname, superclasses, attributedict)
+    def __new__(mcs, clsname, superclasses, attributedict):
+        newclass = type.__new__(mcs, clsname, superclasses, attributedict)
         # condition to prevent base class registration
         if superclasses:
             if newclass.NAME is not None:
@@ -149,5 +149,9 @@ class Device(BaseDevice):
         self.client = None
 
     async def close(self):
-        if self.client and await self.client.is_connected():
-            await self.client.disconnect()
+        try:
+            if self.client and await self.client.is_connected():
+                await self.client.disconnect()
+        # exception on macos when checking for is_connected()
+        except AttributeError:
+            pass
