@@ -11,6 +11,10 @@
 		{
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
+        },
+		{
+            "address": "11:22:33:aa:bb:ee",
+            "type": "xiaomilywsd"
         }
     ]
 }

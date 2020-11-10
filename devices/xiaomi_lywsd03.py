@@ -1,6 +1,7 @@
 import asyncio as aio
 import json
 import logging
+import struct
 import uuid
 from dataclasses import dataclass
 
@@ -10,14 +11,10 @@ from .base import Device
 
 logger = logging.getLogger(__name__)
 
-SERVICE = uuid.UUID('0000180a-0000-1000-8000-00805f9b34fb')
-
 DEVICE_NAME = uuid.UUID('00002a00-0000-1000-8000-00805f9b34fb')
 FIRMWARE_VERSION = uuid.UUID('00002a26-0000-1000-8000-00805f9b34fb')
-# MANUFACTURER_NAME = '00002a29-0000-1000-8000-00805f9b34fb'
-
-MJHT_DATA = uuid.UUID('226caa55-6476-4566-7562-66734470666d')
-MJHT_BATTERY = uuid.UUID('00002a19-0000-1000-8000-00805f9b34fb')
+LYWSD_DATA = uuid.UUID('EBE0CCC1-7A0A-4B0C-8A1A-6FF2997DA3A6')
+LYWSD_BATTERY = uuid.UUID('EBE0CCC4-7A0A-4B0C-8A1A-6FF2997DA3A6')
 
 
 @dataclass
@@ -28,19 +25,16 @@ class SensorState:
 
     @classmethod
     def from_data(cls, sensor_data, battery_data):
-        t, h = tuple(
-            float(x.split('=')[1])
-            for x in sensor_data.decode().strip('\0').split(' ')
-        )
+        t, h, voltage = struct.unpack('<hBH', sensor_data)
         return cls(
-            temperature=t,
+            temperature=round(t/100, 2),
             humidity=h,
             battery=int(ord(battery_data)),
         )
 
 
-class XiaomiHumidityTemperatureV1(Device):
-    NAME = 'xiaomihtv1'
+class XiaomiHumidityTemperatureLYWSD(Device):
+    NAME = 'xiaomilywsd'
     REQUIRE_CONNECTION = True
     RECONNECTION_TIMEOUT = 60
 
@@ -85,7 +79,7 @@ class XiaomiHumidityTemperatureV1(Device):
         return BleakClient(self._mac, address_type='public')
 
     async def get_device_data(self):
-        await self.client.start_notify(MJHT_DATA, self.notification_handler)
+        await self.client.start_notify(LYWSD_DATA, self.notification_handler)
         version = await self._read_with_timeout(FIRMWARE_VERSION)
         if isinstance(version, (bytes, bytearray)):
             self._version = version.decode()
@@ -107,7 +101,7 @@ class XiaomiHumidityTemperatureV1(Device):
         return result
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self._mac}] send state {self._state=}')
+        logger.info(f'[{self._mac}] send state={self._state}')
         state = {}
         for sensor_name, value in (
                 ('temperature', self._state.temperature),
@@ -131,11 +125,7 @@ class XiaomiHumidityTemperatureV1(Device):
             sender,
             ' '.join(format(x, '02x') for x in data),
         ))
-        # sender is 0xd or several requests it becomes
-        # /org/bluez/hci0/dev_58_2D_34_32_E0_69/service000c/char000d
-        if sender == 0xd or isinstance(sender, str) and sender.endswith('000d'):
-            # b'T=23.6 H=39.6\x00'
-            self._stack.put_nowait(data)
+        self._stack.put_nowait(data)
 
     async def handle(self, publish_topic, *args, **kwargs):
         while True:
@@ -152,17 +142,18 @@ class XiaomiHumidityTemperatureV1(Device):
 
             try:
                 logger.debug(f'{self} connected!')
-                battery = await self._read_with_timeout(MJHT_BATTERY)
+                battery = await self._read_with_timeout(LYWSD_BATTERY)
                 data_bytes = await self._stack.get()
                 # clear queue
                 while not self._stack.empty():
                     self._stack.get_nowait()
                 self._state = SensorState.from_data(data_bytes, battery)
-
             except ValueError as e:
                 logger.error(f'Cannot read values {str(e)}')
             else:
                 await self._notify_state(publish_topic)
                 if await self.connection_event.wait():
-                    await aio.sleep(5)
+                    await self.close()
+                    return
+                    # await aio.sleep(5)
             await aio.sleep(1)
