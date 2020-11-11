@@ -249,7 +249,7 @@ class Ble2Mqtt:
             connect_task = self._loop.create_task(device.connect())
             finished, unfinished = await aio.wait(
                 [connect_task],
-                timeout=20,
+                timeout=30,
             )
             try:
                 if connect_task not in finished:
