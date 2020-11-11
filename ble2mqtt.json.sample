@@ -5,7 +5,6 @@
     "devices": [
         {
             "address": "11:22:33:aa:bb:cc",
-            "model": "RK-G200S",
             "type": "redmond200"
         },
 		{

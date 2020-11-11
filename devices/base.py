@@ -29,6 +29,18 @@ class BaseDevice(metaclass=RegisteredType):
     async def close(self):
         pass
 
+    async def _read_with_timeout(self, char, timeout=5):
+        try:
+            result = await aio.wait_for(
+                self.client.read_gatt_char(char),
+                timeout=timeout,
+                loop=self._loop,
+            )
+        except Exception as e:
+            logger.error(f'{str(e)}: Cannot connect to device')
+            result = None
+        return result
+
     @staticmethod
     def transform_value(value):
         if not isinstance(value, str):

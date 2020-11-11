@@ -318,7 +318,7 @@ class Ble2Mqtt:
                     t.cancel()
                 logger.debug(f'wait for cancelling tasks for {device=}')
                 await aio.wait(unfinished)
-            except Exception as e:
+            except Exception:
                 logger.exception(f'{device=} raised an error')
             finally:
                 await device.close()

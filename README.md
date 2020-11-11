@@ -22,7 +22,6 @@ The configuration file is a JSON with the following content:
  	"devices": [
         {
             "address": "11:22:33:aa:bb:cc",
-            "model": "RK-G213S",
             "type": "redmond200"
         },
 		{

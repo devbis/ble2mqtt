@@ -7,6 +7,7 @@ from protocols.redmond import (Kettle200State, Mode, RedmondKettle200Protocol,
                                RunState)
 
 from .base import Device
+from .uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +24,13 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     MANUFACTURER = 'Redmond'
 
     UPDATE_PERIOD = 5  # seconds when boiling
-    STANDBY_UPDATE_PERIOD_MULTIPLIER = 12  # 15 * 5 seconds in standby mode
+    STANDBY_UPDATE_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
 
-    def __init__(self, mac, model, key=b'\xff\xff\xff\xff\xff\xff\xff\xff',
+    def __init__(self, mac, key=b'\xff\xff\xff\xff\xff\xff\xff\xff',
                  *args, loop, **kwargs):
         super().__init__(mac, *args, loop=loop, **kwargs)
         assert isinstance(key, bytes) and len(key) == 8
         self._key = key
-        self._model = model
         self._state = None
 
         self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
@@ -57,6 +57,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     async def get_device_data(self):
         await super().protocol_start()
         await self.login(self._key)
+        model = await self._read_with_timeout(DEVICE_NAME)
+        if isinstance(model, (bytes, bytearray)):
+            self._model = model.decode()
         version = await self.get_version()
         if version:
             self._version = f'{version[0]}.{version[1]}'
@@ -76,7 +79,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         )
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self._mac}] send state {self._state=}')
+        logger.info(f'[{self._mac}] send state={self._state}')
         state = {}
         for sensor_name, value in (
                 ('temperature', self._state.temperature),

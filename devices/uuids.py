@@ -1,0 +1,3 @@
+import uuid
+
+DEVICE_NAME = uuid.UUID('00002a00-0000-1000-8000-00805f9b34fb')

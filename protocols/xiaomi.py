@@ -3,10 +3,10 @@ import logging
 import uuid
 
 from devices.base import BaseDevice
+from devices.uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
 
-DEVICE_NAME = uuid.UUID('00002a00-0000-1000-8000-00805f9b34fb')
 FIRMWARE_VERSION = uuid.UUID('00002a26-0000-1000-8000-00805f9b34fb')
 
 
@@ -20,18 +20,6 @@ class XiaomiPoller(BaseDevice):
         super().__init__(*args, loop=loop, **kwargs)
         self._stack = aio.LifoQueue(loop=loop)
         self.connection_event = aio.Event()
-
-    async def _read_with_timeout(self, char, timeout=5):
-        try:
-            result = await aio.wait_for(
-                self.client.read_gatt_char(char),
-                timeout=timeout,
-                loop=self._loop,
-            )
-        except Exception as e:
-            logger.error(f'{str(e)}: Cannot connect to device')
-            result = None
-        return result
 
     async def get_device_data(self):
         await self.client.start_notify(
