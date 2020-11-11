@@ -27,10 +27,20 @@ The configuration file is a JSON with the following content:
 		{
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
+        },
+		{
+            "address": "11:22:33:aa:bb:ee",
+            "type": "xiaomilywsd"
         }
     ]
 }
 ```
 
-For now only Redmond kettles G2xx and 
-Humidity/Temperature sensors Xiaomi MJ_HT_V1 are supported. 
+Supported devices:
+
+**Kettles:**
+- Redmond G2xx series (redmond200)
+
+**Humidity sensors:**
+- Xiaomi MJ_HT_V1 (xiaomihtv1)
+- Xiaomi LYWSD03MMC (xiaomilywsd)
