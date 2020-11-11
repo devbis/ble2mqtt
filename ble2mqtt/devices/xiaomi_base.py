@@ -1,7 +1,7 @@
 import json
 import logging
 
-from protocols.xiaomi import XiaomiPoller
+from ..protocols.xiaomi import XiaomiPoller
 
 logger = logging.getLogger(__name__)
 

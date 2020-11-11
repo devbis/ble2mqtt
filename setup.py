@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -14,8 +14,11 @@ setup(
     author='Ivan Belokobylskiy',
     author_email='belokobylskij@gmail.com',
     url='https://github.com/devbis/ble2mqtt/',
-    scripts=['ble2mqtt'],
-    py_modules=['ble2mqtt', 'devices', 'protocols'],
+    # scripts=['ble2mqtt.sh'],
+    entry_points={
+        'console_scripts': ['ble2mqtt=ble2mqtt.__init__']
+    },
+    packages=find_packages(include=['ble2mqtt', 'ble2mqtt.*']),
     install_requires=[
         'aio-mqtt>=0.2.0',
         'bleak>=0.9.0',

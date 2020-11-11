@@ -3,9 +3,8 @@ import json
 import logging
 import uuid
 
-from protocols.redmond import (Kettle200State, Mode, RedmondKettle200Protocol,
-                               RunState)
-
+from ..protocols.redmond import (Kettle200State, Mode,
+                                 RedmondKettle200Protocol, RunState)
 from .base import Device
 from .uuids import DEVICE_NAME
 

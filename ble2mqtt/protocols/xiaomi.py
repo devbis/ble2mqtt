@@ -2,8 +2,8 @@ import asyncio as aio
 import logging
 import uuid
 
-from devices.base import BaseDevice
-from devices.uuids import DEVICE_NAME
+from ..devices.base import BaseDevice
+from ..devices.uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
 

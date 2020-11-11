@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
-from devices.base import BaseDevice
+from ..devices.base import BaseDevice
 
 logger = logging.getLogger(__name__)
 
