@@ -360,6 +360,28 @@ class Ble2Mqtt:
             task.cancel()
             await aio.wait([task])
 
+    async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
+        tasks = await self.create_device_manage_tasks()
+        logger.debug("Wait for network interruptions...")
+        finished, unfinished = await aio.wait(
+            [
+                mqtt_connection_fut,
+                *tasks,
+            ],
+            return_when=aio.FIRST_COMPLETED,
+        )
+        for t in finished:
+            try:
+                t.result()
+            except Exception:
+                logger.exception('Root task has raised an exception')
+        for t in unfinished:
+            t.cancel()
+        try:
+            await aio.wait(unfinished)
+        except aio.CancelledError:
+            pass
+
     async def _connect_forever(self) -> None:
         while True:
             try:
@@ -384,26 +406,8 @@ class Ble2Mqtt:
                         retain=True,
                     ),
                 )
-                tasks = await self.create_device_manage_tasks()
-                logger.debug("Wait for network interruptions...")
-                finished, unfinished = await aio.wait(
-                    [
-                        connect_result.disconnect_reason,
-                        *tasks,
-                    ],
-                    return_when=aio.FIRST_COMPLETED,
-                )
-                for t in finished:
-                    try:
-                        t.result()
-                    except Exception:
-                        logger.exception('Root task has raised an exception')
-                for t in unfinished:
-                    t.cancel()
-                try:
-                    await aio.wait(unfinished)
-                except aio.CancelledError:
-                    pass
+                await self._run_device_tasks(connect_result.disconnect_reason)
+
             except aio.CancelledError:
                 raise
 

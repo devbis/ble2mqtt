@@ -19,16 +19,16 @@ The configuration file is a JSON with the following content:
     "mqtt_port": 1883,
     "mqtt_user": "",
     "mqtt_password": "",
- 	"devices": [
+    "devices": [
         {
             "address": "11:22:33:aa:bb:cc",
             "type": "redmond200"
         },
-		{
+        {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
         },
-		{
+        {
             "address": "11:22:33:aa:bb:ee",
             "type": "xiaomilywsd"
         }
