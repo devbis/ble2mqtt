@@ -7,16 +7,15 @@ with open("README.md", "r") as fh:
 
 setup(
     name='ble2mqtt',
-    version='0.1.0a0',
+    version='0.1.0a2',
     description='BLE to MQTT bridge',
     long_description=long_description,
     long_description_content_type="text/markdown",
     author='Ivan Belokobylskiy',
     author_email='belokobylskij@gmail.com',
     url='https://github.com/devbis/ble2mqtt/',
-    # scripts=['ble2mqtt.sh'],
     entry_points={
-        'console_scripts': ['ble2mqtt=ble2mqtt.__init__']
+        'console_scripts': ['ble2mqtt=ble2mqtt:main']
     },
     packages=find_packages(include=['ble2mqtt', 'ble2mqtt.*']),
     install_requires=[

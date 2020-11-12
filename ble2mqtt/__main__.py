@@ -7,7 +7,8 @@ from ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
 
-if __name__ == '__main__':
+
+def main():
     logging.basicConfig(level='INFO')
     loop = aio.get_event_loop()
 
@@ -60,3 +61,7 @@ if __name__ == '__main__':
         loop.run_until_complete(server.close())
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
+
+
+if __name__ == '__main__':
+    main()
