@@ -1,6 +1,8 @@
 # Service to export BLE devices to MQTT with Home Assistant discovery
 
-## !!! It is a very early alpha release !!! Use this software at your own risk.
+## !!! It is a very early alpha release !!! 
+
+**Use this software at your own risk.**
 
 Default config should be located in `/etc/ble2mqtt.json` or 
 can be overridden with `BLE2MQTT_CONFIG` environment variable.
@@ -44,3 +46,29 @@ Supported devices:
 **Humidity sensors:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC (xiaomilywsd)
+
+
+## OpenWRT installation
+
+Execute the following commands in the terminal:
+
+```shell script
+opkg update
+opkg install python3-twisted python3-pip python3-asyncio
+pip install -U ble2mqtt
+```
+
+Create the configuration file in /etc/ble2mqtt.json and
+append your devices.
+
+Bluetooth must be turned on.
+
+```shell script
+hciconfig hci0 up
+```
+
+Run the service in background
+
+```shell script
+python -m ble2mqtt 2> /tmp/ble2mqtt.log &
+```
