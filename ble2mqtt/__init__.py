@@ -31,6 +31,12 @@ ListOfConnectionErrors = (
     AttributeError,
 )
 
+ListOfMQTTConnectionErrors = (
+        aio_mqtt.ConnectionLostError,
+        aio_mqtt.ConnectionClosedError,
+        aio_mqtt.ServerDiedError,
+)
+
 
 class Ble2Mqtt:
     TOPIC_ROOT = 'ble2mqtt'
@@ -286,7 +292,7 @@ class Ble2Mqtt:
             except aio_mqtt.Error:
                 logger.exception(f'Cannot subscribe to topics {device=}')
                 await device.client.disconnect()
-                continue
+                return
 
             try:
                 logger.info(
@@ -316,6 +322,10 @@ class Ble2Mqtt:
                     t.cancel()
                 logger.debug(f'wait for cancelling tasks for {device=}')
                 await aio.wait(unfinished)
+            except ListOfMQTTConnectionErrors:
+                logger.exception('Stop manage task on MQTT connection error')
+                await device.close()
+                return
             except Exception:
                 logger.exception(f'{device=} raised an error')
             finally:
@@ -413,11 +423,7 @@ class Ble2Mqtt:
                 await self.stop_device_manage_tasks()
                 logger.error("Access refused", exc_info=e)
 
-            except (
-                    aio_mqtt.ConnectionLostError,
-                    aio_mqtt.ConnectionClosedError,
-                    aio_mqtt.ServerDiedError,
-            ) as e:
+            except ListOfMQTTConnectionErrors as e:
                 try:
                     await self.stop_device_manage_tasks()
                 except Exception as e:
