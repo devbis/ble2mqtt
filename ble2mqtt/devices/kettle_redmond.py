@@ -36,8 +36,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         assert isinstance(key, bytes) and len(key) == 8
         self._key = key
         self._state = None
-        self._color = (0, 0, 0)
+        self._color = (255, 255, 255)
         self._brightness = 255
+        self._statistics = {}
 
         self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
         self.initial_status_sent = False
@@ -56,6 +57,14 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'name': TEMPERATURE_ENTITY,
                     'device_class': 'temperature',
                     'unit_of_measurement': '\u00b0C',
+                },
+                {
+                    'name': 'statistics',
+                    'topic': 'statistics',
+                    'icon': 'chart-bar',
+                    'json': True,
+                    'main_value': 'number_of_starts',
+                    'unit_of_measurement': ' ',
                 },
             ],
             'light': [
@@ -83,6 +92,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             self.update_multiplier()
             self.initial_status_sent = False
         await self.set_time()
+        await self._update_statistics()
 
     def update_multiplier(self, state: Kettle200State = None):
         if state is None:
@@ -96,9 +106,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
     async def _notify_state(self, publish_topic):
         logger.info(f'[{self._mac}] send state={self._state}')
+        coros = []
+
         state = {}
         for sensor_name, value in (
-                ('temperature', self._state.temperature),
+            ('temperature', self._state.temperature),
         ):
             if any(
                     x['name'] == sensor_name
@@ -107,10 +119,24 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 state[sensor_name] = self.transform_value(value)
 
         if state:
-            await publish_topic(
+            coros.append(publish_topic(
                 topic='/'.join((self.unique_id, 'state')),
                 value=json.dumps(state),
-            )
+            ))
+
+        # keep statistics in a separate topic
+        logger.info(f'[{self._mac}] send statistics={self._statistics}')
+        for sensor_name, value in (
+            ('statistics', self._statistics),
+        ):
+            if any(
+                x['name'] == sensor_name
+                for x in self.entities.get('sensor', [])
+            ):
+                coros.append(publish_topic(
+                    topic='/'.join((self.unique_id, sensor_name)),
+                    value=json.dumps(value),
+                ))
 
         lights = self.entities.get('light', [])
         for light in lights:
@@ -129,10 +155,12 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                         'b': self._color[2],
                     },
                 }
-                await publish_topic(
+                coros.append(publish_topic(
                     topic='/'.join((self.unique_id, light['name'])),
                     value=json.dumps(light_state),
-                )
+                ))
+        if coros:
+            await aio.gather(*coros)
 
     async def notify_run_state(self, new_state: Kettle200State, publish_topic):
         if not self.initial_status_sent or \
@@ -170,6 +198,14 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             self._state = new_state
         self.update_multiplier()
 
+    async def _update_statistics(self):
+        statistics = await self.get_statistics()
+        self._statistics = {
+            'number_of_starts': statistics['starts'],
+            'Energy spent (kWh)': round(statistics['watts_hours']/1000, 2),
+            'Working time (minutes)': round(statistics['seconds_run']/60, 1),
+        }
+
     async def handle(self, publish_topic, *args, **kwargs):
         counter = 0
         while True:
@@ -179,6 +215,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             counter += 1
 
             if counter > self.UPDATE_PERIOD * self._update_period_multiplier:
+                await self._update_statistics()
                 await self._notify_state(publish_topic)
                 counter = 0
             await aio.sleep(1)

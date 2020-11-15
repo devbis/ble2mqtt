@@ -37,7 +37,7 @@ class BaseDevice(metaclass=RegisteredType):
                 loop=self._loop,
             )
         except Exception:
-            logger.exception(f'Cannot connect to device')
+            logger.exception('Cannot connect to device')
             result = None
         return result
 

@@ -28,7 +28,7 @@ class Command(Enum):
     READ_COLOR = 0x33
     SET_BACKLIGHT_MODE = 0x37
     GET_STATISTICS = 0x47
-    GET_STARTS = 0x50
+    GET_STARTS_COUNT = 0x50
     AUTH = 0xFF
 
 
@@ -290,3 +290,23 @@ class RedmondKettle200Protocol(BaseDevice):
             ),
         )
         self._check_zero_response(resp, 'Cannot set color')
+
+    async def get_statistics(self):
+        logger.debug('Get statistics')
+        # b'\x00\x00\xdf\x01\x00\x00$\x01\x00\x00\t\x00\x00\x00\x00\x00'
+        resp = await self.send_command(Command.GET_STATISTICS, b'\0')
+        _, seconds_run, watts_hours, starts, _, _ = \
+            struct.unpack('<HIIHHH', resp)
+        return {
+            'watts_hours': watts_hours,
+            'seconds_run': seconds_run,
+            'starts': starts,
+        }
+
+    async def get_starts_count(self):
+        logger.debug('Get number of start')
+        # b'\x00\x00\x00\t\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        # b'\x00\x00\x00\n\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        resp = await self.send_command(Command.GET_STARTS_COUNT, b'\0')
+        _, _, starts, *_ = struct.unpack('<BHHHHHHHB', resp)
+        return starts

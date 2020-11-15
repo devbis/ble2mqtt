@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 VERSION = '0.1.0a0'
 
 CONFIG_MQTT_NAMESPACE = 'homeassistant'
+SENSOR_STATE_TOPIC = 'state'
 
 
 ListOfConnectionErrors = (
@@ -66,7 +67,7 @@ class Ble2Mqtt:
         self.availability_topic = '/'.join((
             self.TOPIC_ROOT,
             self.BRIDGE_TOPIC,
-            'state',
+            SENSOR_STATE_TOPIC,
         ))
 
         self.device_registry: ty.List[Device] = []
@@ -177,6 +178,9 @@ class Ble2Mqtt:
             icon = entity.pop('icon', None)
             if icon:
                 result['icon'] = f'mdi:{icon}'
+            entity.pop('topic', None)
+            entity.pop('json', None)
+            entity.pop('main_value', None)
             result.update(entity)
             return result
 
@@ -222,7 +226,10 @@ class Ble2Mqtt:
             if cls == 'sensor':
                 for entity in entities:
                     entity_name = entity['name']
-                    state_topic = self._get_topic(device.unique_id, 'state')
+                    state_topic = self._get_topic(
+                        device.unique_id,
+                        entity.get('topic', SENSOR_STATE_TOPIC),
+                    )
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
@@ -230,10 +237,23 @@ class Ble2Mqtt:
                         entity_name,
                         'config',
                     ))
+                    if entity.get('json') and entity.get('main_value'):
+                        state_topic_part = {
+                            'json_attributes_topic': state_topic,
+                            'state_topic': state_topic,
+                            'value_template':
+                                f'{{{{ value_json.{entity["main_value"]} }}}}',
+                        }
+                    else:
+                        state_topic_part = {
+                            'state_topic': state_topic,
+                            'value_template':
+                                f'{{{{ value_json.{entity_name} }}}}',
+                        }
+
                     payload = json.dumps({
                         **get_generic_vals(entity),
-                        'state_topic': state_topic,
-                        'value_template': f'{{{{ value_json.{entity_name} }}}}',
+                        **state_topic_part,
                     })
                     logger.debug(
                         f'Publish config {config_topic=}: {payload=}',
