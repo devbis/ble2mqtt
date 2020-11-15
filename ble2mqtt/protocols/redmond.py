@@ -24,6 +24,9 @@ class Command(Enum):
     WRITE_MODE = 0x05
     READ_MODE = 0x06
     SET_TIME = 0x6e
+    WRITE_COLOR = 0x32
+    READ_COLOR = 0x33
+    SET_BACKLIGHT_MODE = 0x37
     GET_STATISTICS = 0x47
     GET_STARTS = 0x50
     AUTH = 0xFF
@@ -40,12 +43,17 @@ class RunState(Enum):
     ON = 0x02
 
 
+class ColorTarget(Enum):
+    BOIL = 0x00
+    LIGHT = 0x01
+
+
 @dataclass
 class Kettle200State:
     temperature: int = 0
     color_change_period: int = 0xf
     mode: Mode = Mode.BOIL
-    max_temperature: int = 0
+    target_temperature: int = 0
     sound: bool = True
     state: RunState = RunState.OFF
     boil_time: int = 0
@@ -60,7 +68,7 @@ class Kettle200State:
         # 01 00 28 00 01 19 0f 00 00 00 00 00 00 80 00 00 - 40º keep
         (
             mode,  # 0,1
-            max_temp,  # 2,3
+            target_temp,  # 2,3
             sound,  # 4
             current_temp,  # 5
             color_change_period,  # 6-7
@@ -72,7 +80,7 @@ class Kettle200State:
         ) = struct.unpack(cls.FORMAT, response)
         return cls(
             mode=Mode(mode),
-            max_temperature=max_temp,
+            target_temperature=target_temp,
             sound=sound,
             temperature=current_temp,
             state=RunState(state),
@@ -85,7 +93,7 @@ class Kettle200State:
         return struct.pack(
             self.FORMAT,
             self.mode.value,
-            self.max_temperature,
+            self.target_temperature,
             self.sound,
             self.temperature,
             self.color_change_period,
@@ -157,6 +165,14 @@ class RedmondKettle200Protocol(BaseDevice):
         if not success:
             raise RedmondError(error_msg)
 
+    @staticmethod
+    def _check_zero_response(response,
+                             error_msg="Command was not completed successfully",
+                             ):
+        response = response and response[0]
+        if response != 0:
+            raise RedmondError(error_msg)
+
     def _get_command(self, cmd: int, payload: bytes):
         container = struct.pack(
             '<4B',
@@ -226,8 +242,7 @@ class RedmondKettle200Protocol(BaseDevice):
             Command.SET_TIME,
             struct.pack('<ii', ts, -offset * 60 * 60),
         )
-        if resp != b'\x00':
-            raise RedmondError('Cannot set time')
+        self._check_zero_response(resp, 'Cannot set time')
 
     async def get_mode(self):
         logger.debug('Get mode...')
@@ -253,3 +268,25 @@ class RedmondKettle200Protocol(BaseDevice):
         logger.debug('Stop mode')
         resp = await self.send_command(Command.STOP_CURRENT_MODE)
         self._check_success(resp)
+
+    async def set_color(self, mode: ColorTarget, r, g, b, brightness):
+        # scale_light = [0x00, 0x32, 0x64]
+        scale_light = [0x64, 0x64, 0x64]
+
+        rgb_start = rgb_mid = rgb_end = \
+            (b << 24) + (g << 16) + (r << 8) + brightness
+
+        resp = await self.send_command(
+            Command.WRITE_COLOR,
+            struct.pack(
+                '<BBIBIBI',
+                mode.value,
+                scale_light[0],
+                rgb_start,
+                scale_light[1],
+                rgb_mid,
+                scale_light[2],
+                rgb_end,
+            ),
+        )
+        self._check_zero_response(resp, 'Cannot set color')

@@ -94,8 +94,8 @@ class Ble2Mqtt:
         if self._client.is_connected():
             await self._client.disconnect()
 
-    def _get_topic(self, dev_id, subtopic):
-        return '/'.join((self.TOPIC_ROOT, dev_id, subtopic))
+    def _get_topic(self, dev_id, subtopic, *args):
+        return '/'.join((self.TOPIC_ROOT, dev_id, subtopic, *args))
 
     def register(self, device: Device):
         if not device:
@@ -180,6 +180,7 @@ class Ble2Mqtt:
             result.update(entity)
             return result
 
+        messages_to_send = []
         for cls, entities in device.entities.items():
             if cls == 'switch':
                 for entity in entities:
@@ -201,7 +202,7 @@ class Ble2Mqtt:
                     logger.debug(
                         f'Publish config {config_topic=}: {payload=}',
                     )
-                    await self._client.publish(
+                    messages_to_send.append(
                         aio_mqtt.PublishableMessage(
                             topic_name=config_topic,
                             payload=payload,
@@ -237,7 +238,7 @@ class Ble2Mqtt:
                     logger.debug(
                         f'Publish config {config_topic=}: {payload=}',
                     )
-                    await self._client.publish(
+                    messages_to_send.append(
                         aio_mqtt.PublishableMessage(
                             topic_name=config_topic,
                             payload=payload,
@@ -245,6 +246,45 @@ class Ble2Mqtt:
                             retain=True,
                         ),
                     )
+            if cls == 'light':
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    set_topic = self._get_topic(
+                        device.unique_id,
+                        entity_name,
+                        device.SET_POSTFIX,
+                    )
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        device.dev_id,
+                        entity_name,
+                        'config',
+                    ))
+                    payload = json.dumps({
+                        **get_generic_vals(entity),
+                        'schema': 'json',
+                        'rgb': entity.get('rgb', True),
+                        'brightness': entity.get('brightness', True),
+                        'state_topic': state_topic,
+                        'command_topic': set_topic,
+                    })
+                    logger.debug(
+                        f'Publish config {config_topic=}: {payload=}',
+                    )
+                    messages_to_send.append(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+        await aio.gather(*[
+            self._client.publish(message)
+            for message in messages_to_send
+        ])
 
     async def manage_device(self, device: Device):
         logger.debug(f'Start managing {device=}')

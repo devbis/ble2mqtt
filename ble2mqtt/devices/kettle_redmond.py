@@ -3,7 +3,7 @@ import json
 import logging
 import uuid
 
-from ..protocols.redmond import (Kettle200State, Mode,
+from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
                                  RedmondKettle200Protocol, RunState)
 from .base import Device
 from .uuids import DEVICE_NAME
@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 
 UUID_NORDIC_TX = uuid.UUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
 UUID_NORDIC_RX = uuid.UUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+
+BOIL_ENTITY = 'boil'
+HEAT_ENTITY = 'heat'  # not implemented yet
+TEMPERATURE_ENTITY = 'temperature'
+LIGHT_ENTITY = 'backlight'
 
 
 class RedmondKettle(RedmondKettle200Protocol, Device):
@@ -31,6 +36,8 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         assert isinstance(key, bytes) and len(key) == 8
         self._key = key
         self._state = None
+        self._color = (0, 0, 0)
+        self._brightness = 255
 
         self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
         self.initial_status_sent = False
@@ -40,15 +47,20 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         return {
             'switch': [
                 {
-                    'name': 'kettle',
+                    'name': BOIL_ENTITY,
                     'icon': 'kettle',
                 },
             ],
             'sensor': [
                 {
-                    'name': 'temperature',
+                    'name': TEMPERATURE_ENTITY,
                     'device_class': 'temperature',
                     'unit_of_measurement': '\u00b0C',
+                },
+            ],
+            'light': [
+                {
+                    'name': LIGHT_ENTITY,
                 },
             ],
         }
@@ -59,6 +71,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         model = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(model, (bytes, bytearray)):
             self._model = model.decode()
+        else:
+            # macos can't access characteristic
+            self._model = 'G200S'
         version = await self.get_version()
         if version:
             self._version = f'{version[0]}.{version[1]}'
@@ -73,7 +88,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         if state is None:
             state = self._state
         self._update_period_multiplier = (
-            1 if state.state == RunState.ON
+            1
+            if state.state == RunState.ON and
+            state.mode in [Mode.BOIL, Mode.HEAT]
             else self.STANDBY_UPDATE_PERIOD_MULTIPLIER
         )
 
@@ -95,24 +112,70 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 value=json.dumps(state),
             )
 
+        lights = self.entities.get('light', [])
+        for light in lights:
+            if light['name'] == LIGHT_ENTITY:
+                light_state = {
+                    'state': (
+                        RunState.ON.name
+                        if self._state.state == RunState.ON and
+                        self._state.mode == Mode.LIGHT
+                        else RunState.OFF.name
+                    ),
+                    'brightness': 255,
+                    'color': {
+                        'r': self._color[0],
+                        'g': self._color[1],
+                        'b': self._color[2],
+                    },
+                }
+                await publish_topic(
+                    topic='/'.join((self.unique_id, light['name'])),
+                    value=json.dumps(light_state),
+                )
+
+    async def notify_run_state(self, new_state: Kettle200State, publish_topic):
+        if not self.initial_status_sent or \
+                new_state.state != self._state.state or \
+                new_state.mode != self._state.mode:
+            state_to_str = {
+                True: RunState.ON.name,
+                False: RunState.OFF.name,
+            }
+            boil_mode = state_to_str[
+                new_state.mode == Mode.BOIL and
+                new_state.state == RunState.ON
+            ]
+            heat_mode = state_to_str[
+                new_state.mode == Mode.HEAT and
+                new_state.state == RunState.ON
+            ]
+            topics = {
+                BOIL_ENTITY: boil_mode,
+                HEAT_ENTITY: heat_mode,
+            }
+            await aio.gather(
+                *[
+                    publish_topic(
+                        topic='/'.join((self.unique_id, topic)),
+                        value=value,
+                    ) for topic, value in topics.items()
+                ],
+                self._notify_state(publish_topic),
+            )
+            self.initial_status_sent = True
+            self._state = new_state
+            await self._notify_state(publish_topic)
+        else:
+            self._state = new_state
+        self.update_multiplier()
+
     async def handle(self, publish_topic, *args, **kwargs):
         counter = 0
         while True:
             # if boiling notify every 5 seconds, 60 sec otherwise
             new_state = await self.get_mode()
-            if new_state.state != self._state.state or \
-                    not self.initial_status_sent:
-                await publish_topic(
-                    topic='/'.join((self.unique_id, 'kettle')),
-                    value=new_state.state.name,
-                )
-                self.initial_status_sent = True
-                self._state = new_state
-                await self._notify_state(publish_topic)
-            else:
-                self._state = new_state
-            self.update_multiplier()
-
+            await self.notify_run_state(new_state, publish_topic)
             counter += 1
 
             if counter > self.UPDATE_PERIOD * self._update_period_multiplier:
@@ -120,14 +183,14 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 counter = 0
             await aio.sleep(1)
 
-    async def _switch_kettle(self, value):
+    async def _switch_mode(self, mode, value):
         if value == RunState.ON.name:
             try:
-                await self.set_mode(Kettle200State(
-                    mode=Mode.BOIL,
-                ))
+                if self._state.mode != mode:
+                    await self.stop()
+                await self.set_mode(Kettle200State(mode=mode))
             except ValueError:
-                # if the MODE is already BOIL then it returns
+                # if the MODE is the same then it returns
                 # en error. Treat it as normal
                 pass
             await self.run()
@@ -137,19 +200,25 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             next_state = RunState.OFF
         self.update_multiplier(Kettle200State(state=next_state))
 
+    async def _switch_boil(self, value):
+        await self._switch_mode(Mode.BOIL, value)
+
+    async def _switch_backlight(self, value):
+        await self._switch_mode(Mode.LIGHT, value)
+
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
             message = await self.message_queue.get()
             value = message['value']
             entity_name = self.get_entity_from_topic(message['topic'])
-            if entity_name == 'kettle':
+            if entity_name == BOIL_ENTITY:
                 value = self.transform_value(value)
                 logger.info(
                     f'[{self._mac}] switch kettle {entity_name=} {value=}',
                 )
                 while True:
                     try:
-                        await self._switch_kettle(value)
+                        await self._switch_boil(value)
                         # update state to real values
                         await self.get_mode()
                         await aio.gather(
@@ -164,3 +233,21 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     except ConnectionError as e:
                         logger.exception(str(e))
                     await aio.sleep(5)
+            if entity_name == LIGHT_ENTITY:
+                logger.info(f'set backlight {value}')
+                if value.get('state'):
+                    await self._switch_backlight(value['state'])
+                if value.get('color') or value.get('brightness'):
+                    if value.get('color'):
+                        color = value['color']
+                        try:
+                            self._color = color['r'], color['g'], color['b']
+                        except ValueError:
+                            return
+                    if value.get('brightness'):
+                        self._brightness = value['brightness']
+                    await self.set_color(
+                        ColorTarget.LIGHT,
+                        *self._color,
+                        self._brightness,
+                    )

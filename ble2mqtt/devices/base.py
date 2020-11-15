@@ -36,8 +36,8 @@ class BaseDevice(metaclass=RegisteredType):
                 timeout=timeout,
                 loop=self._loop,
             )
-        except Exception as e:
-            logger.error(f'{str(e)}: Cannot connect to device')
+        except Exception:
+            logger.exception(f'Cannot connect to device')
             result = None
         return result
 
@@ -87,7 +87,7 @@ class Device(BaseDevice):
             f'{self.unique_id}/{entity["name"]}/{self.SET_POSTFIX}'
             for cls, items in self.entities.items()
             for entity in items
-            if cls in ['switch']
+            if cls in ['switch', 'light']
         ]
 
     @property
