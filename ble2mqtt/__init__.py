@@ -327,6 +327,10 @@ class Ble2Mqtt:
             except ListOfConnectionErrors as e:
                 logger.warning(f'Error while connecting to {device=}, {e}')
                 await device.close()
+                if 'DBus.Error.LimitsExceeded' in str(e):
+                    raise
+                if 'org.bluez.Error.NotReady' in str(e):
+                    raise
                 continue
 
             try:
@@ -486,8 +490,8 @@ class Ble2Mqtt:
             except ListOfMQTTConnectionErrors as e:
                 try:
                     await self.stop_device_manage_tasks()
-                except Exception as e:
-                    logger.exception(e)
+                except Exception as e1:
+                    logger.exception(e1)
                 logger.error(
                     "Connection lost. Will retry in %d seconds",
                     self._reconnection_interval,
