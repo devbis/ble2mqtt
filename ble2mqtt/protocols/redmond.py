@@ -187,7 +187,7 @@ class RedmondKettle200Protocol(BaseDevice):
         return bytearray(b'%b%b%b' % (container[:3], payload, container[3:]))
 
     async def send_command(self, cmd: Command, payload: bytes = b'',
-                           wait_reply=True, timeout=10):
+                           wait_reply=True, timeout=15):
         command = self._get_command(cmd.value, payload)
         logger.debug(
             f'... send cmd {cmd.value:04x} ['
