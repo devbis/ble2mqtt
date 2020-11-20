@@ -313,12 +313,11 @@ class Ble2Mqtt:
             connect_task = self._loop.create_task(device.connect())
             finished, unfinished = await aio.wait(
                 [connect_task],
-                timeout=30,
+                timeout=device.CONNECTION_TIMEOUT,
             )
             try:
                 if connect_task not in finished:
                     logger.debug(f'Stop task {connect_task=} {device=}')
-                    # connect_task.cancel()
                     await self.stop_task(connect_task)
                     raise ConnectionError(f'Task is timed out {device=}')
                 else:

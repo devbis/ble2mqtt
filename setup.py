@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='ble2mqtt',
-    version='0.1.0a6',
+    version='0.1.0a7',
     description='BLE to MQTT bridge',
     long_description=long_description,
     long_description_content_type="text/markdown",

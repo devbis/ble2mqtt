@@ -65,6 +65,7 @@ class Device(BaseDevice):
     REQUIRE_CONNECTION = False
     MAC_TYPE = 'public'
     MANUFACTURER = None
+    CONNECTION_TIMEOUT = 60
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
