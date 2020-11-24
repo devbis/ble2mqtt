@@ -6,6 +6,7 @@ import typing as ty
 import aio_mqtt
 from bleak import BleakError
 
+from .__version__ import VERSION
 from .devices.base import Device
 
 # linux only but don't crash on other systems
@@ -17,10 +18,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-VERSION = '0.1.0a0'
-
 CONFIG_MQTT_NAMESPACE = 'homeassistant'
 SENSOR_STATE_TOPIC = 'state'
+BLUETOOTH_ERROR_RECONNECTION_TIMEOUT = 60
+FAILURE_LIMIT = 10
 
 
 ListOfConnectionErrors = (
@@ -317,6 +318,7 @@ class Ble2Mqtt:
 
     async def manage_device(self, device: Device):
         logger.debug(f'Start managing {device=}')
+        failure_count = 0
         while True:
             logger.debug(f'Connecting to {device=}')
             connect_task = self._loop.create_task(device.connect())
@@ -337,14 +339,24 @@ class Ble2Mqtt:
                 await device.close()
                 if 'DBus.Error.LimitsExceeded' in str(e):
                     raise
-                if 'org.bluez.Error.NotReady' in str(e):
-                    raise
+                if 'org.bluez.Error.' in str(e) or \
+                        'org.freedesktop.DBus.Error.' in str(e):
+                    failure_count += 1
+                    if failure_count >= FAILURE_LIMIT:
+                        raise
+                    logger.error(
+                        f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
+                        f'secs due to error in bluetooth, '
+                        f'{device=}, exception={e}',
+                    )
+                    await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
                 continue
 
             try:
                 # retrieve version and details
                 logger.debug(f'get_device_data {device=}')
                 await device.get_device_data()
+                failure_count = 0
             except ListOfConnectionErrors:
                 logger.exception(f'Cannot get initial info {device=}')
                 await device.close()
@@ -401,7 +413,6 @@ class Ble2Mqtt:
             except Exception:
                 logger.exception(f'{device=} raised an error')
             finally:
-                await device.close()
                 logger.debug(f'unsubscribe from topics for {device=}')
                 try:
                     if device.subscribed_topics:
@@ -419,6 +430,27 @@ class Ble2Mqtt:
                     logger.exception(
                         f'Couldn\'t stop all tasks for {device=} {e}',
                     )
+
+                try:
+                    await device.close()
+                except ListOfConnectionErrors as e:
+                    # if close raises an error it might relate to
+                    # temporary down of bluetooth device
+                    # if so, sleep for a min and try to reconnect
+                    failure_count += 1
+                    if failure_count >= FAILURE_LIMIT:
+                        raise
+                    # 'org.freedesktop.DBus.Error.ServiceUnknown'
+                    # 'org.freedesktop.DBus.Error.NoReply'
+                    if 'org.freedesktop.DBus.Error.' in str(e):
+                        device.client = None
+                        logger.error(
+                            f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
+                            f'secs due to error in bluetooth, '
+                            f'{device=}, exception={e}',
+                        )
+                        await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
+
             logger.info(
                 f'Sleep for {device.RECONNECTION_TIMEOUT} secs to '
                 f'reconnect to {device=}',

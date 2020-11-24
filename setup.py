@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 from setuptools import find_packages, setup
+from ble2mqtt.__version__ import VERSION
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
     name='ble2mqtt',
-    version='0.1.0a7',
+    version=VERSION,
     description='BLE to MQTT bridge',
     long_description=long_description,
     long_description_content_type="text/markdown",
