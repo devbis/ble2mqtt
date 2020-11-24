@@ -72,11 +72,20 @@ class Ble2Mqtt:
 
         self.device_registry: ty.List[Device] = []
 
-    def start(self):
-        self._root_tasks = [
-            self._loop.create_task(self._connect_forever()),
-            self._loop.create_task(self._handle_messages()),
-        ]
+    async def start(self):
+        finished, unfinished = await aio.wait(
+            [
+                self._loop.create_task(self._connect_forever()),
+                self._loop.create_task(self._handle_messages()),
+            ],
+            return_when=aio.FIRST_COMPLETED,
+        )
+        for t in unfinished:
+            t.cancel()
+        await aio.wait(unfinished)
+        for t in finished:
+            # forward exception from task if any
+            t.result()
 
     @staticmethod
     async def stop_task(task):

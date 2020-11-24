@@ -50,10 +50,8 @@ def main():
             **device,
         ))
 
-    server.start()
-
     try:
-        loop.run_forever()
+        loop.run_until_complete(server.start())
     except KeyboardInterrupt:
         pass
 
