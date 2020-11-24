@@ -3,7 +3,7 @@ import json
 import logging
 import os
 
-from ble2mqtt import Ble2Mqtt
+from ble2mqtt.ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
 
