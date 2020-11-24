@@ -3,7 +3,7 @@ import struct
 import uuid
 from dataclasses import dataclass
 
-from ..utils import cr3032_voltage_to_percent
+from ..utils import cr2032_voltage_to_percent
 from .base import Device
 from .xiaomi_base import XiaomiHumidityTemperature
 
@@ -25,7 +25,7 @@ class SensorState:
         return cls(
             temperature=round(t/100, 2),
             humidity=h,
-            battery=int(cr3032_voltage_to_percent(voltage)),
+            battery=int(cr2032_voltage_to_percent(voltage)),
         )
 
 
