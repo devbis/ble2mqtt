@@ -16,7 +16,7 @@ setup(
     author_email='belokobylskij@gmail.com',
     url='https://github.com/devbis/ble2mqtt/',
     entry_points={
-        'console_scripts': ['ble2mqtt=ble2mqtt:main']
+        'console_scripts': ['ble2mqtt=ble2mqtt.__main__:main']
     },
     packages=find_packages(include=['ble2mqtt', 'ble2mqtt.*']),
     install_requires=[

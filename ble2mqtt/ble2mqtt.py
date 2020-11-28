@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 CONFIG_MQTT_NAMESPACE = 'homeassistant'
 SENSOR_STATE_TOPIC = 'state'
 BLUETOOTH_ERROR_RECONNECTION_TIMEOUT = 60
-FAILURE_LIMIT = 10
+FAILURE_LIMIT = 5
 
 
 ListOfConnectionErrors = (
@@ -31,6 +31,16 @@ ListOfConnectionErrors = (
     # AttributeError: 'NoneType' object has no attribute 'callRemote'
     AttributeError,
 )
+
+
+def hardware_exception_occured(exception):
+    ex_str = str(exception)
+    return (
+        'org.freedesktop.DBus.Error.ServiceUnknown' in ex_str or
+        'org.freedesktop.DBus.Error.NoReply' in ex_str or
+        'org.bluez.Error.NotReady' in ex_str
+    )
+
 
 ListOfMQTTConnectionErrors = (
         aio_mqtt.ConnectionLostError,
@@ -71,6 +81,7 @@ class Ble2Mqtt:
         ))
 
         self.device_registry: ty.List[Device] = []
+        self.bluetooth_restarting = False
 
     async def start(self):
         finished, unfinished = await aio.wait(
@@ -315,6 +326,30 @@ class Ble2Mqtt:
             for message in messages_to_send
         ])
 
+    async def restart_bluetooth(self):
+        # EXPERIMENTAL: restart bluetooth on errors
+        if self.bluetooth_restarting:
+            await aio.sleep(7)
+            return
+        self.bluetooth_restarting = True
+        logger.warning('Restarting bluetoothd...')
+        proc = await aio.create_subprocess_exec(
+            'hciconfig', 'hci0', 'down',
+        )
+        await proc.wait()
+        proc = await aio.create_subprocess_exec(
+            '/etc/init.d/bluetoothd', 'restart',
+        )
+        await proc.wait()
+        await aio.sleep(3)
+        proc = await aio.create_subprocess_exec(
+            'hciconfig', 'hci0', 'up',
+        )
+        await proc.wait()
+        await aio.sleep(3)
+        logger.warning('Restarting bluetoothd finished')
+        self.bluetooth_restarting = False
+
     async def manage_device(self, device: Device):
         logger.debug(f'Start managing {device=}')
         failure_count = 0
@@ -338,11 +373,16 @@ class Ble2Mqtt:
                 await device.close()
                 if 'DBus.Error.LimitsExceeded' in str(e):
                     raise
-                if 'org.bluez.Error.' in str(e) or \
+                if hardware_exception_occured(e):
+                    await self.restart_bluetooth()
+                    await aio.sleep(3)
+                    continue
+                elif 'org.bluez.Error.' in str(e) or \
                         'org.freedesktop.DBus.Error.' in str(e):
                     failure_count += 1
                     if failure_count >= FAILURE_LIMIT:
-                        raise
+                        await self.restart_bluetooth()
+                        # raise
                     logger.error(
                         f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
                         f'secs due to error in bluetooth, '
@@ -409,7 +449,9 @@ class Ble2Mqtt:
                 logger.exception('Stop manage task on MQTT connection error')
                 await device.close()
                 return
-            except Exception:
+            except Exception as e:
+                if hardware_exception_occured(e):
+                    await self.restart_bluetooth()
                 logger.exception(f'{device=} raised an error')
             finally:
                 logger.debug(f'unsubscribe from topics for {device=}')
@@ -438,10 +480,11 @@ class Ble2Mqtt:
                     # if so, sleep for a min and try to reconnect
                     failure_count += 1
                     if failure_count >= FAILURE_LIMIT:
-                        raise
+                        await self.restart_bluetooth()
+
                     # 'org.freedesktop.DBus.Error.ServiceUnknown'
                     # 'org.freedesktop.DBus.Error.NoReply'
-                    if 'org.freedesktop.DBus.Error.' in str(e):
+                    elif 'org.freedesktop.DBus.Error.' in str(e):
                         device.client = None
                         logger.error(
                             f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
