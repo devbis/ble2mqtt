@@ -252,7 +252,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             if entity_name == BOIL_ENTITY:
                 value = self.transform_value(value)
                 logger.info(
-                    f'[{self._mac}] switch kettle {entity_name=} {value=}',
+                    f'[{self._mac}] switch kettle {entity_name} value={value}',
                 )
                 while True:
                     try:

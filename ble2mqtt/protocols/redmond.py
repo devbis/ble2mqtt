@@ -228,7 +228,7 @@ class RedmondKettle200Protocol(BaseDevice):
         logger.debug('fetching version...')
         resp = await self.send_command(Command.VERSION, b'', True)
         version = tuple(resp)
-        logger.info(f'version: {version=}')
+        logger.info(f'version: {version}')
         return version
 
     async def set_time(self, ts=None):
@@ -237,7 +237,7 @@ class RedmondKettle200Protocol(BaseDevice):
         ts = int(ts)
         offset = time.timezone \
             if (time.localtime().tm_isdst == 0) else time.altzone
-        logger.debug(f'Setting time {ts=} {offset=}')
+        logger.debug(f'Setting time ts={ts} offset={offset}')
         resp = await self.send_command(
             Command.SET_TIME,
             struct.pack('<ii', ts, -offset * 60 * 60),
