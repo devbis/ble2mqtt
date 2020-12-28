@@ -47,7 +47,8 @@ class XiaomiHumidityTemperature(XiaomiPoller):
                     x['name'] == sensor_name
                     for x in self.entities.get('sensor', [])
             ):
-                state[sensor_name] = self.transform_value(value)
+                if sensor_name != 'battery' or value:
+                    state[sensor_name] = self.transform_value(value)
 
         if state:
             await publish_topic(

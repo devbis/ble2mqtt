@@ -4,7 +4,7 @@ import logging
 import typing as ty
 
 import aio_mqtt
-from bleak import BleakError
+from bleak import BleakError, BleakScanner
 
 from .devices.base import Device
 
@@ -393,16 +393,16 @@ class Ble2Mqtt:
                     )
                     await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
                 continue
-
-            try:
-                # retrieve version and details
-                logger.debug(f'get_device_data {device=}')
-                await device.get_device_data()
-                failure_count = 0
-            except ListOfConnectionErrors:
-                logger.exception(f'Cannot get initial info {device=}')
-                await device.close()
-                continue
+            if not device.passive:
+                try:
+                    # retrieve version and details
+                    logger.debug(f'get_device_data device={device}')
+                    await device.get_device_data()
+                    failure_count = 0
+                except ListOfConnectionErrors:
+                    logger.exception(f'Cannot get initial info device={device}')
+                    await device.close()
+                    continue
 
             try:
                 await self.send_device_config(device)
@@ -513,12 +513,31 @@ class Ble2Mqtt:
             task.cancel()
             await aio.wait([task])
 
+    def device_detection_callback(self, device, advertisement_data):
+        for reg_device in self.device_registry:
+            if reg_device._mac == device.address and reg_device.passive:
+                if device.name:
+                    reg_device._model = device.name
+                reg_device.handle_advert(device, advertisement_data)
+
+    async def scan_devices_task(self):
+        while True:
+            async with BleakScanner() as scanner:
+                scanner.register_detection_callback(
+                    self.device_detection_callback,
+                )
+                await aio.sleep(3.0)
+                devices = await scanner.get_discovered_devices()
+            logger.debug(f'found {len(devices)} devices')
+            await aio.sleep(1)
+
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
         tasks = await self.create_device_manage_tasks()
         logger.debug("Wait for network interruptions...")
         finished, unfinished = await aio.wait(
             [
                 mqtt_connection_fut,
+                self._loop.create_task(self.scan_devices_task()),
                 *tasks,
             ],
             return_when=aio.FIRST_COMPLETED,

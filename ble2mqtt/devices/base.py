@@ -20,11 +20,18 @@ class RegisteredType(type):
 
 class BaseDevice(metaclass=RegisteredType):
     NAME = None
+    SUPPORT_PASSIVE = False
+    SUPPORT_ACTIVE = True
 
     def __init__(self, *args, loop, **kwargs):
         self._loop = loop
         self.client: BleakClient = None
         self.bt_lock = aio.Lock()
+        if kwargs.get('passive') and not self.SUPPORT_PASSIVE:
+            raise NotImplementedError(
+                'This device doesn\'t support passive mode',
+            )
+        self.passive = kwargs.get('passive', self.SUPPORT_PASSIVE)
 
     async def close(self):
         pass
@@ -37,7 +44,7 @@ class BaseDevice(metaclass=RegisteredType):
                 loop=self._loop,
             )
         except Exception:
-            logger.exception('Cannot connect to device')
+            logger.exception(f'Cannot connect to device {self}')
             result = None
         return result
 
@@ -119,6 +126,9 @@ class Device(BaseDevice):
     async def handle(self, *args, **kwargs):
         raise NotImplementedError()
 
+    def handle_advert(self, *args, **kwargs):
+        raise NotImplementedError()
+
     async def handle_messages(self, *args, **kwargs):
         while True:
             await aio.sleep(1)
@@ -144,6 +154,9 @@ class Device(BaseDevice):
         return BleakClient(self._mac, address_type=self.MAC_TYPE)
 
     async def connect(self):
+        if self.passive:
+            return None
+
         self.client = await self.get_client()
         self.disconnected_future = self._loop.create_future()
         try:

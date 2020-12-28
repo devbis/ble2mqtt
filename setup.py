@@ -21,7 +21,7 @@ setup(
     packages=find_packages(include=['ble2mqtt', 'ble2mqtt.*']),
     install_requires=[
         'aio-mqtt>=0.2.0',
-        'bleak>=0.9.0',
+        'bleak>=0.10.0',
     ],
     classifiers=[
         'Programming Language :: Python :: 3.5',
