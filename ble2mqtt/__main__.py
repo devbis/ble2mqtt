@@ -18,8 +18,10 @@ def main():
         try:
             with open(os.environ['BLE2MQTT_CONFIG'], 'r') as f:
                 config = json.load(f)
-        except Exception:
+        except FileNotFoundError:
             pass
+        except Exception:
+            raise
 
     config = {
         'mqtt_host': 'localhost',
