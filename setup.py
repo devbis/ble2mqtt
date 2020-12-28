@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from setuptools import find_packages, setup
+
 from ble2mqtt.__version__ import VERSION
 
 with open("README.md", "r") as fh:
