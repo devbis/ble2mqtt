@@ -32,6 +32,7 @@ class BaseDevice(metaclass=RegisteredType):
                 'This device doesn\'t support passive mode',
             )
         self.passive = kwargs.get('passive', self.SUPPORT_PASSIVE)
+        self.config_sent = False
 
     async def close(self):
         pass

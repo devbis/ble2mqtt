@@ -184,10 +184,11 @@ class Ble2Mqtt:
                 device.unique_id,
             ],
             'name': device.unique_id,
-            'sw_version': device.version,
             'model': device.model,
             'manufacturer': device.manufacturer,
         }
+        if device.version:
+            device_info['sw_version'] = device.version
 
         def get_generic_vals(entity: dict):
             name = entity.pop('name')
@@ -326,6 +327,7 @@ class Ble2Mqtt:
             self._client.publish(message)
             for message in messages_to_send
         ])
+        device.config_sent = True
 
     async def restart_bluetooth(self):
         # EXPERIMENTAL: restart bluetooth on errors
@@ -405,7 +407,8 @@ class Ble2Mqtt:
                     continue
 
             try:
-                await self.send_device_config(device)
+                if not device.passive:
+                    await self.send_device_config(device)
 
                 if device.subscribed_topics:
                     await self._client.subscribe(*[
@@ -429,7 +432,10 @@ class Ble2Mqtt:
                     [
                         *([disconnect_fut] if disconnect_fut else []),
                         self._loop.create_task(
-                            device.handle(self.publish_topic_callback),
+                            device.handle(
+                                self.publish_topic_callback,
+                                send_config=self.send_device_config,
+                            ),
                         ),
                         self._loop.create_task(
                             device.handle_messages(self.publish_topic_callback),
