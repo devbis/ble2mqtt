@@ -528,13 +528,16 @@ class Ble2Mqtt:
 
     async def scan_devices_task(self):
         while True:
-            async with BleakScanner() as scanner:
-                scanner.register_detection_callback(
-                    self.device_detection_callback,
-                )
-                await aio.sleep(3.0)
-                devices = await scanner.get_discovered_devices()
-            logger.debug(f'found {len(devices)} devices')
+            try:
+                async with BleakScanner() as scanner:
+                    scanner.register_detection_callback(
+                        self.device_detection_callback,
+                    )
+                    await aio.sleep(3.0)
+                    devices = await scanner.get_discovered_devices()
+                logger.debug(f'found {len(devices)} devices')
+            except KeyError as e:
+                logger.exception(e)
             await aio.sleep(1)
 
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
