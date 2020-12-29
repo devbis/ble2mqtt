@@ -536,7 +536,7 @@ class Ble2Mqtt:
                     await aio.sleep(3.0)
                     devices = await scanner.get_discovered_devices()
                 logger.debug(f'found {len(devices)} devices')
-            except KeyError as e:
+            except ListOfConnectionErrors as e:
                 logger.exception(e)
             await aio.sleep(1)
 
