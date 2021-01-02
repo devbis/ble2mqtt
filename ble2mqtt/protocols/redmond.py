@@ -134,7 +134,7 @@ class RedmondKettle200Protocol(BaseDevice):
 
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
-        assert await self.client.is_connected()
+        assert self.client.is_connected
         # check for fresh client
         assert not self.client._notification_callbacks
         logger.info(f'Enable BLE notifications from [{self.client.address}]')

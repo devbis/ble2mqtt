@@ -187,7 +187,7 @@ class Device(BaseDevice):
 
     async def close(self):
         try:
-            if self.client and await self.client.is_connected():
+            if self.client and self.client.is_connected:
                 await self.client.disconnect()
         # exception on macos when checking for is_connected()
         except AttributeError:

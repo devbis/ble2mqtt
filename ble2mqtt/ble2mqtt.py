@@ -113,7 +113,7 @@ class Ble2Mqtt:
             await self.stop_task(task)
         for k, task in self._device_manage_tasks.items():
             await self.stop_task(task)
-        if self._client.is_connected():
+        if self._client.is_connected:
             await self._client.disconnect()
 
     def _get_topic(self, dev_id, subtopic, *args):
@@ -160,7 +160,7 @@ class Ble2Mqtt:
                         break
                 else:
                     raise NotImplementedError('Unknown topic')
-                if not await device.client.is_connected():
+                if not device.client.is_connected:
                     logger.warning(
                         f'Received topic {topic_wo_prefix} '
                         f'with {message.payload} '
