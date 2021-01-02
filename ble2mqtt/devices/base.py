@@ -86,9 +86,11 @@ class Device(BaseDevice):
         self.connection_event = aio.Event()
 
     def get_entity_from_topic(self, topic: str):
-        return topic.removesuffix(self.SET_POSTFIX).removeprefix(
-            self.unique_id,
-        ).strip('/')
+        if topic.startswith(self.unique_id):
+            topic = topic[len(self.unique_id):]
+        if topic.endswith(self.SET_POSTFIX):
+            topic = topic[:-len(self.SET_POSTFIX)]
+        return topic.strip('/')
 
     @property
     def subscribed_topics(self):

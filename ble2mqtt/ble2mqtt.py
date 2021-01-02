@@ -151,9 +151,11 @@ class Ble2Mqtt:
                 if message.topic_name not in self.subscribed_topics:
                     continue
 
-                topic_wo_prefix = message.topic_name.removeprefix(
-                    f'{self.TOPIC_ROOT}/',
-                )
+                prefix = f'{self.TOPIC_ROOT}/'
+                if message.topic_name.startswith(prefix):
+                    topic_wo_prefix = message.topic_name[len(prefix):]
+                else:
+                    topic_wo_prefix = prefix
                 for _device in self.device_registry:
                     if topic_wo_prefix in _device.subscribed_topics:
                         device = _device
