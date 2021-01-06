@@ -72,3 +72,19 @@ Run the service in background
 ```shell script
 python -m ble2mqtt 2> /tmp/ble2mqtt.log &
 ```
+
+## Container
+
+Build the image as:
+
+```shell script
+podman build .
+```
+
+Then use it as a mounted volume as:
+
+```shell script
+podman run -d --net=host -v $PWD/ble2mqtt.json.sample:/etc/ble2mqtt.json:z 5966e7eaef47
+```
+
+NOTE: `--net=host` is required as it needs to use the bluetooth interface
