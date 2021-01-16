@@ -10,7 +10,7 @@ can be overridden with `BLE2MQTT_CONFIG` environment variable.
 Example run command:
 
 ```sh 
-BLE2MQTT_CONFIG=./ble2mqtt.json python3 ble2mqtt.py
+BLE2MQTT_CONFIG=./ble2mqtt.json ble2mqtt
 ```
 
 The configuration file is a JSON with the following content:
@@ -31,6 +31,11 @@ The configuration file is a JSON with the following content:
             "type": "xiaomihtv1"
         },
         {
+            "address": "11:22:34:aa:bb:dd",
+            "type": "xiaomihtv1",
+            "passive": false
+        },
+        {
             "address": "11:22:33:aa:bb:ee",
             "type": "xiaomilywsd"
         }
@@ -47,6 +52,13 @@ Supported devices:
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC (xiaomilywsd)
 
+By default, a device works in the passive mode without connection by 
+listening to advertisement packets from a device.
+To use connection to the device provide `"passive": false` parameter.
+
+**Supported devices in passive mode:**
+- Xiaomi MJ_HT_V1 (xiaomihtv1)
+
 
 ## OpenWRT installation
 
@@ -55,7 +67,8 @@ Execute the following commands in the terminal:
 ```shell script
 opkg update
 opkg install python3-pip python3-asyncio
-pip install -U ble2mqtt
+pip3 install git+https://github.com/hbldh/bleak.git@f50a334e1173b27a8cf0a53d8ac56d9acc24fedf#egg=bleak
+pip3 install -U ble2mqtt
 ```
 
 Create the configuration file in /etc/ble2mqtt.json and
@@ -70,7 +83,7 @@ hciconfig hci0 up
 Run the service in background
 
 ```shell script
-python -m ble2mqtt 2> /tmp/ble2mqtt.log &
+ble2mqtt 2> /tmp/ble2mqtt.log &
 ```
 
 ## Container
