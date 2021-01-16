@@ -95,10 +95,10 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
                 await self._notify_state(publish_topic)
             await aio.sleep(self.CONNECTION_TIMEOUT)
 
-    async def handle(self, publish_topic, *args, **kwargs):
+    async def handle(self, publish_topic, send_config, *args, **kwargs):
         if self.passive:
             return await self.handle_passive(
                 publish_topic,
-                kwargs['send_config'],
+                send_config,
             )
-        return await super().handle(publish_topic, *args, **kwargs)
+        return await super().handle(publish_topic, send_config, *args, **kwargs)

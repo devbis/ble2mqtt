@@ -119,6 +119,10 @@ class Ble2Mqtt:
     def register(self, device: Device):
         if not device:
             return
+        if not device.passive and not device.SUPPORT_ACTIVE:
+            raise NotImplementedError(
+                f'Device {device.dev_id} doesn\'t support active mode',
+            )
         self.device_registry.append(device)
 
     @property
@@ -484,6 +488,8 @@ class Ble2Mqtt:
                         'Stop manage task on MQTT connection error',
                     )
                     return
+                except KeyboardInterrupt:
+                    raise
                 except Exception as e:
                     logger.exception(
                         f'Couldn\'t stop all tasks for device={device}, {e}',
@@ -534,7 +540,8 @@ class Ble2Mqtt:
 
     def device_detection_callback(self, device, advertisement_data):
         for reg_device in self.device_registry:
-            if reg_device._mac == device.address and reg_device.passive:
+            if reg_device._mac.lower() == device.address.lower() and \
+                    reg_device.passive:
                 if device.name:
                     reg_device._model = device.name
                 reg_device.handle_advert(device, advertisement_data)

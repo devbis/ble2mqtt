@@ -63,6 +63,12 @@ class BaseDevice(metaclass=RegisteredType):
     def unique_id(self):
         raise None
 
+    async def handle(self, publish_topic, send_config, *args, **kwargs):
+        raise NotImplementedError()
+
+    def handle_advert(self, *args, **kwargs):
+        raise NotImplementedError()
+
 
 class Device(BaseDevice):
     MQTT_VALUES = None
@@ -124,12 +130,6 @@ class Device(BaseDevice):
     @property
     def entities(self):
         return {}
-
-    async def handle(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def handle_advert(self, *args, **kwargs):
-        raise NotImplementedError()
 
     async def handle_messages(self, *args, **kwargs):
         while True:

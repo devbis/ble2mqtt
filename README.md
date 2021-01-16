@@ -38,6 +38,10 @@ The configuration file is a JSON with the following content:
         {
             "address": "11:22:33:aa:bb:ee",
             "type": "xiaomilywsd"
+        },
+        {
+            "address": "11:22:33:aa:bb:ff",
+            "type": "xiaomilywsd_atc"
         }
     ]
 }
@@ -51,6 +55,7 @@ Supported devices:
 **Humidity sensors:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC (xiaomilywsd)
+- Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
 
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
@@ -58,6 +63,7 @@ To use connection to the device provide `"passive": false` parameter.
 
 **Supported devices in passive mode:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
+- Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
 
 
 ## OpenWRT installation

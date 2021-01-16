@@ -47,7 +47,7 @@ class XiaomiPoller(BaseDevice):
     async def read_and_send_data(self, publish_topic):
         raise NotImplementedError()
 
-    async def handle(self, publish_topic, *args, **kwargs):
+    async def handle(self, publish_topic, send_config, *args, **kwargs):
         while True:
             try:
                 logger.debug(f'Wait {self} for connecting...')
