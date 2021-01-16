@@ -22,8 +22,9 @@ setup(
     packages=find_packages(include=['ble2mqtt', 'ble2mqtt.*']),
     install_requires=[
         'aio-mqtt>=0.2.0',
-        'bleak>=0.10.0',
+        'bleak',
     ],
+    dependency_links=['http://github.com/hbldh/bleak/tarball/dbus-next-2#egg=bleak-0.12.0'],
     classifiers=[
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',

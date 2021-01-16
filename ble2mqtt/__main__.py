@@ -10,6 +10,7 @@ from .devices import registered_device_types
 
 def main():
     logging.basicConfig(level='INFO')
+    # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
     loop = aio.get_event_loop()
 
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')

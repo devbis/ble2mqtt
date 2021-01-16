@@ -26,7 +26,6 @@ class BaseDevice(metaclass=RegisteredType):
     def __init__(self, *args, loop, **kwargs):
         self._loop = loop
         self.client: BleakClient = None
-        self.bt_lock = aio.Lock()
         if kwargs.get('passive') and not self.SUPPORT_PASSIVE:
             raise NotImplementedError(
                 'This device doesn\'t support passive mode',
@@ -148,9 +147,9 @@ class Device(BaseDevice):
             'value': value,
         })
 
-    async def get_device_data(self):
+    async def get_device_data(self) -> ty.Sequence[aio.Future]:
         """Here put the initial configuration for the device"""
-        pass
+        return []
 
     async def get_client(self) -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
@@ -163,9 +162,8 @@ class Device(BaseDevice):
         self.client = await self.get_client()
         self.disconnected_future = self._loop.create_future()
         try:
-            async with self.bt_lock:
-                await self.client.connect()
-                self.connection_event.set()
+            await self.client.connect()
+            self.connection_event.set()
             self.client.set_disconnected_callback(self.on_disconnect)
         except BleakError:
             self.connection_event.clear()
@@ -177,20 +175,15 @@ class Device(BaseDevice):
     def on_disconnect(self, client, *args):
         logger.info(f'Client {client.address} disconnected, device={self}')
         self.connection_event.clear()
-        if self.disconnected_future.done() or \
-                self.disconnected_future.cancelled():
-            raise NotImplementedError(
-                f'disconnected_future for device={self} is '
-                f'{self.disconnected_future}',
-            )
-        self.disconnected_future.set_result(client.address)
-        self.client.set_disconnected_callback(None)
-        self.client = None
+        if not self.disconnected_future.done() and \
+                not self.disconnected_future.cancelled():
+            self.disconnected_future.set_result(client.address)
 
     async def close(self):
         try:
-            if self.client and self.client.is_connected:
-                await self.client.disconnect()
+            connected = self.client and self.client.is_connected
         # exception on macos when checking for is_connected()
         except AttributeError:
-            pass
+            connected = True
+        if connected:
+            await self.client.disconnect()

@@ -1,6 +1,7 @@
 import asyncio as aio
 import json
 import logging
+import typing as ty
 import uuid
 
 from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
@@ -75,8 +76,8 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             ],
         }
 
-    async def get_device_data(self):
-        await super().protocol_start()
+    async def get_device_data(self) -> ty.Sequence[aio.Future]:
+        await self.protocol_start()
         await self.login(self._key)
         model = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(model, (bytes, bytearray)):
@@ -94,6 +95,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             self.initial_status_sent = False
         await self.set_time()
         await self._update_statistics()
+        return [self.queue_handler] if self.queue_handler else []
 
     def update_multiplier(self, state: Kettle200State = None):
         if state is None:

@@ -1,2 +1,2 @@
 aio-mqtt==0.2.0
-bleak>=0.10.0
+git+https://github.com/hbldh/bleak.git@f50a334e1173b27a8cf0a53d8ac56d9acc24fedf#egg=bleak
