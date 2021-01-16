@@ -54,7 +54,7 @@ Execute the following commands in the terminal:
 
 ```shell script
 opkg update
-opkg install python3-twisted python3-pip python3-asyncio
+opkg install python3-pip python3-asyncio
 pip install -U ble2mqtt
 ```
 
