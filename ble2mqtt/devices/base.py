@@ -1,3 +1,4 @@
+import abc
 import asyncio as aio
 import logging
 import typing as ty
@@ -6,6 +7,12 @@ from bleak import BleakClient, BleakError
 
 logger = logging.getLogger(__name__)
 registered_device_types = {}
+
+
+BINARY_SENSOR_DOMAIN = 'binary_sensor'
+SENSOR_DOMAIN = 'sensor'
+LIGHT_DOMAIN = 'light'
+SWITCH_DOMAIN = 'switch'
 
 
 class RegisteredType(type):
@@ -50,6 +57,8 @@ class BaseDevice(metaclass=RegisteredType):
 
     @staticmethod
     def transform_value(value):
+        if isinstance(value, bool):
+            return 'ON' if value else 'OFF'
         if not isinstance(value, str):
             return value
         vl = value.lower()
@@ -90,6 +99,13 @@ class Device(BaseDevice):
         self._manufacturer = self.MANUFACTURER
         self.connection_event = aio.Event()
 
+        assert set(self.entities.keys()) <= {
+            BINARY_SENSOR_DOMAIN,
+            SENSOR_DOMAIN,
+            LIGHT_DOMAIN,
+            SWITCH_DOMAIN,
+        }
+
     def get_entity_from_topic(self, topic: str):
         if topic.startswith(self.unique_id):
             topic = topic[len(self.unique_id):]
@@ -103,7 +119,7 @@ class Device(BaseDevice):
             f'{self.unique_id}/{entity["name"]}/{self.SET_POSTFIX}'
             for cls, items in self.entities.items()
             for entity in items
-            if cls in ['switch', 'light']
+            if cls in [SWITCH_DOMAIN, LIGHT_DOMAIN]
         ]
 
     @property
@@ -128,6 +144,7 @@ class Device(BaseDevice):
         return '_'.join([p for p in parts if p])
 
     @property
+    @abc.abstractmethod
     def entities(self):
         return {}
 

@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager
 import aio_mqtt
 from bleak import BleakError, BleakScanner
 
-from .devices.base import Device
+from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
+                           SWITCH_DOMAIN, Device)
 
 logger = logging.getLogger(__name__)
 
@@ -214,44 +215,7 @@ class Ble2Mqtt:
 
         messages_to_send = []
         for cls, entities in device.entities.items():
-            if cls == 'switch':
-                for entity in entities:
-                    entity_name = entity['name']
-                    state_topic = self._get_topic(device.unique_id, entity_name)
-                    command_topic = '/'.join((state_topic, device.SET_POSTFIX))
-                    config_topic = '/'.join((
-                        CONFIG_MQTT_NAMESPACE,
-                        cls,
-                        device.dev_id,
-                        entity_name,
-                        'config',
-                    ))
-                    payload = json.dumps({
-                        **get_generic_vals(entity),
-                        'state_topic': state_topic,
-                        'command_topic': command_topic,
-                    })
-                    logger.debug(
-                        f'Publish config topic={config_topic}: {payload}',
-                    )
-                    messages_to_send.append(
-                        aio_mqtt.PublishableMessage(
-                            topic_name=config_topic,
-                            payload=payload,
-                            qos=aio_mqtt.QOSLevel.QOS_1,
-                            retain=True,
-                        ),
-                    )
-                    # TODO: send real state on receiving status from a device
-                    logger.debug(f'Publish initial state topic={state_topic}')
-                    await self._client.publish(
-                        aio_mqtt.PublishableMessage(
-                            topic_name=state_topic,
-                            payload='OFF',
-                            qos=aio_mqtt.QOSLevel.QOS_1,
-                        ),
-                    )
-            if cls == 'sensor':
+            if cls in (BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN):
                 for entity in entities:
                     entity_name = entity['name']
                     state_topic = self._get_topic(
@@ -294,7 +258,44 @@ class Ble2Mqtt:
                             retain=True,
                         ),
                     )
-            if cls == 'light':
+            if cls == SWITCH_DOMAIN:
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    command_topic = '/'.join((state_topic, device.SET_POSTFIX))
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        device.dev_id,
+                        entity_name,
+                        'config',
+                    ))
+                    payload = json.dumps({
+                        **get_generic_vals(entity),
+                        'state_topic': state_topic,
+                        'command_topic': command_topic,
+                    })
+                    logger.debug(
+                        f'Publish config topic={config_topic}: {payload}',
+                    )
+                    messages_to_send.append(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+                    # TODO: send real state on receiving status from a device
+                    logger.debug(f'Publish initial state topic={state_topic}')
+                    await self._client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=state_topic,
+                            payload='OFF',
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                        ),
+                    )
+            if cls == LIGHT_DOMAIN:
                 for entity in entities:
                     entity_name = entity['name']
                     state_topic = self._get_topic(device.unique_id, entity_name)
@@ -542,7 +543,7 @@ class Ble2Mqtt:
             await aio.wait([task])
             try:
                 dev.close()
-            except Exception as e:
+            except Exception:
                 logger.exception(f'Error on closing dev {dev}')
 
     def device_detection_callback(self, device, advertisement_data):

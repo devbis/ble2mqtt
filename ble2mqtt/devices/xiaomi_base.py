@@ -2,6 +2,7 @@ import json
 import logging
 
 from ..protocols.xiaomi import XiaomiPoller
+from .base import SENSOR_DOMAIN
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class XiaomiHumidityTemperature(XiaomiPoller):
     @property
     def entities(self):
         return {
-            'sensor': [
+            SENSOR_DOMAIN: [
                 {
                     'name': 'temperature',
                     'device_class': 'temperature',

@@ -6,7 +6,7 @@ import uuid
 
 from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
                                  RedmondKettle200Protocol, RunState)
-from .base import Device
+from .base import LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device
 from .uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
@@ -48,13 +48,13 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     @property
     def entities(self):
         return {
-            'switch': [
+            SWITCH_DOMAIN: [
                 {
                     'name': BOIL_ENTITY,
                     'icon': 'kettle',
                 },
             ],
-            'sensor': [
+            SENSOR_DOMAIN: [
                 {
                     'name': TEMPERATURE_ENTITY,
                     'device_class': 'temperature',
@@ -69,7 +69,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'unit_of_measurement': ' ',
                 },
             ],
-            'light': [
+            LIGHT_DOMAIN: [
                 {
                     'name': LIGHT_ENTITY,
                 },
