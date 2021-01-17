@@ -111,7 +111,10 @@ class Ble2Mqtt:
         for k, task in self._device_manage_tasks.items():
             await self.stop_task(task)
         if self._client.is_connected:
-            await self._client.disconnect()
+            try:
+                await self._client.disconnect()
+            except aio_mqtt.Error:
+                pass
 
     def _get_topic(self, dev_id, subtopic, *args):
         return '/'.join((self.TOPIC_ROOT, dev_id, subtopic, *args))
@@ -537,6 +540,10 @@ class Ble2Mqtt:
             task = self._device_manage_tasks.pop(dev)
             task.cancel()
             await aio.wait([task])
+            try:
+                dev.close()
+            except Exception as e:
+                logger.exception(f'Error on closing dev {dev}')
 
     def device_detection_callback(self, device, advertisement_data):
         for reg_device in self.device_registry:
@@ -582,12 +589,7 @@ class Ble2Mqtt:
             except aio.CancelledError:
                 pass
         for t in finished:
-            try:
-                t.result()
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                logger.exception(f'Root task has raised an exception {t}')
+            t.result()
 
     async def _connect_forever(self) -> None:
         while True:
