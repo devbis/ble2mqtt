@@ -4,16 +4,29 @@
     "mqtt_password": "",
     "devices": [
         {
+            "address": "11:22:33:aa:cc:aa",
+            "type": "presence"
+        },
+        {
             "address": "11:22:33:aa:bb:cc",
             "type": "redmond200"
         },
-		{
+        {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
         },
-		{
+        {
+            "address": "11:22:34:aa:bb:dd",
+            "type": "xiaomihtv1",
+            "passive": false
+        },
+        {
             "address": "11:22:33:aa:bb:ee",
             "type": "xiaomilywsd"
+        },
+        {
+            "address": "11:22:33:aa:bb:ff",
+            "type": "xiaomilywsd_atc"
         }
     ]
 }

@@ -23,6 +23,10 @@ The configuration file is a JSON with the following content:
     "mqtt_password": "",
     "devices": [
         {
+            "address": "11:22:33:aa:cc:aa",
+            "type": "presence"
+        },
+        {
             "address": "11:22:33:aa:bb:cc",
             "type": "redmond200"
         },
@@ -48,6 +52,9 @@ The configuration file is a JSON with the following content:
 ```
 
 Supported devices:
+
+**Any device**
+- Any bluetooth device can work as a presence tracker
 
 **Kettles:**
 - Redmond G2xx series (redmond200)
