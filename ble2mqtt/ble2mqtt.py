@@ -44,6 +44,7 @@ ListOfMQTTConnectionErrors = (
         aio_mqtt.ConnectionLostError,
         aio_mqtt.ConnectionClosedError,
         aio_mqtt.ServerDiedError,
+        BrokenPipeError
 )
 
 
