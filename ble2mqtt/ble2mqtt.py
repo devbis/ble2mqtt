@@ -542,7 +542,7 @@ class Ble2Mqtt:
             task.cancel()
             await aio.wait([task])
             try:
-                dev.close()
+                await dev.close()
             except Exception:
                 logger.exception(f'Error on closing dev {dev}')
 
