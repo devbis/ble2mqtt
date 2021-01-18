@@ -57,7 +57,7 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
         adv_data = service_data.get(str(ADVERTISING))
 
         def from_word(data):
-            return int.from_bytes(data, byteorder='little') / 10
+            return int.from_bytes(data, byteorder='little', signed=True) / 10
 
         if adv_data:
             #                 <----- mac -----> typ  len <-- data -->

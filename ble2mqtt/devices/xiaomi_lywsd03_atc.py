@@ -31,7 +31,7 @@ class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature, Device):
         adv_data = service_data.get(str(ADVERTISING))
 
         def from_word(data):
-            return int.from_bytes(data, byteorder='big') / 10
+            return int.from_bytes(data, byteorder='big', signed=True) / 10
 
         if adv_data:
             # [a4 c1 38 84 7e 97 01 26 15 50 0b 73 17]
