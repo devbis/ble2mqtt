@@ -38,7 +38,6 @@ class SensorState:
 
 class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
     NAME = 'xiaomihtv1'
-    REQUIRE_CONNECTION = True
     DATA_CHAR = MJHT_DATA
     BATTERY_CHAR = MJHT_BATTERY
     SENSOR_CLASS = SensorState

@@ -25,7 +25,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
     RX_CHAR = UUID_NORDIC_RX
-    REQUIRE_CONNECTION = True
     CONNECTION_TIMEOUT = 30
     MANUFACTURER = 'Redmond'
 

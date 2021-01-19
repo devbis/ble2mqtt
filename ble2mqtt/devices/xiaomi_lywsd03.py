@@ -31,7 +31,6 @@ class SensorState:
 
 class XiaomiHumidityTemperatureLYWSD(XiaomiHumidityTemperature, Device):
     NAME = 'xiaomilywsd'
-    REQUIRE_CONNECTION = True
     DATA_CHAR = LYWSD_DATA
     BATTERY_CHAR = LYWSD_BATTERY
     SENSOR_CLASS = SensorState

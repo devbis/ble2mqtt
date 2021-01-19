@@ -48,23 +48,23 @@ class XiaomiPoller(BaseDevice):
         raise NotImplementedError()
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
+        logger.debug(f'Wait {self} for connecting...')
+        sec_to_wait_connection = 0
         while True:
-            try:
-                logger.debug(f'Wait {self} for connecting...')
-                await aio.wait_for(
-                    self.connection_event.wait(),
-                    timeout=1,
-                )
-            except aio.TimeoutError:
-                continue
+            if not self.client.is_connected:
+                if sec_to_wait_connection >= 30:
+                    raise TimeoutError(
+                        f'{self} not connected for 30 sec in handle()',
+                    )
+                sec_to_wait_connection += 1
 
+                await aio.sleep(1)
             try:
                 logger.debug(f'{self} connected!')
                 await self.read_and_send_data(publish_topic)
             except ValueError as e:
                 logger.error(f'Cannot read values {str(e)}')
             else:
-                if await self.connection_event.wait():
-                    await self.close()
-                    return
+                await self.close()
+                return
             await aio.sleep(1)

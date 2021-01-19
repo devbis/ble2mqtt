@@ -84,7 +84,6 @@ class Device(BaseDevice):
     ON_OFF = False
     SET_POSTFIX = 'set'
     RECONNECTION_TIMEOUT = 3
-    REQUIRE_CONNECTION = False
     MAC_TYPE = 'public'
     MANUFACTURER = None
     CONNECTION_TIMEOUT = 60
@@ -97,7 +96,6 @@ class Device(BaseDevice):
         self._model = None
         self._version = None
         self._manufacturer = self.MANUFACTURER
-        self.connection_event = aio.Event()
 
         assert set(self.entities.keys()) <= {
             BINARY_SENSOR_DOMAIN,
@@ -179,11 +177,9 @@ class Device(BaseDevice):
         self.client = await self.get_client()
         self.disconnected_future = self._loop.create_future()
         try:
-            await self.client.connect()
-            self.connection_event.set()
             self.client.set_disconnected_callback(self.on_disconnect)
+            await self.client.connect()
         except BleakError:
-            self.connection_event.clear()
             self.client.set_disconnected_callback(None)
             raise
         logger.info(f'Connected to {self.client.address}')
@@ -191,7 +187,6 @@ class Device(BaseDevice):
 
     def on_disconnect(self, client, *args):
         logger.info(f'Client {client.address} disconnected, device={self}')
-        self.connection_event.clear()
         if not self.disconnected_future.done() and \
                 not self.disconnected_future.cancelled():
             self.disconnected_future.set_result(client.address)
