@@ -375,6 +375,7 @@ class Ble2Mqtt:
     async def manage_device(self, device: Device):
         logger.debug(f'Start managing device={device}')
         failure_count = 0
+        missing_device_count = 0
         while True:
             logger.debug(f'Connecting to device={device}')
             try:
@@ -387,6 +388,10 @@ class Ble2Mqtt:
                 await device.close()
                 if 'DBus.Error.LimitsExceeded' in str(e):
                     raise
+                if 'Device with address' in str(e) and \
+                        'was not found' in str(e):
+                    missing_device_count += 1
+
                 if hardware_exception_occurred(e):
                     # restarted in contextmanager
                     continue
@@ -403,6 +408,19 @@ class Ble2Mqtt:
                         await self.restart_bluetooth()
                         failure_count = 0
                     await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
+
+                # sometimes LYWSD03MMC devices remain connected
+                # and doesn't advert their presence.
+                # If cannot find device for several attempts, restart
+                # the bluetooth chip
+                if missing_device_count >= device.CONNECTION_FAILURES_LIMIT:
+                    logger.error(
+                        f'Device {device} was not found for '
+                        f'{missing_device_count} times. Restarting bluetooth.',
+                    )
+                    missing_device_count = 0
+                    await self.restart_bluetooth()
+
                 continue
             initial_tasks = []
             if not device.passive:
@@ -412,6 +430,7 @@ class Ble2Mqtt:
                     async with self.handle_ble_exceptions():
                         initial_tasks = await device.get_device_data()
                         failure_count = 0
+                        missing_device_count = 0
                 except ListOfConnectionErrors:
                     logger.exception(f'Cannot get initial info device={device}')
                     await device.close()

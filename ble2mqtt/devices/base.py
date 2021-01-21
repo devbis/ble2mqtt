@@ -87,6 +87,7 @@ class Device(BaseDevice):
     MAC_TYPE = 'public'
     MANUFACTURER = None
     CONNECTION_TIMEOUT = 60
+    CONNECTION_FAILURES_LIMIT = 100
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
