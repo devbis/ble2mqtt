@@ -187,9 +187,6 @@ class Device(BaseDevice):
 
     def on_disconnect(self, client, *args):
         logger.info(f'Client {client.address} disconnected, device={self}')
-        if not self.disconnected_future.done() and \
-                not self.disconnected_future.cancelled():
-            self.disconnected_future.set_result(client.address)
 
     async def close(self):
         try:

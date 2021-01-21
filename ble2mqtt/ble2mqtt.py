@@ -174,6 +174,7 @@ class Ble2Mqtt:
                         f'with {message.payload} '
                         f' but {device.client} is offline',
                     )
+                    await aio.sleep(5)
                     continue
 
                 try:
@@ -392,14 +393,15 @@ class Ble2Mqtt:
                 elif 'org.bluez.Error.' in str(e) or \
                         'org.freedesktop.DBus.Error.' in str(e):
                     failure_count += 1
-                    if failure_count >= FAILURE_LIMIT:
-                        await self.restart_bluetooth()
                     logger.error(
                         f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
                         f'secs due to error in bluetooth, '
                         f'device={device}, exception={e}, '
                         f'failure_count={failure_count}',
                     )
+                    if failure_count >= FAILURE_LIMIT:
+                        await self.restart_bluetooth()
+                        failure_count = 0
                     await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
                 continue
             initial_tasks = []
