@@ -81,7 +81,6 @@ class BaseDevice(metaclass=RegisteredType):
 
 class Device(BaseDevice):
     MQTT_VALUES = None
-    ON_OFF = False
     SET_POSTFIX = 'set'
     RECONNECTION_TIMEOUT = 3
     MAC_TYPE = 'public'
@@ -140,7 +139,7 @@ class Device(BaseDevice):
     @property
     def unique_id(self):
         parts = [self.manufacturer, self.model, self.dev_id]
-        return '_'.join([p for p in parts if p])
+        return '_'.join([p.replace(' ', '_') for p in parts if p])
 
     @property
     @abc.abstractmethod
