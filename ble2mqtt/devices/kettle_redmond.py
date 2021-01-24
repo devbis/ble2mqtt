@@ -107,7 +107,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         )
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self._mac}] send state={self._state}')
+        logger.info(f'[{self}] send state={self._state}')
         coros = []
 
         state = {}
@@ -127,7 +127,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             ))
 
         # keep statistics in a separate topic
-        logger.info(f'[{self._mac}] send statistics={self._statistics}')
+        logger.info(f'[{self}] send statistics={self._statistics}')
         for sensor_name, value in (
             ('statistics', self._statistics),
         ):
@@ -253,7 +253,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             if entity_name == BOIL_ENTITY:
                 value = self.transform_value(value)
                 logger.info(
-                    f'[{self._mac}] switch kettle {entity_name} value={value}',
+                    f'[{self}] switch kettle {entity_name} value={value}',
                 )
                 while True:
                     try:
