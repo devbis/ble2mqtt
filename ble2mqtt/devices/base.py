@@ -50,7 +50,7 @@ class BaseDevice(metaclass=RegisteredType):
                 timeout=timeout,
                 loop=self._loop,
             )
-        except Exception:
+        except (aio.TimeoutError, BleakError, AttributeError):
             logger.exception(f'Cannot connect to device {self}')
             result = None
         return result

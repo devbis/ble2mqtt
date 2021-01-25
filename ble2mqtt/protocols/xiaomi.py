@@ -57,8 +57,8 @@ class XiaomiPoller(BaseDevice):
                         f'{self} not connected for 30 sec in handle()',
                     )
                 sec_to_wait_connection += 1
-
                 await aio.sleep(1)
+                continue
             try:
                 logger.debug(f'{self} connected!')
                 await self.read_and_send_data(publish_topic)

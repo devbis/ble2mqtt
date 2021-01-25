@@ -21,8 +21,6 @@ def main():
                 config = json.load(f)
         except FileNotFoundError:
             pass
-        except Exception:
-            raise
 
     config = {
         'mqtt_host': 'localhost',
