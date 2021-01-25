@@ -104,13 +104,19 @@ ble2mqtt 2> /tmp/ble2mqtt.log &
 Build the image as:
 
 ```shell script
-podman build .
+podman build -t ble2mqtt:dev .
 ```
 
-Then use it as a mounted volume as:
-
+Start the container and share the config file and DBus for Bluetooth connectivity:
 ```shell script
-podman run -d --net=host -v $PWD/ble2mqtt.json.sample:/etc/ble2mqtt.json:z 5966e7eaef47
+podman run \
+-d \
+--net=host \
+-v $PWD/ble2mqtt.json.sample:/etc/ble2mqtt.json:z \
+-v /var/run/dbus:/var/run/dbus:z \
+ble2mqtt:dev
 ```
+
+Instead of sharing `/var/run/dbus`, you can export `DBUS_SYSTEM_BUS_ADDRESS`.
 
 NOTE: `--net=host` is required as it needs to use the bluetooth interface
