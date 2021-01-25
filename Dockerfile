@@ -2,7 +2,7 @@
 FROM python:slim as builder
 
 RUN apt-get update && \
-    apt-get install gcc -y && \
+    apt-get install gcc git -y && \
     apt-get clean
 
 WORKDIR /usr/src/app
