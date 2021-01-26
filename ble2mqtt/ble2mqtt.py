@@ -33,10 +33,20 @@ ListOfConnectionErrors = (
 
 async def run_tasks_and_cancel_on_first_return(*tasks,
                                                return_when=aio.FIRST_COMPLETED):
-    done, pending = await aio.wait(
-        tasks,
-        return_when=return_when,
-    )
+    try:
+        done, pending = await aio.wait(
+            tasks,
+            return_when=return_when,
+        )
+    except aio.CancelledError:
+        # cancel subtasks if cancel current
+        for t in tasks:
+            t.cancel()
+            try:
+                await t
+            except aio.CancelledError:
+                pass
+        raise
     logger.info(f'run_tasks_and_cancel_on_first_return Pending: {pending}')
     for t in pending:
         if isinstance(t, aio.Task):
@@ -111,7 +121,6 @@ class Ble2Mqtt:
             self._loop.create_task(self._handle_messages()),
         )
         for t in result:
-            # forward exception from task if any
             t.result()
 
     @staticmethod
