@@ -47,7 +47,6 @@ async def run_tasks_and_cancel_on_first_return(*tasks,
             except aio.CancelledError:
                 pass
         raise
-    logger.info(f'run_tasks_and_cancel_on_first_return Pending: {pending}')
     for t in pending:
         if isinstance(t, aio.Task):
             t.cancel()
@@ -55,7 +54,6 @@ async def run_tasks_and_cancel_on_first_return(*tasks,
                 await t
             except aio.CancelledError:
                 pass
-    logger.info(f'run_tasks_and_cancel_on_first_return Done: {done}')
     return done
 
 
@@ -489,7 +487,7 @@ class Ble2Mqtt:
                     f'Start device {device} handle task and wait '
                     f'for disconnect',
                 )
-                finished = await run_tasks_and_cancel_on_first_return(
+                tasks = [
                     *(initial_tasks or []),
                     self._loop.create_task(
                         device.handle(
@@ -550,7 +548,7 @@ class Ble2Mqtt:
                         )
                         await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
 
-            logger.info(f'unsubscribe from topics for device={device}')
+            logger.debug(f'unsubscribe from topics for device={device}')
             try:
                 if mqtt_topics:
                     await self._client.unsubscribe(*[
