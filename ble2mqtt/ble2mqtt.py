@@ -495,10 +495,13 @@ class Ble2Mqtt:
                             send_config=self.send_device_config,
                         ),
                     ),
-                    self._loop.create_task(
+                ]
+                will_handle_messages = bool(device.subscribed_topics)
+                if will_handle_messages:
+                    tasks.append(self._loop.create_task(
                         device.handle_messages(self.publish_topic_callback),
-                    ),
-                )
+                    ))
+                finished = await run_tasks_and_cancel_on_first_return(*tasks)
                 for t in finished:
                     logger.debug(f'Fetching result device={device}, task={t}')
                     t.result()
