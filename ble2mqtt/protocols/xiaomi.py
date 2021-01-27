@@ -61,7 +61,12 @@ class XiaomiPoller(BaseDevice):
                 continue
             try:
                 logger.debug(f'{self} connected!')
-                await self.read_and_send_data(publish_topic)
+                # in case of bluetooth error populating queue
+                # could stop and will wait for self._stack.get() forever
+                await aio.wait_for(
+                    self.read_and_send_data(publish_topic),
+                    timeout=15,
+                )
             except ValueError as e:
                 logger.error(f'Cannot read values {str(e)}')
             else:
