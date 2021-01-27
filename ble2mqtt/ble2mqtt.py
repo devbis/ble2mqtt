@@ -504,6 +504,8 @@ class Ble2Mqtt:
                 for t in finished:
                     logger.debug(f'Fetching result device={device}, task={t}')
                     t.result()
+            except aio.CancelledError:
+                raise
             except AttributeError as e:
                 #   File "/usr/lib/python3.7/site-packages/aio_mqtt/client.py", line 423, in _send
                 # AttributeError: 'NoneType' object has no attribute 'drain'
@@ -588,6 +590,8 @@ class Ble2Mqtt:
             await self.stop_task(task)
             try:
                 await dev.close()
+            except aio.CancelledError:
+                raise
             except Exception:
                 logger.exception(f'Error on closing dev {dev}')
 
@@ -656,6 +660,8 @@ class Ble2Mqtt:
                 )
                 await self._run_device_tasks(mqtt_connection.disconnect_reason)
 
+            except aio.CancelledError:
+                raise
             except KeyboardInterrupt:
                 raise
             except Exception:
