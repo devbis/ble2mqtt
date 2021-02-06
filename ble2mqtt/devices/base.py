@@ -96,7 +96,7 @@ class Device(BaseDevice):
         super().__init__(*args, **kwargs)
         self.disconnected_event = aio.Event()
         self.message_queue = aio.Queue()
-        self._mac = mac
+        self.mac = mac
         self._model = None
         self._version = None
         self._manufacturer = self.MANUFACTURER
@@ -138,7 +138,7 @@ class Device(BaseDevice):
 
     @property
     def dev_id(self):
-        return self._mac.replace(':', '').lower()
+        return self.mac.replace(':', '').lower()
 
     @property
     def unique_id(self):
@@ -172,7 +172,7 @@ class Device(BaseDevice):
 
     async def get_client(self, **kwargs) -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
-        return BleakClient(self._mac, address_type=self.MAC_TYPE, **kwargs)
+        return BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
 
     async def connect(self):
         if self.passive:

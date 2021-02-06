@@ -536,7 +536,7 @@ class Ble2Mqtt:
 
     def device_detection_callback(self, device, advertisement_data):
         for reg_device in self.device_registry:
-            if reg_device._mac.lower() == device.address.lower() and \
+            if reg_device.mac.lower() == device.address.lower() and \
                     reg_device.passive:
                 if device.name:
                     reg_device._model = device.name
