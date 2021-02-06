@@ -80,7 +80,7 @@ Execute the following commands in the terminal:
 ```shell script
 opkg update
 opkg install python3-pip python3-asyncio
-pip3 install git+https://github.com/hbldh/bleak.git@f50a334e1173b27a8cf0a53d8ac56d9acc24fedf#egg=bleak
+pip3 install http://github.com/hbldh/bleak/tarball/dbus-next-2#egg=bleak-0.11.0a1
 pip3 install -U ble2mqtt
 ```
 
