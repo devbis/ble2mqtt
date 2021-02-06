@@ -92,7 +92,6 @@ class Ble2Mqtt:
             client_id_prefix='ble2mqtt_',
             loop=self._loop,
         )
-        self._root_tasks = []
 
         self._device_manage_tasks = {}
 
@@ -123,10 +122,17 @@ class Ble2Mqtt:
             pass
 
     async def close(self) -> None:
-        for task in self._root_tasks:
-            await self.stop_task(task)
-        for k, task in self._device_manage_tasks.items():
-            await self.stop_task(task)
+        tasks = []
+        devices = []
+        for device, task in self._device_manage_tasks.items():
+            tasks.append(aio.create_task(self.stop_task(task)))
+            devices.append(device)
+        await aio.gather(*tasks, return_exceptions=True)
+        await aio.gather(
+            *[aio.create_task(device.close()) for device in devices],
+            return_exceptions=True
+        )
+
         if self._mqtt_client.is_connected:
             try:
                 await self._mqtt_client.disconnect()

@@ -2,10 +2,34 @@ import asyncio as aio
 import json
 import logging
 import os
+import signal
 
 from ble2mqtt.ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
+
+
+async def shutdown(loop, service: Ble2Mqtt, signal=None):
+    """Cleanup tasks tied to the service's shutdown."""
+    if signal:
+        logging.info(f"Received exit signal {signal.name}...")
+    logging.info("Closing ble2mqtt service")
+    await service.close()
+    tasks = [t for t in aio.all_tasks() if t is not aio.current_task()]
+
+    [task.cancel() for task in tasks]
+
+    logging.info(f"Cancelling {len(tasks)} outstanding tasks")
+    await aio.gather(*tasks, return_exceptions=True)
+    loop.stop()
+
+
+def handle_exception(loop, context, service):
+    # context["message"] will always be there; but context["exception"] may not
+    msg = context.get("exception", context["message"])
+    logging.error(f"Caught exception: {msg}")
+    logging.info("Shutting down...")
+    aio.create_task(shutdown(loop, service))
 
 
 def main():
@@ -28,13 +52,23 @@ def main():
         **config,
     }
 
-    server = Ble2Mqtt(
+    service = Ble2Mqtt(
         reconnection_interval=10,
         loop=loop,
         host=config['mqtt_host'],
         port=config['mqtt_port'],
         user=config.get('mqtt_user'),
         password=config.get('mqtt_password'),
+    )
+
+    signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+    for sig in signals:
+        loop.add_signal_handler(
+            sig,
+            lambda s=sig: aio.create_task(shutdown(loop, service, s)),
+        )
+    loop.set_exception_handler(
+        lambda *args: handle_exception(*args, service=service),
     )
 
     devices = config.get('devices') or []
@@ -45,19 +79,17 @@ def main():
         except (ValueError, IndexError):
             continue
         klass = registered_device_types[typ]
-        server.register(klass(
+        service.register(klass(
             mac=mac,
             loop=loop,
             **device,
         ))
 
     try:
-        loop.run_until_complete(server.start())
-    except KeyboardInterrupt:
-        pass
-
+        loop.create_task(service.start())
+        loop.run_forever()
     finally:
-        loop.run_until_complete(server.close())
+        loop.run_until_complete(service.close())
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
 
