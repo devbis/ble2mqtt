@@ -19,7 +19,6 @@ class XiaomiPoller(BaseDevice):
     def __init__(self, *args, loop, **kwargs):
         super().__init__(*args, loop=loop, **kwargs)
         self._stack = aio.LifoQueue(loop=loop)
-        self.connection_event = aio.Event()
 
     async def get_device_data(self):
         await self.client.start_notify(
@@ -32,6 +31,7 @@ class XiaomiPoller(BaseDevice):
         name = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(name, (bytes, bytearray)):
             self._model = name.decode()
+        return []
 
     def filter_notifications(self, sender):
         return True
@@ -68,7 +68,7 @@ class XiaomiPoller(BaseDevice):
                     timeout=15,
                 )
             except ValueError as e:
-                logger.error(f'Cannot read values {str(e)}')
+                logger.error(f'[{self}] Cannot read values {str(e)}')
             else:
                 await self.close()
                 return

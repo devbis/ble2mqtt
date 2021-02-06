@@ -30,6 +30,10 @@ class BaseDevice(metaclass=RegisteredType):
     SUPPORT_PASSIVE = False
     SUPPORT_ACTIVE = True
 
+    # Whether we should stop handle task on disconnect or not
+    # if true wait more to publish data to topics
+    DEVICE_DROPS_CONNECTION = False
+
     def __init__(self, *args, loop, **kwargs):
         self._loop = loop
         self.client: BleakClient = None
@@ -90,7 +94,7 @@ class Device(BaseDevice):
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.disconnected_future: ty.Optional[aio.Future] = None
+        self.disconnected_event = aio.Event()
         self.message_queue = aio.Queue()
         self._mac = mac
         self._model = None
@@ -166,27 +170,28 @@ class Device(BaseDevice):
         """Here put the initial configuration for the device"""
         return []
 
-    async def get_client(self) -> BleakClient:
+    async def get_client(self, **kwargs) -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
-        return BleakClient(self._mac, address_type=self.MAC_TYPE)
+        return BleakClient(self._mac, address_type=self.MAC_TYPE, **kwargs)
 
     async def connect(self):
         if self.passive:
-            return None
+            return
 
-        self.client = await self.get_client()
-        self.disconnected_future = self._loop.create_future()
+        self.client = await self.get_client(
+            disconnected_callback=self._on_disconnect,
+        )
+        self.disconnected_event.clear()
         try:
-            self.client.set_disconnected_callback(self.on_disconnect)
             await self.client.connect()
-        except BleakError:
-            self.client.set_disconnected_callback(None)
+        except (Exception, aio.CancelledError):
+            self.disconnected_event.set()
             raise
         logger.info(f'Connected to {self.client.address}')
-        return self.disconnected_future
 
-    def on_disconnect(self, client, *args):
+    def _on_disconnect(self, client, *args):
         logger.info(f'Client {client.address} disconnected, device={self}')
+        self.disconnected_event.set()
 
     async def close(self):
         try:

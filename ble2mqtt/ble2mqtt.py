@@ -33,24 +33,19 @@ ListOfConnectionErrors = (
 
 async def run_tasks_and_cancel_on_first_return(*tasks,
                                                return_when=aio.FIRST_COMPLETED):
+    pending = []
+    done = aio.Future()
+    done.set_result(None)
     try:
         done, pending = await aio.wait(tasks, return_when=return_when)
-    except aio.CancelledError:
-        # cancel subtasks if cancel current
-        for t in tasks:
-            t.cancel()
-            try:
-                await t
-            except aio.CancelledError:
-                pass
-        raise
-    for t in pending:
-        if isinstance(t, aio.Task):
-            t.cancel()
-            try:
-                await t
-            except aio.CancelledError:
-                pass
+    finally:
+        for t in pending:
+            if isinstance(t, aio.Task):
+                t.cancel()
+                try:
+                    await t
+                except aio.CancelledError:
+                    pass
     return done
 
 
@@ -93,7 +88,7 @@ class Ble2Mqtt:
 
         self._reconnection_interval = reconnection_interval
         self._loop = loop or aio.get_event_loop()
-        self._client = aio_mqtt.Client(
+        self._mqtt_client = aio_mqtt.Client(
             client_id_prefix='ble2mqtt_',
             loop=self._loop,
         )
@@ -108,7 +103,7 @@ class Ble2Mqtt:
         ))
 
         self.device_registry: ty.List[Device] = []
-        self.bluetooth_restarting = False
+        self.bluetooth_restarting = aio.Lock()
 
     async def start(self):
         result = await run_tasks_and_cancel_on_first_return(
@@ -132,9 +127,9 @@ class Ble2Mqtt:
             await self.stop_task(task)
         for k, task in self._device_manage_tasks.items():
             await self.stop_task(task)
-        if self._client.is_connected:
+        if self._mqtt_client.is_connected:
             try:
-                await self._client.disconnect()
+                await self._mqtt_client.disconnect()
             except (aio_mqtt.Error, BrokenPipeError):
                 pass
 
@@ -160,7 +155,7 @@ class Ble2Mqtt:
 
     async def publish_topic_callback(self, topic, value):
         logger.debug(f'call publish callback topic={topic} value={value}')
-        await self._client.publish(
+        await self._mqtt_client.publish(
             aio_mqtt.PublishableMessage(
                 topic_name='/'.join((self.TOPIC_ROOT, topic)),
                 payload=value,
@@ -169,7 +164,7 @@ class Ble2Mqtt:
         )
 
     async def _handle_messages(self) -> None:
-        async for message in self._client.delivered_messages(
+        async for message in self._mqtt_client.delivered_messages(
             f'{self.TOPIC_ROOT}/#',
         ):
             logger.debug(message)
@@ -310,7 +305,7 @@ class Ble2Mqtt:
                     )
                     # TODO: send real state on receiving status from a device
                     logger.debug(f'Publish initial state topic={state_topic}')
-                    await self._client.publish(
+                    await self._mqtt_client.publish(
                         aio_mqtt.PublishableMessage(
                             topic_name=state_topic,
                             payload='OFF',
@@ -353,34 +348,33 @@ class Ble2Mqtt:
                         ),
                     )
         await aio.gather(*[
-            self._client.publish(message)
+            self._mqtt_client.publish(message)
             for message in messages_to_send
         ])
         device.config_sent = True
 
     async def restart_bluetooth(self):
         # EXPERIMENTAL: restart bluetooth on errors
-        if self.bluetooth_restarting:
+        if self.bluetooth_restarting.locked():
             await aio.sleep(9)
             return
-        self.bluetooth_restarting = True
-        logger.warning('Restarting bluetoothd...')
-        proc = await aio.create_subprocess_exec(
-            'hciconfig', 'hci0', 'down',
-        )
-        await proc.wait()
-        proc = await aio.create_subprocess_exec(
-            '/etc/init.d/bluetoothd', 'restart',
-        )
-        await proc.wait()
-        await aio.sleep(3)
-        proc = await aio.create_subprocess_exec(
-            'hciconfig', 'hci0', 'up',
-        )
-        await proc.wait()
-        await aio.sleep(5)
-        logger.warning('Restarting bluetoothd finished')
-        self.bluetooth_restarting = False
+        async with self.bluetooth_restarting:
+            logger.warning('Restarting bluetoothd...')
+            proc = await aio.create_subprocess_exec(
+                'hciconfig', 'hci0', 'down',
+            )
+            await proc.wait()
+            proc = await aio.create_subprocess_exec(
+                '/etc/init.d/bluetoothd', 'restart',
+            )
+            await proc.wait()
+            await aio.sleep(3)
+            proc = await aio.create_subprocess_exec(
+                'hciconfig', 'hci0', 'up',
+            )
+            await proc.wait()
+            await aio.sleep(5)
+            logger.warning('Restarting bluetoothd finished')
 
     @asynccontextmanager
     async def handle_ble_exceptions(self):
@@ -396,12 +390,67 @@ class Ble2Mqtt:
         logger.debug(f'Start managing device={device}')
         failure_count = 0
         missing_device_count = 0
-        mqtt_topics = []
         while True:
-            logger.debug(f'Connecting to device={device}')
+            tasks = []
+            async with self.bluetooth_restarting:
+                logger.debug(f'[{device}] Check for lock')
             try:
                 async with self.handle_ble_exceptions():
                     await device.connect()
+                    initial_tasks = []
+                    if not device.passive:
+                        if not device.DEVICE_DROPS_CONNECTION:
+                            initial_tasks.append(
+                                device.disconnected_event.wait(),
+                            )
+                        initial_tasks += await device.get_device_data()
+                        failure_count = 0
+                        missing_device_count = 0
+
+                    if device.subscribed_topics:
+                        await self._mqtt_client.subscribe(*[
+                            (
+                                '/'.join((self.TOPIC_ROOT, topic)),
+                                aio_mqtt.QOSLevel.QOS_1,
+                            )
+                            for topic in device.subscribed_topics
+                        ])
+                    logger.debug(f'[{device}] mqtt subscribed')
+                    tasks = [
+                        *(initial_tasks or []),
+                        self._loop.create_task(
+                            device.handle(
+                                self.publish_topic_callback,
+                                send_config=self.send_device_config,
+                            ),
+                        ),
+                    ]
+                    will_handle_messages = bool(device.subscribed_topics)
+                    if will_handle_messages:
+                        tasks.append(self._loop.create_task(
+                            device.handle_messages(self.publish_topic_callback),
+                        ))
+
+                    logger.debug(f'[{device}] tasks are created')
+
+                    finished = await run_tasks_and_cancel_on_first_return(
+                        *tasks,
+                    )
+                    if device.disconnected_event.is_set():
+                        logger.debug(f'{device} has disconnected')
+                    for t in finished:
+                        logger.debug(
+                            f'Fetching result device={device}, task={t}',
+                        )
+                        t.result()
+            except aio.CancelledError:
+                raise
+            except KeyboardInterrupt:
+                raise
+            except (ConnectionError, TimeoutError) as e:
+                logger.warning(
+                    f'[{device}] connection problem, {e} {repr(e)}',
+                )
             except ListOfConnectionErrors as e:
                 if 'Device with address' in str(e) and \
                         'was not found' in str(e):
@@ -411,30 +460,12 @@ class Ble2Mqtt:
                         f'attempts={missing_device_count}',
                     )
                 else:
+                    if isinstance(e, aio.TimeoutError):
+                        failure_count += 1
                     logger.warning(
-                        f'Error while connecting to {device}, {e} {repr(e)}',
-                    )
-                await device.close()
-                if 'DBus.Error.LimitsExceeded' in str(e):
-                    raise
-
-                if hardware_exception_occurred(e):
-                    # restarted in contextmanager
-                    continue
-
-                if 'org.bluez.Error.' in str(e) or \
-                        'org.freedesktop.DBus.Error.' in str(e):
-                    failure_count += 1
-                    logger.error(
-                        f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
-                        f'secs due to error in bluetooth, '
-                        f'device={device}, exception={e}, '
+                        f'Error while connecting to {device}, {e} {repr(e)}, '
                         f'failure_count={failure_count}',
                     )
-                    if failure_count >= FAILURE_LIMIT:
-                        await self.restart_bluetooth()
-                        failure_count = 0
-                    await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
 
                 # sometimes LYWSD03MMC devices remain connected
                 # and doesn't advert their presence.
@@ -447,128 +478,34 @@ class Ble2Mqtt:
                     )
                     missing_device_count = 0
                     await self.restart_bluetooth()
-
-                continue
-            initial_tasks = []
-            if not device.passive:
-                try:
-                    # retrieve version and details
-                    logger.debug(f'get_device_data device={device}')
-                    async with self.handle_ble_exceptions():
-                        initial_tasks = await device.get_device_data()
-                        failure_count = 0
-                        missing_device_count = 0
-                except ListOfConnectionErrors:
-                    logger.exception(f'Cannot get initial info device={device}')
-                    await device.close()
-                    continue
-
-            try:
-                if not device.passive:
-                    await self.send_device_config(device)
-                if device.subscribed_topics:
-                    await self._client.subscribe(*[
-                        (
-                            '/'.join((self.TOPIC_ROOT, topic)),
-                            aio_mqtt.QOSLevel.QOS_1,
-                        )
-                        for topic in device.subscribed_topics
-                    ])
-                    mqtt_topics = device.subscribed_topics
-            except (aio_mqtt.Error, BrokenPipeError):
-                logger.exception(f'Cannot subscribe to topics device={device}')
-                await device.close()
-                raise
-
-            logger.info(
-                f'Start device {device} handle task and wait '
-                f'for disconnect',
-            )
-            tasks = [
-                *(initial_tasks or []),
-                self._loop.create_task(
-                    device.handle(
-                        self.publish_topic_callback,
-                        send_config=self.send_device_config,
-                    ),
-                ),
-            ]
-            will_handle_messages = bool(device.subscribed_topics)
-            if will_handle_messages:
-                tasks.append(self._loop.create_task(
-                    device.handle_messages(self.publish_topic_callback),
-                ))
-
-            try:
-                finished = await run_tasks_and_cancel_on_first_return(*tasks)
-                for t in finished:
-                    logger.debug(f'Fetching result device={device}, task={t}')
-                    t.result()
-            except aio.CancelledError:
-                raise
-            except AttributeError as e:
-                #   File "/usr/lib/python3.7/site-packages/aio_mqtt/client.py", line 423, in _send
-                # AttributeError: 'NoneType' object has no attribute 'drain'
-                if "'NoneType' object has no attribute 'drain'" in str(e):
-                    logger.exception(
-                        'Stop manage task on MQTT connection error',
-                    )
-                    raise aio_mqtt.Error
-                logger.exception(f'{device} AttributeError')
-                # go to finally block
-            except (aio_mqtt.Error, BrokenPipeError):
-                mqtt_topics = []
-                logger.exception('Stop manage task on MQTT connection error')
-                raise
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                if hardware_exception_occurred(e):
-                    await self.restart_bluetooth()
-                logger.exception(f'Device {device} raised an error')
-            else:
-                logger.info(f'Stop {device} task, wait for next loop')
             finally:
                 try:
-                    async with self.handle_ble_exceptions():
-                        await device.close()
-                except ListOfConnectionErrors as e:
-                    # if close raises an error it might relate to
-                    # temporary down of bluetooth device
-                    # if so, sleep for a min and try to reconnect
-                    failure_count += 1
-                    if failure_count >= FAILURE_LIMIT:
-                        await self.restart_bluetooth()
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
+                            try:
+                                await t
+                            except aio.CancelledError:
+                                pass
 
-                    # 'org.freedesktop.DBus.Error.ServiceUnknown'
-                    # 'org.freedesktop.DBus.Error.NoReply'
-                    elif 'org.freedesktop.DBus.Error.' in str(e):
-                        device.client = None
-                        logger.error(
-                            f'Sleep for {BLUETOOTH_ERROR_RECONNECTION_TIMEOUT} '
-                            f'secs due to error in bluetooth, '
-                            f'device={device}, exception={e}',
-                        )
-                        await aio.sleep(BLUETOOTH_ERROR_RECONNECTION_TIMEOUT)
+                    await device.close()
+                except aio.CancelledError:
+                    raise
+                except Exception:
+                    pass
 
-            logger.debug(f'unsubscribe from topics for device={device}')
-            if mqtt_topics:
+            if failure_count >= FAILURE_LIMIT:
+                await self.restart_bluetooth()
+                failure_count = 0
+            if not device.disconnected_event.is_set():
                 try:
-                    await self._client.unsubscribe(*[
-                        '/'.join((self.TOPIC_ROOT, topic))
-                        for topic in mqtt_topics
-                    ])
-                    mqtt_topics = []
-                    logger.debug(f'unsubscribed successfully {device}')
-                except (aio_mqtt.Error, BrokenPipeError):
-                    logger.exception(
-                        f'Stop manage task for {device} on MQTT '
-                        f'connection error',
+                    await device.close()
+                    await aio.wait_for(
+                        device.disconnected_event.wait(),
+                        timeout=10,
                     )
-                    raise
-                except KeyboardInterrupt:
-                    raise
-
+                except aio.TimeoutError:
+                    logger.error(f'{device} not disconnected in 10 secs')
             logger.info(
                 f'Sleep for {device.RECONNECTION_TIMEOUT} secs to '
                 f'reconnect to device={device}',
@@ -578,6 +515,8 @@ class Ble2Mqtt:
     async def create_device_manage_tasks(self):
         tasks = []
         for dev in self.device_registry:
+            assert not self._device_manage_tasks.get(dev) or \
+                self._device_manage_tasks[dev].done()
             task = self._loop.create_task(self.manage_device(dev))
             self._device_manage_tasks[dev] = task
             tasks.append(task)
@@ -616,6 +555,8 @@ class Ble2Mqtt:
                     logger.debug(f'found {len(devices)} devices')
             except KeyboardInterrupt:
                 raise
+            except aio.IncompleteReadError:
+                raise
             except ListOfConnectionErrors as e:
                 logger.exception(e)
             await aio.sleep(1)
@@ -636,7 +577,7 @@ class Ble2Mqtt:
         dev_id = hex(getnode())
         while True:
             try:
-                mqtt_connection = await self._client.connect(
+                mqtt_connection = await self._mqtt_client.connect(
                     host=self._mqtt_host,
                     port=self._mqtt_port,
                     username=self._mqtt_user,
@@ -650,7 +591,7 @@ class Ble2Mqtt:
                     ),
                 )
                 logger.info(f'Connected to {self._mqtt_host}')
-                await self._client.publish(
+                await self._mqtt_client.publish(
                     aio_mqtt.PublishableMessage(
                         topic_name=self.availability_topic,
                         payload='online',
@@ -659,20 +600,20 @@ class Ble2Mqtt:
                     ),
                 )
                 await self._run_device_tasks(mqtt_connection.disconnect_reason)
-
             except aio.CancelledError:
                 raise
             except KeyboardInterrupt:
                 raise
-            except Exception:
+            except Exception as e:
+                logger.exception(
+                    "Connection lost. Will retry in %d seconds. %s",
+                    self._reconnection_interval,
+                    e,
+                )
                 try:
-                    await self._client.disconnect()
+                    await self._mqtt_client.disconnect()
                 except aio_mqtt.Error:
                     pass
-                logger.exception(
-                    "Connection lost. Will retry in %d seconds",
-                    self._reconnection_interval,
-                )
                 try:
                     await self.stop_device_manage_tasks()
                 except Exception as e1:

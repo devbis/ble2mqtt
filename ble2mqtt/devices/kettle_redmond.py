@@ -247,7 +247,16 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
-            message = await self.message_queue.get()
+            try:
+                if not self.client.is_connected:
+                    raise ConnectionError()
+                message = await aio.wait_for(
+                    self.message_queue.get(),
+                    timeout=60,
+                )
+            except aio.TimeoutError:
+                await aio.sleep(1)
+                continue
             value = message['value']
             entity_name = self.get_entity_from_topic(message['topic'])
             if entity_name == BOIL_ENTITY:
