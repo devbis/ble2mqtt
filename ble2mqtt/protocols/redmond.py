@@ -36,11 +36,17 @@ class Mode(Enum):
     BOIL = 0x00
     HEAT = 0x01
     LIGHT = 0x03
+    UNKNOWN1 = 0x04
+    UNKNOWN2 = 0x05
+    UNKNOWN3 = 0x06
 
 
 class RunState(Enum):
     OFF = 0x00
+    SETUP_PROGRAM = 0x01  # for cooker
     ON = 0x02
+    HEAT = 0x04  # for cooker
+    DELAYED_START = 0x05  # for cooker
 
 
 class ColorTarget(Enum):
@@ -73,7 +79,7 @@ class Kettle200State:
             current_temp,  # 5
             color_change_period,  # 6-7
             state,  # 8,9
-            _,  # 10,11
+            ionization,  # 10,11  # for air purifier
             _,   # 12,
             boil_time_relative,  # 13
             error,  # 14,15
