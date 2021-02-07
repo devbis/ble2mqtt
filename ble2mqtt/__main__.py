@@ -44,10 +44,6 @@ def handle_exception(loop, context, service):
 
 
 def main():
-    logging.basicConfig(level='INFO')
-    # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
-    loop = aio.get_event_loop()
-
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')
     config = {}
     if os.path.exists(os.environ['BLE2MQTT_CONFIG']):
@@ -60,8 +56,13 @@ def main():
     config = {
         'mqtt_host': 'localhost',
         'mqtt_port': 1883,
+        'log_level': 'INFO',
         **config,
     }
+
+    logging.basicConfig(level=config['log_level'].upper())
+    # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
+    loop = aio.get_event_loop()
 
     service = Ble2Mqtt(
         reconnection_interval=10,

@@ -21,6 +21,7 @@ The configuration file is a JSON with the following content:
     "mqtt_port": 1883,
     "mqtt_user": "",
     "mqtt_password": "",
+    "log_level": "INFO",
     "devices": [
         {
             "address": "11:22:33:aa:cc:aa",
@@ -50,6 +51,8 @@ The configuration file is a JSON with the following content:
     ]
 }
 ```
+
+You can omit a line, then default value will be used.
 
 Supported devices:
 
