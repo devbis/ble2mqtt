@@ -47,6 +47,14 @@ def handle_exception(loop, context, service):
         # task = asyncio.get_event_loop().create_task(self._cleanup_all())
         logger.info("Ignore this exception.")
         return
+
+    if "'NoneType' object has no attribute 'set'" in \
+            str(repr(context.get('exception', ''))):
+        # lambda _: self._disconnecting_event.set()
+        # AttributeError: 'NoneType' object has no attribute 'set'
+        logger.info("Ignore this exception.")
+        return
+
     logger.info("Shutting down...")
     aio.create_task(shutdown(loop, service))
 
