@@ -7,6 +7,7 @@ from uuid import getnode
 
 import aio_mqtt
 from bleak import BleakError, BleakScanner
+from bleak.backends.device import BLEDevice
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
                            SWITCH_DOMAIN, Device)
@@ -243,7 +244,19 @@ class Ble2Mqtt:
             return result
 
         messages_to_send = []
-        for cls, entities in device.entities.items():
+        sensor_entities = device.entities.get(SENSOR_DOMAIN, [])
+        sensor_entities.append(
+            {
+                'name': 'linkquality',
+                'unit_of_measurement': 'lqi',
+                'icon': 'signal',
+            },
+        )
+        entities = {
+            **device.entities,
+            SENSOR_DOMAIN: sensor_entities,
+        }
+        for cls, entities in entities.items():
             if cls in (BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN):
                 for entity in entities:
                     entity_name = entity['name']
@@ -546,13 +559,16 @@ class Ble2Mqtt:
             except Exception:
                 logger.exception(f'Error on closing dev {dev}')
 
-    def device_detection_callback(self, device, advertisement_data):
+    def device_detection_callback(self, device: BLEDevice, advertisement_data):
         for reg_device in self.device_registry:
-            if reg_device.mac.lower() == device.address.lower() and \
-                    reg_device.passive:
-                if device.name:
-                    reg_device._model = device.name
-                reg_device.handle_advert(device, advertisement_data)
+            if reg_device.mac.lower() == device.address.lower():
+                if device.rssi:
+                    # update rssi for all devices if available
+                    reg_device.rssi = device.rssi
+                if reg_device.passive:
+                    if device.name:
+                        reg_device._model = device.name
+                    reg_device.handle_advert(device, advertisement_data)
 
     async def scan_devices_task(self):
         while True:

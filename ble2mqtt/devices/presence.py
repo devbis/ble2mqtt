@@ -42,7 +42,7 @@ class Presence(Device):
 
     async def _notify_state(self, publish_topic):
         logger.info(f'[{self}] send state={self._state}')
-        state = {}
+        state = {'linkquality': self.linkquality}
         for sensor_name, value in (
                 ('presence', self._state.presence),
         ):

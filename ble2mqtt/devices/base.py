@@ -5,6 +5,8 @@ import typing as ty
 
 from bleak import BleakClient, BleakError
 
+from ble2mqtt.utils import rssi_to_linkquality
+
 logger = logging.getLogger(__name__)
 registered_device_types = {}
 
@@ -100,6 +102,7 @@ class Device(BaseDevice):
         self._model = None
         self._version = None
         self._manufacturer = self.MANUFACTURER
+        self._rssi = None
 
         assert set(self.entities.keys()) <= {
             BINARY_SENSOR_DOMAIN,
@@ -144,6 +147,20 @@ class Device(BaseDevice):
     def unique_id(self):
         parts = [self.manufacturer, self.model, self.dev_id]
         return '_'.join([p.replace(' ', '_') for p in parts if p])
+
+    @property
+    def rssi(self):
+        return self._rssi
+
+    @rssi.setter
+    def rssi(self, value):
+        self._rssi = value
+
+    @property
+    def linkquality(self):
+        if self.rssi is None:
+            return None
+        return rssi_to_linkquality(self.rssi)
 
     @property
     @abc.abstractmethod

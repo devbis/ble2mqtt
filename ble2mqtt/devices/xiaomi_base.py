@@ -38,7 +38,7 @@ class XiaomiHumidityTemperature(XiaomiPoller):
 
     async def _notify_state(self, publish_topic):
         logger.info(f'[{self}] send state={self._state}')
-        state = {}
+        state = {'linkquality': self.linkquality}
         for sensor_name, value in (
                 ('temperature', self._state.temperature),
                 ('humidity', self._state.humidity),

@@ -110,7 +110,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         logger.info(f'[{self}] send state={self._state}')
         coros = []
 
-        state = {}
+        state = {'linkquality': self.linkquality}
         for sensor_name, value in (
             ('temperature', self._state.temperature),
         ):
