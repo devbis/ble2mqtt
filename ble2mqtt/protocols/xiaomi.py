@@ -63,6 +63,8 @@ class XiaomiPoller(BaseDevice):
                 logger.debug(f'{self} connected!')
                 # in case of bluetooth error populating queue
                 # could stop and will wait for self._stack.get() forever
+                if not self.config_sent:
+                    await send_config(self)
                 await aio.wait_for(
                     self.read_and_send_data(publish_topic),
                     timeout=15,
