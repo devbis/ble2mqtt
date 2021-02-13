@@ -33,19 +33,25 @@ ListOfConnectionErrors = (
 
 async def run_tasks_and_cancel_on_first_return(*tasks,
                                                return_when=aio.FIRST_COMPLETED):
-    pending = []
-    done = aio.Future()
-    done.set_result(None)
     try:
         done, pending = await aio.wait(tasks, return_when=return_when)
-    finally:
-        for t in pending:
-            if isinstance(t, aio.Task):
+    except aio.CancelledError:
+        for t in tasks:
+            if isinstance(t, aio.Task) and not t.done():
                 t.cancel()
                 try:
                     await t
                 except aio.CancelledError:
                     pass
+        raise
+
+    for t in pending:
+        if isinstance(t, aio.Task):
+            t.cancel()
+            try:
+                await t
+            except aio.CancelledError:
+                pass
     return done
 
 
@@ -512,7 +518,7 @@ class Ble2Mqtt:
                     )
                 except aio.TimeoutError:
                     logger.error(f'{device} not disconnected in 10 secs')
-            logger.info(
+            logger.debug(
                 f'Sleep for {device.RECONNECTION_TIMEOUT} secs to '
                 f'reconnect to device={device}',
             )

@@ -190,7 +190,7 @@ class Device(BaseDevice):
         logger.info(f'Connected to {self.client.address}')
 
     def _on_disconnect(self, client, *args):
-        logger.info(f'Client {client.address} disconnected, device={self}')
+        logger.debug(f'Client {client.address} disconnected, device={self}')
         self.disconnected_event.set()
 
     async def close(self):
