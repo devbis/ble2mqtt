@@ -19,6 +19,7 @@ class XiaomiPoller(BaseDevice):
     def __init__(self, *args, loop, **kwargs):
         super().__init__(*args, loop=loop, **kwargs)
         self._stack = aio.LifoQueue(loop=loop)
+        self._state = None
 
     async def get_device_data(self):
         await self.client.start_notify(
@@ -47,7 +48,7 @@ class XiaomiPoller(BaseDevice):
     async def read_and_send_data(self, publish_topic):
         raise NotImplementedError()
 
-    async def handle(self, publish_topic, send_config, *args, **kwargs):
+    async def handle_active(self, publish_topic, send_config, *args, **kwargs):
         logger.debug(f'Wait {self} for connecting...')
         sec_to_wait_connection = 0
         while True:
@@ -63,9 +64,7 @@ class XiaomiPoller(BaseDevice):
                 logger.debug(f'{self} connected!')
                 # in case of bluetooth error populating queue
                 # could stop and will wait for self._stack.get() forever
-                self.rssi = self.client._properties.get('RSSI')
-                if not self.config_sent:
-                    await send_config(self)
+                await self.update_device_data(send_config)
                 await aio.wait_for(
                     self.read_and_send_data(publish_topic),
                     timeout=15,
@@ -76,3 +75,19 @@ class XiaomiPoller(BaseDevice):
                 await self.close()
                 return
             await aio.sleep(1)
+
+    async def handle_passive(self, publish_topic, send_config, *args, **kwargs):
+        while True:
+            if not self._state:
+                await aio.sleep(5)
+                continue
+            logger.debug(f'Try publish {self._state}')
+            if self._state and self._state.temperature and self._state.humidity:
+                await self.update_device_data(send_config)
+                await self._notify_state(publish_topic)
+            await aio.sleep(self.CONNECTION_TIMEOUT)
+
+    async def handle(self, *args, **kwargs):
+        if self.passive:
+            return await self.handle_passive(*args, **kwargs)
+        return await self.handle_active(*args, **kwargs)

@@ -1,4 +1,3 @@
-import asyncio as aio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -81,23 +80,3 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
                 f'Advert received for {self}, {data_formatted}, '
                 f'current state: {self._state}',
             )
-
-    async def handle_passive(self, publish_topic, send_config):
-        while True:
-            if not self._state:
-                await aio.sleep(5)
-                continue
-            logger.debug(f'Try publish {self._state}')
-            if self._state and self._state.temperature and self._state.humidity:
-                if not self.config_sent:
-                    await send_config(self)
-                await self._notify_state(publish_topic)
-            await aio.sleep(self.CONNECTION_TIMEOUT)
-
-    async def handle(self, publish_topic, send_config, *args, **kwargs):
-        if self.passive:
-            return await self.handle_passive(
-                publish_topic,
-                send_config,
-            )
-        return await super().handle(publish_topic, send_config, *args, **kwargs)

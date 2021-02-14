@@ -211,9 +211,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         counter = 0
         while True:
-            if not self.config_sent:
-                await send_config(self)
-            self.rssi = self.client._properties.get('RSSI')
+            await self.update_device_data(send_config)
             # if boiling notify every 5 seconds, 60 sec otherwise
             new_state = await self.get_mode()
             await self.notify_run_state(new_state, publish_topic)

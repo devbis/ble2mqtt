@@ -137,7 +137,7 @@ class Ble2Mqtt:
         await aio.gather(*tasks, return_exceptions=True)
         await aio.gather(
             *[aio.create_task(device.close()) for device in devices],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         if self._mqtt_client.is_connected:

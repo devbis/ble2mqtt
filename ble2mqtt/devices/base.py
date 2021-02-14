@@ -171,6 +171,16 @@ class Device(BaseDevice):
         while True:
             await aio.sleep(1)
 
+    async def update_device_data(self, send_config):
+        """
+        Call this method on each iteration in handle.
+        It will update rssi and config
+        """
+        if not self.config_sent:
+            await send_config(self)
+        if self.client:  # in passive mode, client is None
+            self.rssi = self.client._properties.get('RSSI')
+
     def __str__(self):
         return self.unique_id
 

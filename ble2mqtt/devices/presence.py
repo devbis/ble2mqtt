@@ -76,8 +76,7 @@ class Presence(Device):
                 continue
 
             if self._state:
-                if not self.config_sent:
-                    await send_config(self)
+                await self.update_device_data(send_config)
                 if self._state.presence and \
                         self._state.last_check + \
                         timedelta(seconds=self.THRESHOLD) < datetime.now():

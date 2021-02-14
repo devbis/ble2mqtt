@@ -8,7 +8,6 @@ from ble2mqtt.ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
 
-
 logger = logging.getLogger(__name__)
 
 
