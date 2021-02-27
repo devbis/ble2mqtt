@@ -47,6 +47,10 @@ The configuration file is a JSON with the following content:
         {
             "address": "11:22:33:aa:bb:ff",
             "type": "xiaomilywsd_atc"
+        },
+        {
+            "address": "11:22:33:aa:aa:aa",
+            "type": "atomfast"
         }
     ]
 }
@@ -66,6 +70,9 @@ Supported devices:
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC (xiaomilywsd)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
+
+**Dosimeters**
+- Atom Fast (atomfast)
 
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
