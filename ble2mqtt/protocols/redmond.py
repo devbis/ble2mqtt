@@ -340,3 +340,4 @@ class RedmondKettle200Protocol(BaseDevice):
 
     async def close(self):
         self.cmd_queue._queue.clear()
+        await super().close()
