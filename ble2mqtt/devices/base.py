@@ -193,7 +193,7 @@ class Device(BaseDevice):
             'value': value,
         })
 
-    async def get_device_data(self) -> ty.Sequence[aio.Future]:
+    async def get_device_data(self) -> ty.Sequence[callable]:
         """Here put the initial configuration for the device"""
         return []
 

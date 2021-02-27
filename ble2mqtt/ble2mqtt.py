@@ -32,8 +32,9 @@ ListOfConnectionErrors = (
 )
 
 
-async def run_tasks_and_cancel_on_first_return(*tasks,
-                                               return_when=aio.FIRST_COMPLETED):
+async def run_tasks_and_cancel_on_first_return(*tasks: ty.Set[aio.Future],
+                                               return_when=aio.FIRST_COMPLETED,
+                                               ) -> ty.Set[aio.Future]:
     try:
         done, pending = await aio.wait(tasks, return_when=return_when)
     except aio.CancelledError:
@@ -49,6 +50,8 @@ async def run_tasks_and_cancel_on_first_return(*tasks,
     for t in pending:
         if isinstance(t, aio.Task):
             t.cancel()
+    for t in pending:
+        if isinstance(t, aio.Task):
             try:
                 await t
             except aio.CancelledError:
@@ -422,13 +425,11 @@ class Ble2Mqtt:
             try:
                 async with self.handle_ble_exceptions():
                     await device.connect()
-                    initial_tasks = []
+                    initial_coros = []
                     if not device.passive:
                         if not device.DEVICE_DROPS_CONNECTION:
-                            initial_tasks.append(
-                                device.disconnected_event.wait(),
-                            )
-                        initial_tasks += await device.get_device_data()
+                            initial_coros.append(device.disconnected_event.wait)
+                        initial_coros.extend(await device.get_device_data())
                         failure_count = 0
                         missing_device_count = 0
 
@@ -442,13 +443,13 @@ class Ble2Mqtt:
                         ])
                     logger.debug(f'[{device}] mqtt subscribed')
                     tasks = [
-                        *(initial_tasks or []),
                         self._loop.create_task(
                             device.handle(
                                 self.publish_topic_callback,
                                 send_config=self.send_device_config,
                             ),
                         ),
+                        *[aio.create_task(coro()) for coro in initial_coros],
                     ]
                     will_handle_messages = bool(device.subscribed_topics)
                     if will_handle_messages:
@@ -472,9 +473,11 @@ class Ble2Mqtt:
                 raise
             except KeyboardInterrupt:
                 raise
-            except (ConnectionError, TimeoutError) as e:
+            except (ConnectionError, TimeoutError, aio.TimeoutError) as e:
+                missing_device_count += 1
                 logger.warning(
-                    f'[{device}] connection problem, {e} {repr(e)}',
+                    f'[{device}] connection problem, {e} {repr(e)}, '
+                    f'attempts={missing_device_count}',
                 )
             except ListOfConnectionErrors as e:
                 if 'Device with address' in str(e) and \
@@ -574,7 +577,7 @@ class Ble2Mqtt:
         while True:
             try:
                 async with self.handle_ble_exceptions():
-                    async with BleakScanner() as scanner:
+                    async with BleakScanner(scanning_mode='passive') as scanner:
                         scanner.register_detection_callback(
                             self.device_detection_callback,
                         )

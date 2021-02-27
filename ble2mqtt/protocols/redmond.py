@@ -133,7 +133,6 @@ class RedmondKettle200Protocol(BaseDevice):
         self.wait_event = aio.Event()
         self.received_data = None
         self.cmd_queue = aio.Queue()
-        self.queue_handler = None
 
     def notification_handler(self, sender: int, data: bytearray):
         logger.debug("Notification: {0}: {1}".format(
@@ -154,12 +153,17 @@ class RedmondKettle200Protocol(BaseDevice):
                 f'{" ".join(format(x, "02x") for x in cmd)}',
             )
             self.wait_event.clear()
-            cmd_resp = await self.client.write_gatt_char(
-                self.TX_CHAR,
-                cmd,
-                True,
+            cmd_resp = await aio.wait_for(
+                self.client.write_gatt_char(
+                    self.TX_CHAR,
+                    cmd,
+                    True,
+                ),
+                timeout=command.timeout,
             )
             if not command.wait_reply:
+                if command.answer.cancelled():
+                    return
                 command.answer.set_result(cmd_resp)
 
             await aio.wait_for(
@@ -171,6 +175,8 @@ class RedmondKettle200Protocol(BaseDevice):
             cmd_resp = bytes(self.received_data[3:-1])
             self.wait_event.clear()
             self.received_data = None
+            if command.answer.cancelled():
+                return
             command.answer.set_result(cmd_resp)
 
     async def protocol_start(self):
@@ -193,12 +199,9 @@ class RedmondKettle200Protocol(BaseDevice):
             self.RX_CHAR,
             self.notification_handler,
         )
-        self.queue_handler = aio.create_task(self.handle_queue())
-        return self.queue_handler
 
     async def protocol_stop(self):
         # NB: not used for now as we don't disconnect from our side
-        self.queue_handler.cancel()
         await self.client.stop_notify(self.RX_CHAR)
 
     @staticmethod
@@ -233,7 +236,7 @@ class RedmondKettle200Protocol(BaseDevice):
                            wait_reply=True, timeout=25):
         cmd = KettleCommand(cmd, payload, wait_reply, timeout)
         await self.cmd_queue.put(cmd)
-        return await cmd.answer
+        return await aio.wait_for(cmd.answer, timeout)
 
     async def login(self, key):
         logger.debug('logging in...')
