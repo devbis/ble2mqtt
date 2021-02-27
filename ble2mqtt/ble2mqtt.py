@@ -429,7 +429,7 @@ class Ble2Mqtt:
                     if not device.passive:
                         if not device.DEVICE_DROPS_CONNECTION:
                             initial_coros.append(device.disconnected_event.wait)
-                        initial_coros.extend(await device.get_device_data())
+                        await device.get_device_data()
                         failure_count = 0
                         missing_device_count = 0
 

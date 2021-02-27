@@ -82,7 +82,6 @@ class AtomFast(Device):
         name = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(name, (bytes, bytearray)):
             self._model = name.decode().strip('\0')
-        return []
 
     def filter_notifications(self, sender):
         # Consider filtering by sender == 0x24

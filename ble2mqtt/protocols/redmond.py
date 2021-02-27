@@ -133,6 +133,7 @@ class RedmondKettle200Protocol(BaseDevice):
         self.wait_event = aio.Event()
         self.received_data = None
         self.cmd_queue = aio.Queue()
+        self.queue_handler = self._loop.create_task(self.handle_queue())
 
     def notification_handler(self, sender: int, data: bytearray):
         logger.debug("Notification: {0}: {1}".format(
@@ -145,39 +146,46 @@ class RedmondKettle200Protocol(BaseDevice):
 
     async def handle_queue(self):
         while True:
-            command: KettleCommand = await self.cmd_queue.get()
-            cmd = self._get_command(command.cmd.value, command.payload)
-            logger.debug(
-                f'... send cmd {command.cmd.value:04x} ['
-                f'{"".join(format(x, "02x") for x in command.payload)}] '
-                f'{" ".join(format(x, "02x") for x in cmd)}',
-            )
-            self.wait_event.clear()
-            cmd_resp = await aio.wait_for(
-                self.client.write_gatt_char(
-                    self.TX_CHAR,
-                    cmd,
-                    True,
-                ),
-                timeout=command.timeout,
-            )
-            if not command.wait_reply:
+            try:
+                command: KettleCommand = await self.cmd_queue.get()
+                cmd = self._get_command(command.cmd.value, command.payload)
+                logger.debug(
+                    f'... send cmd {command.cmd.value:04x} ['
+                    f'{"".join(format(x, "02x") for x in command.payload)}] '
+                    f'{" ".join(format(x, "02x") for x in cmd)}',
+                )
+                self.wait_event.clear()
+                cmd_resp = await aio.wait_for(
+                    self.client.write_gatt_char(
+                        self.TX_CHAR,
+                        cmd,
+                        True,
+                    ),
+                    timeout=command.timeout,
+                )
+                if not command.wait_reply:
+                    if command.answer.cancelled():
+                        return
+                    command.answer.set_result(cmd_resp)
+
+                await aio.wait_for(
+                    self.wait_event.wait(),
+                    timeout=command.timeout,
+                )
+
+                # extract payload from container
+                cmd_resp = bytes(self.received_data[3:-1])
+                self.wait_event.clear()
+                self.received_data = None
                 if command.answer.cancelled():
                     return
                 command.answer.set_result(cmd_resp)
-
-            await aio.wait_for(
-                self.wait_event.wait(),
-                timeout=command.timeout,
-            )
-
-            # extract payload from container
-            cmd_resp = bytes(self.received_data[3:-1])
-            self.wait_event.clear()
-            self.received_data = None
-            if command.answer.cancelled():
-                return
-            command.answer.set_result(cmd_resp)
+            except aio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    f'{self} raise an error in handle_queue, ignore it',
+                )
 
     async def protocol_start(self):
         # we assume that every time protocol starts it uses new blank
@@ -329,3 +337,11 @@ class RedmondKettle200Protocol(BaseDevice):
         resp = await self.send_command(Command.GET_STARTS_COUNT, b'\0')
         _, _, starts, *_ = struct.unpack('<BHHHHHHHB', resp)
         return starts
+
+    async def close(self):
+        if not self.queue_handler.done():
+            self.queue_handler.cancel()
+            try:
+                await self.queue_handler
+            except aio.CancelledError:
+                pass

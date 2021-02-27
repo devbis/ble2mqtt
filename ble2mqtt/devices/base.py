@@ -193,9 +193,9 @@ class Device(BaseDevice):
             'value': value,
         })
 
-    async def get_device_data(self) -> ty.Sequence[callable]:
+    async def get_device_data(self):
         """Here put the initial configuration for the device"""
-        return []
+        pass
 
     async def get_client(self, **kwargs) -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
