@@ -339,9 +339,4 @@ class RedmondKettle200Protocol(BaseDevice):
         return starts
 
     async def close(self):
-        if not self.queue_handler.done():
-            self.queue_handler.cancel()
-            try:
-                await self.queue_handler
-            except aio.CancelledError:
-                pass
+        self.cmd_queue._queue.clear()
