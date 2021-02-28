@@ -1,12 +1,10 @@
-import asyncio as aio
-import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from bleak.backends.device import BLEDevice
 
-from .base import BINARY_SENSOR_DOMAIN, Device
+from .base import BINARY_SENSOR_DOMAIN, Sensor
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +15,15 @@ class SensorState:
     last_check: datetime = None
 
 
-class Presence(Device):
+class Presence(Sensor):
     NAME = 'presence'
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False
     MANUFACTURER = 'Generic'
-    THRESHOLD = 120
+    THRESHOLD = 120  # if no activity more than THRESHOLD, consider presence=OFF
+    PASSIVE_SLEEP_INTERVAL = 1
+    SEND_DATA_PERIOD = 60
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -40,24 +40,6 @@ class Presence(Device):
             ],
         }
 
-    async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
-        state = {'linkquality': self.linkquality}
-        for sensor_name, value in (
-                ('presence', self._state.presence),
-        ):
-            if any(
-                x['name'] == sensor_name
-                for x in self.entities.get(BINARY_SENSOR_DOMAIN, [])
-            ):
-                state[sensor_name] = self.transform_value(value)
-
-        if state:
-            await publish_topic(
-                topic='/'.join((self.unique_id, 'state')),
-                value=json.dumps(state),
-            )
-
     def handle_advert(self, scanned_device: BLEDevice, *args, **kwargs):
         self._state = self.SENSOR_CLASS(
             presence=True,
@@ -67,28 +49,23 @@ class Presence(Device):
             f'Advert received for {self}, current state: {self._state}',
         )
 
-    async def handle(self, publish_topic, send_config, *args, **kwargs):
-        last_sent_value = None
-        last_sent_time = None
-        while True:
-            if not self._state:
-                await aio.sleep(5)
-                continue
+    async def handle_passive(self, *args, **kwargs):
+        self.last_sent_value = None
+        self.last_sent_time = None
+        await super().handle_passive(*args, **kwargs)
 
-            if self._state:
-                await self.update_device_data(send_config)
-                if self._state.presence and \
-                        self._state.last_check + \
-                        timedelta(seconds=self.THRESHOLD) < datetime.now():
-                    self._state.presence = False
-                # send if changed or update value every CONNECTION_TIMEOUT secs
-                if last_sent_value is None or \
-                        last_sent_value != self._state.presence or \
-                        (datetime.now() - last_sent_time).seconds > \
-                        self.CONNECTION_TIMEOUT:
-                    logger.debug(f'Try publish {self._state}')
-                    await self._notify_state(publish_topic)
-                    last_sent_value = self._state.presence
-                    last_sent_time = datetime.now()
+    async def do_passive_loop(self, publish_topic):
+        if self._state.presence and \
+                self._state.last_check + \
+                timedelta(seconds=self.THRESHOLD) < datetime.now():
+            self._state.presence = False
+        # send if changed or update value every SEND_DATA_PERIOD secs
+        if self.last_sent_value is None or \
+                self.last_sent_value != self._state.presence or \
+                (datetime.now() - self.last_sent_time).seconds > \
+                self.SEND_DATA_PERIOD:
 
-            await aio.sleep(1)
+            logger.debug(f'Try publish {self._state}')
+            await self._notify_state(publish_topic)
+            self.last_sent_value = self._state.presence
+            self.last_sent_time = datetime.now()

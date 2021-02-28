@@ -4,13 +4,12 @@ from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
-from .base import Device
+from .uuids import BATTERY
 from .xiaomi_base import XiaomiHumidityTemperature
 
 logger = logging.getLogger(__name__)
 
 MJHT_DATA = uuid.UUID('226caa55-6476-4566-7562-66734470666d')
-MJHT_BATTERY = uuid.UUID('00002a19-0000-1000-8000-00805f9b34fb')
 ADVERTISING = uuid.UUID('0000fe95-0000-1000-8000-00805f9b34fb')
 
 
@@ -35,10 +34,10 @@ class SensorState:
         )
 
 
-class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature, Device):
+class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature):
     NAME = 'xiaomihtv1'
     DATA_CHAR = MJHT_DATA
-    BATTERY_CHAR = MJHT_BATTERY
+    BATTERY_CHAR = BATTERY
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
 

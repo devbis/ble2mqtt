@@ -473,10 +473,10 @@ class Ble2Mqtt:
                 raise
             except KeyboardInterrupt:
                 raise
-            except (ConnectionError, TimeoutError, aio.TimeoutError) as e:
+            except (ConnectionError, TimeoutError, aio.TimeoutError):
                 missing_device_count += 1
-                logger.warning(
-                    f'[{device}] connection problem, {e} {repr(e)}, '
+                logger.exception(
+                    f'[{device}] connection problem, '
                     f'attempts={missing_device_count}',
                 )
             except ListOfConnectionErrors as e:
@@ -525,20 +525,20 @@ class Ble2Mqtt:
             if failure_count >= FAILURE_LIMIT:
                 await self.restart_bluetooth()
                 failure_count = 0
-            if not device.disconnected_event.is_set():
-                try:
-                    await device.close()
+            try:
+                await device.close()
+                if not device.disconnected_event.is_set():
                     await aio.wait_for(
                         device.disconnected_event.wait(),
                         timeout=10,
                     )
-                except aio.TimeoutError:
-                    logger.error(f'{device} not disconnected in 10 secs')
+            except aio.TimeoutError:
+                logger.exception(f'{device} not disconnected in 10 secs')
             logger.debug(
-                f'Sleep for {device.RECONNECTION_TIMEOUT} secs to '
+                f'Sleep for {device.RECONNECTION_SLEEP_INTERVAL} secs to '
                 f'reconnect to device={device}',
             )
-            await aio.sleep(device.RECONNECTION_TIMEOUT)
+            await aio.sleep(device.RECONNECTION_SLEEP_INTERVAL)
 
     async def create_device_manage_tasks(self):
         tasks = []

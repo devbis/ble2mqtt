@@ -1,10 +1,11 @@
 import abc
 import asyncio as aio
+import json
 import logging
-import typing as ty
 
 from bleak import BleakClient, BleakError
 
+from ble2mqtt.devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
 from ble2mqtt.utils import rssi_to_linkquality
 
 logger = logging.getLogger(__name__)
@@ -88,11 +89,15 @@ class BaseDevice(metaclass=RegisteredType):
 class Device(BaseDevice):
     MQTT_VALUES = None
     SET_POSTFIX = 'set'
-    RECONNECTION_TIMEOUT = 3
     MAC_TYPE = 'public'
     MANUFACTURER = None
-    CONNECTION_TIMEOUT = 60
     CONNECTION_FAILURES_LIMIT = 100
+    RECONNECTION_SLEEP_INTERVAL = 60
+    ACTIVE_SLEEP_INTERVAL = 60
+    PASSIVE_SLEEP_INTERVAL = 60
+
+    # secs to sleep if not connected or no data in passive mode
+    NOT_READY_SLEEP_INTERVAL = 3
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -228,3 +233,106 @@ class Device(BaseDevice):
             connected = True
         if connected:
             await self.client.disconnect()
+        await super().close()
+
+
+class Sensor(Device):
+    # a list of state properties that must be not None at least one of them
+    # to send data.
+    # E.g. only battery updated, but wait for temperature and humidity
+    REQUIRED_VALUES = ()
+
+    def __init__(self, mac, *args, loop, **kwargs) -> None:
+        super().__init__(mac, *args, loop=loop, **kwargs)
+        self._state = None
+
+    @property
+    def entities(self):
+        raise NotImplementedError()
+
+    async def get_device_data(self):
+        name = await self._read_with_timeout(DEVICE_NAME)
+        if isinstance(name, (bytes, bytearray)):
+            self._model = name.decode().strip('\0')
+        version = await self._read_with_timeout(FIRMWARE_VERSION)
+        if isinstance(version, (bytes, bytearray)):
+            self._version = version.decode().strip('\0')
+
+    def get_entity_map(self):
+        state = {}
+        for domain, entities in self.entities.items():
+            for entity in entities:
+                sensor_name = entity['name']
+                value = getattr(self._state, sensor_name, None)
+                if value is not None:
+                    state[sensor_name] = self.transform_value(value)
+        if self.REQUIRED_VALUES and not any(
+            state.get(x) for x in self.REQUIRED_VALUES
+        ):
+            return {}
+        return state
+
+    async def _notify_state(self, publish_topic):
+        logger.info(f'[{self}] send state={self._state}')
+        state = self.get_entity_map()
+        if state:
+            state['linkquality'] = self.linkquality
+            await publish_topic(
+                topic='/'.join((self.unique_id, 'state')),
+                value=json.dumps(state),
+            )
+
+    async def do_active_loop(self, publish_topic):
+        await self._notify_state(publish_topic)
+
+    async def do_passive_loop(self, publish_topic):
+        await self._notify_state(publish_topic)
+
+    async def handle_active(self, publish_topic, send_config, *args, **kwargs):
+        while True:
+            await self.update_device_data(send_config)
+            if not self._state:
+                await aio.sleep(self.NOT_READY_SLEEP_INTERVAL)
+                continue
+
+            await self.do_active_loop(publish_topic)
+            await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
+
+    async def handle_passive(self, publish_topic, send_config, *args, **kwargs):
+        while True:
+            if not self._state:
+                await aio.sleep(self.NOT_READY_SLEEP_INTERVAL)
+                continue
+
+            await self.update_device_data(send_config)
+            await self.do_passive_loop(publish_topic)
+            await aio.sleep(self.PASSIVE_SLEEP_INTERVAL)
+
+    async def handle(self, *args, **kwargs):
+        if self.passive:
+            return await self.handle_passive(*args, **kwargs)
+        return await self.handle_active(*args, **kwargs)
+
+
+class SubscribeAndSetDataMixin:
+    def filter_notifications(self, sender):
+        return True
+
+    def process_data(self, data):
+        self._state = self.SENSOR_CLASS.from_data(data)
+
+    def notification_handler(self, sender, data: bytearray):
+        logger.debug("{0} notification: {1}: {2}".format(
+            self,
+            sender,
+            ' '.join(format(x, '02x') for x in data),
+        ))
+        if self.filter_notifications(sender):
+            self.process_data(data)
+
+    async def get_device_data(self):
+        await self.client.start_notify(
+            self.DATA_CHAR,
+            self.notification_handler,
+        )
+        await super().get_device_data()

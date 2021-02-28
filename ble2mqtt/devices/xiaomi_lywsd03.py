@@ -4,7 +4,6 @@ import uuid
 from dataclasses import dataclass
 
 from ..utils import cr2032_voltage_to_percent
-from .base import Device
 from .xiaomi_base import XiaomiHumidityTemperature
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ class SensorState:
         )
 
 
-class XiaomiHumidityTemperatureLYWSD(XiaomiHumidityTemperature, Device):
+class XiaomiHumidityTemperatureLYWSD(XiaomiHumidityTemperature):
     NAME = 'xiaomilywsd'
     DATA_CHAR = LYWSD_DATA
     BATTERY_CHAR = LYWSD_BATTERY

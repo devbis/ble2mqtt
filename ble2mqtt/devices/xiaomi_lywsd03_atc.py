@@ -1,15 +1,12 @@
 import logging
-import uuid
 from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
-from .base import Device
+from .uuids import ENVIRONMENTAL_SENSING
 from .xiaomi_base import XiaomiHumidityTemperature
 
 logger = logging.getLogger(__name__)
-
-ADVERTISING = uuid.UUID('0000181a-0000-1000-8000-00805f9b34fb')
 
 
 @dataclass
@@ -19,7 +16,7 @@ class SensorState:
     humidity: float = 0
 
 
-class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature, Device):
+class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature):
     NAME = 'xiaomilywsd_atc'
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
@@ -27,7 +24,7 @@ class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature, Device):
 
     def handle_advert(self, scanned_device: BLEDevice, adv_data):
         service_data = adv_data.service_data
-        adv_data = service_data.get(str(ADVERTISING))
+        adv_data = service_data.get(str(ENVIRONMENTAL_SENSING))
 
         def from_word(data):
             return int.from_bytes(data, byteorder='big', signed=True) / 10

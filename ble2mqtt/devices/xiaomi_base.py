@@ -1,4 +1,3 @@
-import json
 import logging
 
 from ..protocols.xiaomi import XiaomiPoller
@@ -9,9 +8,8 @@ logger = logging.getLogger(__name__)
 
 class XiaomiHumidityTemperature(XiaomiPoller):
     SENSOR_CLASS = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    # send data only if temperature or humidity is set
+    REQUIRED_VALUES = ('temperature', 'humidity')
 
     @property
     def entities(self):
@@ -34,27 +32,6 @@ class XiaomiHumidityTemperature(XiaomiPoller):
                 },
             ],
         }
-
-    async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
-        state = {'linkquality': self.linkquality}
-        for sensor_name, value in (
-                ('temperature', self._state.temperature),
-                ('humidity', self._state.humidity),
-                ('battery', self._state.battery),
-        ):
-            if any(
-                    x['name'] == sensor_name
-                    for x in self.entities.get('sensor', [])
-            ):
-                if sensor_name != 'battery' or value:
-                    state[sensor_name] = self.transform_value(value)
-
-        if state:
-            await publish_topic(
-                topic='/'.join((self.unique_id, 'state')),
-                value=json.dumps(state),
-            )
 
     async def read_and_send_data(self, publish_topic):
         battery = await self._read_with_timeout(self.BATTERY_CHAR)

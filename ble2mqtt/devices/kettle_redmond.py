@@ -1,7 +1,6 @@
 import asyncio as aio
 import json
 import logging
-import typing as ty
 import uuid
 
 from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
@@ -25,11 +24,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
     RX_CHAR = UUID_NORDIC_RX
-    CONNECTION_TIMEOUT = 30
+    RECONNECTION_SLEEP_INTERVAL = 30
     MANUFACTURER = 'Redmond'
 
-    UPDATE_PERIOD = 5  # seconds when boiling
-    STANDBY_UPDATE_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
+    SEND_DATA_PERIOD = 5  # seconds when boiling
+    STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
 
     def __init__(self, mac, key=b'\xff\xff\xff\xff\xff\xff\xff\xff',
                  *args, loop, **kwargs):
@@ -41,7 +40,8 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         self._brightness = 255
         self._statistics = {}
 
-        self._update_period_multiplier = self.STANDBY_UPDATE_PERIOD_MULTIPLIER
+        self._send_data_period_multiplier = \
+            self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         self.initial_status_sent = False
 
     @property
@@ -98,11 +98,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     def update_multiplier(self, state: Kettle200State = None):
         if state is None:
             state = self._state
-        self._update_period_multiplier = (
+        self._send_data_period_multiplier = (
             1
             if state.state == RunState.ON and
             state.mode in [Mode.BOIL, Mode.HEAT]
-            else self.STANDBY_UPDATE_PERIOD_MULTIPLIER
+            else self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         )
 
     async def _notify_state(self, publish_topic):
@@ -216,7 +216,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             await self.notify_run_state(new_state, publish_topic)
             counter += 1
 
-            if counter > self.UPDATE_PERIOD * self._update_period_multiplier:
+            if counter > (
+                    self.SEND_DATA_PERIOD * self._send_data_period_multiplier
+            ):
                 await self._update_statistics()
                 await self._notify_state(publish_topic)
                 counter = 0
