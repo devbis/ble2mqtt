@@ -5,6 +5,7 @@ import uuid
 
 from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
                                  RedmondKettle200Protocol, RunState)
+from ..utils import is_client_connected
 from .base import LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device
 from .uuids import DEVICE_NAME
 
@@ -250,7 +251,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
             try:
-                if not self.client.is_connected:
+                if not await is_client_connected(self.client):
                     raise ConnectionError()
                 message = await aio.wait_for(
                     self.message_queue.get(),

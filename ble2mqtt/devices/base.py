@@ -6,7 +6,7 @@ import logging
 from bleak import BleakClient, BleakError
 
 from ble2mqtt.devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
-from ble2mqtt.utils import rssi_to_linkquality
+from ble2mqtt.utils import is_client_connected, rssi_to_linkquality
 
 logger = logging.getLogger(__name__)
 registered_device_types = {}
@@ -97,7 +97,7 @@ class Device(BaseDevice):
     PASSIVE_SLEEP_INTERVAL = 60
 
     # secs to sleep if not connected or no data in passive mode
-    NOT_READY_SLEEP_INTERVAL = 3
+    NOT_READY_SLEEP_INTERVAL = 5
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -184,7 +184,14 @@ class Device(BaseDevice):
         if not self.config_sent:
             await send_config(self)
         if self.client:  # in passive mode, client is None
-            self.rssi = self.client._properties.get('RSSI')
+            props = {}
+            if hasattr(self.client, '_properties'):
+                # dbus-next
+                props = self.client._properties
+            elif getattr(self.client, '_device_info', None):
+                # txdbus
+                props = self.client._device_info
+            self.rssi = props.get('RSSI')
 
     def __str__(self):
         return self.unique_id
@@ -227,7 +234,7 @@ class Device(BaseDevice):
 
     async def close(self):
         try:
-            connected = self.client and self.client.is_connected
+            connected = self.client and await is_client_connected(self.client)
         # exception on macos when checking for is_connected()
         except AttributeError:
             connected = True

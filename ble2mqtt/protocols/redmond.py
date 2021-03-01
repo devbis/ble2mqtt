@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..devices.base import BaseDevice
+from ..utils import is_client_connected
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,7 @@ class RedmondKettle200Protocol(BaseDevice):
 
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
-        assert self.client.is_connected
+        assert await is_client_connected(self.client)
         # check for fresh client
         assert not self.client._notification_callbacks
         logger.debug(f'Enable BLE notifications from [{self.client.address}]')

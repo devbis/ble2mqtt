@@ -11,6 +11,12 @@ from bleak.backends.device import BLEDevice
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
                            SWITCH_DOMAIN, Device)
+from .utils import is_client_connected
+
+try:
+    from txdbus.error import RemoteError  # noqa
+except ImportError:
+    RemoteError = BleakError
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,9 @@ FAILURE_LIMIT = 5
 ListOfConnectionErrors = (
     BleakError,
     aio.TimeoutError,
+
+    # txdbus:
+    RemoteError,
 
     # dbus-next exceptions:
     # AttributeError: 'NoneType' object has no attribute 'call'
@@ -186,6 +195,7 @@ class Ble2Mqtt:
             logger.debug(message)
             while True:
                 if message.topic_name not in self.subscribed_topics:
+                    await aio.sleep(0)
                     continue
 
                 prefix = f'{self.TOPIC_ROOT}/'
@@ -199,7 +209,8 @@ class Ble2Mqtt:
                         break
                 else:
                     raise NotImplementedError('Unknown topic')
-                if not device.client.is_connected:
+                await aio.sleep(0)
+                if not await is_client_connected(device.client):
                     logger.warning(
                         f'Received topic {topic_wo_prefix} '
                         f'with {message.payload} '
@@ -540,7 +551,7 @@ class Ble2Mqtt:
             )
             await aio.sleep(device.RECONNECTION_SLEEP_INTERVAL)
 
-    async def create_device_manage_tasks(self):
+    def create_device_manage_tasks(self):
         tasks = []
         for dev in self.device_registry:
             assert not self._device_manage_tasks.get(dev) or \
@@ -581,7 +592,7 @@ class Ble2Mqtt:
                         scanner.register_detection_callback(
                             self.device_detection_callback,
                         )
-                        await aio.sleep(3.0)
+                        await aio.sleep(3)
                         devices = await scanner.get_discovered_devices()
                     logger.debug(f'found {len(devices)} devices')
             except KeyboardInterrupt:
@@ -593,7 +604,7 @@ class Ble2Mqtt:
             await aio.sleep(1)
 
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
-        tasks = await self.create_device_manage_tasks()
+        tasks = self.create_device_manage_tasks()
         logger.debug("Wait for network interruptions...")
 
         finished = await run_tasks_and_cancel_on_first_return(

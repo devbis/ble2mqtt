@@ -3,6 +3,7 @@ import logging
 import uuid
 
 from ..devices.base import Sensor, SubscribeAndSetDataMixin
+from ..utils import is_client_connected
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor):
         logger.debug(f'Wait {self} for connecting...')
         sec_to_wait_connection = 0
         while True:
-            if not self.client.is_connected:
+            if not await is_client_connected(self.client):
                 if sec_to_wait_connection >= 30:
                     raise TimeoutError(
                         f'{self} not connected for 30 sec in handle()',
