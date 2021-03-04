@@ -35,7 +35,7 @@ setup(
     cmdclass={'install': PostInstall},
     install_requires=[
         'aio-mqtt>=0.2.0',
-        # 'bleak @ http://github.com/hbldh/bleak/tarball/dbus-next-2#egg=bleak-0.11.0a1',
+        # 'bleak @ http://github.com/hbldh/bleak/tarball/develop#egg=bleak-0.11.0a1',
     ],
     classifiers=[
         'Programming Language :: Python :: 3.5',
