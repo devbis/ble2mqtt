@@ -135,6 +135,21 @@ class RedmondKettle200Protocol(BaseDevice):
         self.received_data = None
         self.cmd_queue = aio.Queue()
         self.queue_handler = self._loop.create_task(self.handle_queue())
+        self.queue_handler.add_done_callback(self._queue_handler_done_callback)
+
+    def _queue_handler_done_callback(self, future: aio.Future):
+        exc_info = None
+        try:
+            exc_info = future.exception()
+        except aio.CancelledError:
+            pass
+
+        if exc_info is not None:
+            exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+            logger.exception(
+                f'{self} handle_queue() stopped unexpectedly',
+                exc_info=exc_info,
+            )
 
     def notification_handler(self, sender: int, data: bytearray):
         logger.debug("Notification: {0}: {1}".format(
@@ -166,7 +181,7 @@ class RedmondKettle200Protocol(BaseDevice):
                 )
                 if not command.wait_reply:
                     if command.answer.cancelled():
-                        return
+                        continue
                     command.answer.set_result(cmd_resp)
 
                 await aio.wait_for(
@@ -179,9 +194,10 @@ class RedmondKettle200Protocol(BaseDevice):
                 self.wait_event.clear()
                 self.received_data = None
                 if command.answer.cancelled():
-                    return
+                    continue
                 command.answer.set_result(cmd_resp)
             except aio.CancelledError:
+                logger.exception(f'{self} handle_queue is cancelled!')
                 raise
             except Exception:
                 logger.exception(
@@ -196,6 +212,8 @@ class RedmondKettle200Protocol(BaseDevice):
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
         assert await is_client_connected(self.client)
+        assert not self.queue_handler.cancelled()
+        assert not self.queue_handler.done()
         # check for fresh client
         assert not self.client._notification_callbacks
         logger.debug(f'Enable BLE notifications from [{self.client.address}]')
