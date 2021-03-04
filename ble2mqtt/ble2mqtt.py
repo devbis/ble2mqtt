@@ -10,7 +10,7 @@ from bleak import BleakError, BleakScanner
 from bleak.backends.device import BLEDevice
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
-                           SWITCH_DOMAIN, Device)
+                           SWITCH_DOMAIN, Device, done_callback)
 from .utils import is_client_connected
 
 try:
@@ -74,6 +74,7 @@ def hardware_exception_occurred(exception):
         'org.freedesktop.DBus.Error.ServiceUnknown' in ex_str or
         'org.freedesktop.DBus.Error.NoReply' in ex_str or
         'org.freedesktop.DBus.Error.AccessDenied' in ex_str or
+        'org.bluez.Error.Failed: Connection aborted' in ex_str or
         'org.bluez.Error.NotReady' in ex_str or
         'org.bluez.Error.InProgress' in ex_str
     )
@@ -499,8 +500,10 @@ class Ble2Mqtt:
                         f'attempts={missing_device_count}',
                     )
                 else:
-                    if isinstance(e, aio.TimeoutError):
-                        failure_count += 1
+                    # if isinstance(e, aio.TimeoutError) or \
+                    #         'org.bluez.Error.Failed: Connection aborted' in \
+                    #         str(e):
+                    failure_count += 1
                     logger.warning(
                         f'Error while connecting to {device}, {e} {repr(e)}, '
                         f'failure_count={failure_count}',
@@ -557,6 +560,7 @@ class Ble2Mqtt:
             assert not self._device_manage_tasks.get(dev) or \
                 self._device_manage_tasks[dev].done()
             task = self._loop.create_task(self.manage_device(dev))
+            task.add_done_callback(done_callback)
             self._device_manage_tasks[dev] = task
             tasks.append(task)
         return tasks
@@ -606,10 +610,12 @@ class Ble2Mqtt:
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
         tasks = self.create_device_manage_tasks()
         logger.debug("Wait for network interruptions...")
+        scan_task = self._loop.create_task(self.scan_devices_task())
+        scan_task.add_done_callback(done_callback)
 
         finished = await run_tasks_and_cancel_on_first_return(
             mqtt_connection_fut,
-            self._loop.create_task(self.scan_devices_task()),
+            scan_task,
             *tasks,
         )
         for t in finished:

@@ -18,6 +18,21 @@ LIGHT_DOMAIN = 'light'
 SWITCH_DOMAIN = 'switch'
 
 
+def done_callback(future: aio.Future):
+    exc_info = None
+    try:
+        exc_info = future.exception()
+    except aio.CancelledError:
+        pass
+
+    if exc_info is not None:
+        exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+        logger.exception(
+            f'{future} stopped unexpectedly',
+            exc_info=exc_info,
+        )
+
+
 class RegisteredType(type):
     def __new__(mcs, clsname, superclasses, attributedict):
         newclass = type.__new__(mcs, clsname, superclasses, attributedict)
