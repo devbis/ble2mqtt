@@ -18,6 +18,10 @@ LIGHT_DOMAIN = 'light'
 SWITCH_DOMAIN = 'switch'
 
 
+class ConnectionTimeoutError(ConnectionError):
+    pass
+
+
 def done_callback(future: aio.Future):
     exc_info = None
     try:
@@ -238,6 +242,9 @@ class Device(BaseDevice):
         self.disconnected_event.clear()
         try:
             await self.client.connect()
+        except aio.TimeoutError as e:
+            self.disconnected_event.set()
+            raise ConnectionTimeoutError() from e
         except (Exception, aio.CancelledError):
             self.disconnected_event.set()
             raise

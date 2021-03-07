@@ -10,7 +10,8 @@ from bleak import BleakError, BleakScanner
 from bleak.backends.device import BLEDevice
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
-                           SWITCH_DOMAIN, Device, done_callback)
+                           SWITCH_DOMAIN, ConnectionTimeoutError, Device,
+                           done_callback)
 from .utils import is_client_connected
 
 try:
@@ -41,30 +42,28 @@ ListOfConnectionErrors = (
 )
 
 
-async def run_tasks_and_cancel_on_first_return(*tasks: ty.Set[aio.Future],
+async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
                                                return_when=aio.FIRST_COMPLETED,
+                                               ignore_futures=(),
                                                ) -> ty.Set[aio.Future]:
-    try:
-        done, pending = await aio.wait(tasks, return_when=return_when)
-    except aio.CancelledError:
+    async def cancel_tasks(_tasks):
         for t in tasks:
-            if isinstance(t, aio.Task) and not t.done():
+            if t in ignore_futures:
+                continue
+            if not t.done() and not t.cancelled():
                 t.cancel()
                 try:
                     await t
                 except aio.CancelledError:
                     pass
+
+    try:
+        done, pending = await aio.wait(tasks, return_when=return_when)
+    except aio.CancelledError:
+        await cancel_tasks(tasks)
         raise
 
-    for t in pending:
-        if isinstance(t, aio.Task):
-            t.cancel()
-    for t in pending:
-        if isinstance(t, aio.Task):
-            try:
-                await t
-            except aio.CancelledError:
-                pass
+    await cancel_tasks(pending)
     return done
 
 
@@ -133,13 +132,14 @@ class Ble2Mqtt:
             t.result()
 
     @staticmethod
-    async def stop_task(task):
+    async def stop_task(task: aio.Task):
         logger.debug(f'stop_task task={task}')
-        task.cancel()
-        try:
-            await task
-        except aio.CancelledError:
-            pass
+        if not task.done() and not task.cancelled():
+            task.cancel()
+            try:
+                await task
+            except aio.CancelledError:
+                pass
 
     async def close(self) -> None:
         tasks = []
@@ -156,7 +156,7 @@ class Ble2Mqtt:
         if self._mqtt_client.is_connected:
             try:
                 await self._mqtt_client.disconnect()
-            except (aio_mqtt.Error, BrokenPipeError):
+            except Exception:
                 pass
 
     def _get_topic(self, dev_id, subtopic, *args):
@@ -431,7 +431,6 @@ class Ble2Mqtt:
         failure_count = 0
         missing_device_count = 0
         while True:
-            tasks = []
             async with self.bluetooth_restarting:
                 logger.debug(f'[{device}] Check for lock')
             try:
@@ -454,21 +453,20 @@ class Ble2Mqtt:
                             for topic in device.subscribed_topics
                         ])
                     logger.debug(f'[{device}] mqtt subscribed')
-                    tasks = [
-                        self._loop.create_task(
-                            device.handle(
-                                self.publish_topic_callback,
-                                send_config=self.send_device_config,
-                            ),
+                    coros = [
+                        *[coro() for coro in initial_coros],
+                        device.handle(
+                            self.publish_topic_callback,
+                            send_config=self.send_device_config,
                         ),
-                        *[aio.create_task(coro()) for coro in initial_coros],
                     ]
                     will_handle_messages = bool(device.subscribed_topics)
                     if will_handle_messages:
-                        tasks.append(self._loop.create_task(
+                        coros.append(
                             device.handle_messages(self.publish_topic_callback),
-                        ))
+                        )
 
+                    tasks = [self._loop.create_task(t) for t in coros]
                     logger.debug(f'[{device}] tasks are created')
 
                     finished = await run_tasks_and_cancel_on_first_return(
@@ -485,6 +483,12 @@ class Ble2Mqtt:
                 raise
             except KeyboardInterrupt:
                 raise
+            except ConnectionTimeoutError:
+                missing_device_count += 1
+                logger.error(
+                    f'[{device}] connection problem, '
+                    f'attempts={missing_device_count}',
+                )
             except (ConnectionError, TimeoutError, aio.TimeoutError):
                 missing_device_count += 1
                 logger.exception(
@@ -560,7 +564,7 @@ class Ble2Mqtt:
             assert not self._device_manage_tasks.get(dev) or \
                 self._device_manage_tasks[dev].done()
             task = self._loop.create_task(self.manage_device(dev))
-            task.add_done_callback(done_callback)
+            # task.add_done_callback(done_callback)
             self._device_manage_tasks[dev] = task
             tasks.append(task)
         return tasks
@@ -617,6 +621,7 @@ class Ble2Mqtt:
             mqtt_connection_fut,
             scan_task,
             *tasks,
+            ignore_futures=[mqtt_connection_fut],
         )
         for t in finished:
             t.result()
@@ -659,11 +664,11 @@ class Ble2Mqtt:
                     e,
                 )
                 try:
-                    await self._mqtt_client.disconnect()
-                except aio_mqtt.Error:
-                    pass
-                try:
                     await self.stop_device_manage_tasks()
                 except Exception as e1:
                     logger.exception(e1)
+                try:
+                    await self._mqtt_client.disconnect()
+                except Exception:
+                    logger.error('Disconnect from MQTT broker error')
                 await aio.sleep(self._reconnection_interval)
