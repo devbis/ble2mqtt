@@ -10,9 +10,16 @@ from .devices import registered_device_types
 
 logger = logging.getLogger(__name__)
 
+is_shutting_down = False
+
 
 async def shutdown(loop, service: Ble2Mqtt, signal=None):
     """Cleanup tasks tied to the service's shutdown."""
+    global is_shutting_down
+
+    if is_shutting_down:
+        return
+    is_shutting_down = True
     if signal:
         logger.info(f"Received exit signal {signal.name}...")
     logger.info("Closing ble2mqtt service")
@@ -24,6 +31,7 @@ async def shutdown(loop, service: Ble2Mqtt, signal=None):
     logger.info(f"Cancelling {len(tasks)} outstanding tasks")
     await aio.gather(*tasks, return_exceptions=True)
     loop.stop()
+    is_shutting_down = False
 
 
 def handle_exception(loop, context, service):

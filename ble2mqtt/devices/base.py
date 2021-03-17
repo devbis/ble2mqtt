@@ -201,7 +201,7 @@ class Device(BaseDevice):
         It will update rssi and config
         """
         if not self.config_sent:
-            await send_config(self)
+            await send_config()
         if self.client:  # in passive mode, client is None
             props = {}
             if hasattr(self.client, '_properties'):

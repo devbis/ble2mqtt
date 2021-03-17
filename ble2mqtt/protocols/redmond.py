@@ -197,7 +197,7 @@ class RedmondKettle200Protocol(BaseDevice):
                     continue
                 command.answer.set_result(cmd_resp)
             except aio.CancelledError:
-                logger.exception(f'{self} handle_queue is cancelled!')
+                logger.debug(f'{self} handle_queue is cancelled!')
                 raise
             except Exception:
                 logger.exception(
