@@ -70,22 +70,22 @@ async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
     return done
 
 
-def handle_returned_tasks(*tasks: aio.Future):
+async def handle_returned_tasks(*tasks: aio.Future):
     raised = [t for t in tasks if t.done() and t.exception()]
     returned_normally = set(tasks) - set(raised)
 
     results = []
 
     for t in returned_normally:
-        results.append(t.result())
+        results.append(await t)
     if raised:
         task_for_raise = raised.pop()
         for t in raised:
             try:
-                t.result()
+                await t
             except Exception:
                 logger.exception('Task raised an error')
-        task_for_raise.result()
+        await task_for_raise
     return results
 
 
@@ -395,7 +395,7 @@ class DeviceManager:
                     if device.disconnected_event.is_set():
                         logger.debug(f'{device} has disconnected')
 
-                    handle_returned_tasks(*finished)
+                    await handle_returned_tasks(*finished)
             except aio.CancelledError:
                 raise
             except KeyboardInterrupt:
@@ -518,7 +518,7 @@ class Ble2Mqtt:
             self._loop.create_task(self._handle_messages()),
         )
         for t in result:
-            t.result()
+            await t
 
     @staticmethod
     async def stop_task(task: aio.Task):
@@ -666,7 +666,7 @@ class Ble2Mqtt:
         for m in finished_managers:
             await m.close()
 
-        handle_returned_tasks(*finished)
+        await handle_returned_tasks(*finished)
 
     async def _connect_forever(self) -> None:
         dev_id = hex(getnode())

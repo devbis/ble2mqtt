@@ -46,14 +46,6 @@ def handle_exception(loop, context, service):
         # Skip this exception for now.
         logger.info("Ignore this exception.")
         return
-    if context['message'] == 'Future exception was never retrieved' and \
-            'Future finished exception=' in \
-            str(repr(context.get('future', ''))):
-        # bleak internally creates a task and doesn't handle exceptions in
-        # client._cleanup_all()
-        # task = asyncio.get_event_loop().create_task(self._cleanup_all())
-        logger.info("Ignore this exception.")
-        return
 
     if "'NoneType' object has no attribute 'set'" in \
             str(repr(context.get('exception', ''))):

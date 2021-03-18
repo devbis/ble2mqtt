@@ -25,6 +25,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
     RX_CHAR = UUID_NORDIC_RX
+    ACTIVE_SLEEP_INTERVAL = 1
     RECONNECTION_SLEEP_INTERVAL = 30
     MANUFACTURER = 'Redmond'
 
@@ -223,7 +224,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 await self._update_statistics()
                 await self._notify_state(publish_topic)
                 counter = 0
-            await aio.sleep(1)
+            await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
 
     async def _switch_mode(self, mode, value):
         if value == RunState.ON.name:
