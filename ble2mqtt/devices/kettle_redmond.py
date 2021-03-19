@@ -31,11 +31,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     SEND_DATA_PERIOD = 5  # seconds when boiling
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
 
-    def __init__(self, mac, key=b'\xff\xff\xff\xff\xff\xff\xff\xff',
+    def __init__(self, mac, key='ffffffffffffffff',
                  *args, loop, **kwargs):
         super().__init__(mac, *args, loop=loop, **kwargs)
-        assert isinstance(key, bytes) and len(key) == 8
-        self._key = key
+        assert isinstance(key, str) and len(key) == 16
+        self._key = bytes.fromhex(key)
         self._state = None
         self._color = (255, 255, 255)
         self._brightness = 255
