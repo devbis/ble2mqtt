@@ -3,6 +3,7 @@ import json
 import logging
 import typing as ty
 from contextlib import asynccontextmanager
+from pprint import pformat
 from uuid import getnode
 
 import aio_mqtt
@@ -48,7 +49,7 @@ BLUETOOTH_RESTARTING = aio.Lock()
 async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
                                                return_when=aio.FIRST_COMPLETED,
                                                ignore_futures=(),
-                                               ) -> ty.Set[aio.Future]:
+                                               ) -> ty.Sequence[aio.Future]:
     async def cancel_tasks(_tasks):
         for t in tasks:
             if t in ignore_futures:
@@ -67,7 +68,9 @@ async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
         raise
 
     await cancel_tasks(pending)
-    return done
+
+    task_remains = [t for t in pending if not t.done()]
+    return [*done, *task_remains]
 
 
 async def handle_returned_tasks(*tasks: aio.Future):
@@ -83,6 +86,8 @@ async def handle_returned_tasks(*tasks: aio.Future):
         for t in raised:
             try:
                 await t
+            except aio.CancelledError:
+                raise
             except Exception:
                 logger.exception('Task raised an error')
         await task_for_raise
@@ -161,6 +166,8 @@ class DeviceManager:
         self.manage_task = None
         try:
             await self.device.close()
+        except aio.CancelledError:
+            raise
         except Exception:
             logger.exception(f'Problem on closing device {self.device}')
 
@@ -537,6 +544,8 @@ class Ble2Mqtt:
         if self._mqtt_client.is_connected:
             try:
                 await self._mqtt_client.disconnect()
+            except aio.CancelledError:
+                raise
             except Exception as e:
                 logger.warning(f'Error on MQTT  disconnecting: {repr(e)}')
 
@@ -602,6 +611,8 @@ class Ble2Mqtt:
         for manager in self._device_managers.values():
             try:
                 await manager.close()
+            except aio.CancelledError:
+                raise
             except Exception:
                 logger.exception(
                     f'Problem on closing dev manager {manager.device}')
@@ -643,10 +654,15 @@ class Ble2Mqtt:
         logger.debug("Wait for network interruptions...")
         scan_task = self._loop.create_task(self.scan_devices_task())
         scan_task.add_done_callback(done_callback)
+
+        tasks_to_check = [
+            manager.run_task()
+            for manager in self._device_managers.values()
+        ]
         futs = [
             mqtt_connection_fut,
             scan_task,
-            *[manager.run_task() for manager in self._device_managers.values()]
+            *tasks_to_check,
         ]
 
         finished = await run_tasks_and_cancel_on_first_return(
@@ -665,6 +681,11 @@ class Ble2Mqtt:
         # exceptions. We must fetch all of them
         for m in finished_managers:
             await m.close()
+
+        logger.info(f"_run_device_tasks: before exit: {pformat(futs)}")
+
+        assert all(t.done() for t in tasks_to_check), \
+            "Not all tasks finished to restart"
 
         await handle_returned_tasks(*finished)
 
@@ -706,10 +727,14 @@ class Ble2Mqtt:
                 )
                 try:
                     await self.stop_device_manage_tasks()
+                except aio.CancelledError:
+                    raise
                 except Exception:
                     logger.exception('Exception in _connect_forever()')
                 try:
                     await self._mqtt_client.disconnect()
+                except aio.CancelledError:
+                    raise
                 except Exception:
                     logger.error('Disconnect from MQTT broker error')
                 await aio.sleep(self._reconnection_interval)
