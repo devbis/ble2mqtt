@@ -13,12 +13,6 @@ from bleak.backends.device import BLEDevice
 from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
                            SWITCH_DOMAIN, ConnectionTimeoutError, Device,
                            done_callback)
-from .utils import is_client_connected
-
-try:
-    from txdbus.error import RemoteError  # noqa
-except ImportError:
-    RemoteError = BleakError
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +25,6 @@ FAILURE_LIMIT = 5
 ListOfConnectionErrors = (
     BleakError,
     aio.TimeoutError,
-
-    # txdbus:
-    RemoteError,
 
     # dbus-next exceptions:
     # AttributeError: 'NoneType' object has no attribute 'call'
@@ -588,7 +579,7 @@ class Ble2Mqtt:
                 else:
                     raise NotImplementedError('Unknown topic')
                 await aio.sleep(0)
-                if not await is_client_connected(device.client):
+                if not device.client.is_connected:
                     logger.warning(
                         f'Received topic {topic_wo_prefix} '
                         f'with {message.payload} '

@@ -100,7 +100,7 @@ Execute the following commands in the terminal:
 ```shell script
 opkg update
 opkg install python3-pip python3-asyncio
-pip3 install http://github.com/hbldh/bleak/tarball/dbus-next-2#egg=bleak-0.11.0a1
+pip3 install "bleak>=0.11.0"
 pip3 install -U ble2mqtt
 ```
 

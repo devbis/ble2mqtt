@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..devices.base import BaseDevice
-from ..utils import is_client_connected
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +210,7 @@ class RedmondKettle200Protocol(BaseDevice):
 
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
-        assert await is_client_connected(self.client)
+        assert self.client.is_connected
         assert not self.queue_handler.cancelled()
         assert not self.queue_handler.done()
         # check for fresh client

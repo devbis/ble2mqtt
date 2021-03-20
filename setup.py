@@ -7,15 +7,6 @@ from setuptools.command.install import install
 
 from ble2mqtt.__version__ import VERSION
 
-
-class PostInstall(install):
-    pkgs = ' http://github.com/hbldh/bleak/tarball/dbus-next-2#egg=bleak-0.11.0a1'
-
-    def run(self):
-        install.run(self)
-        print(getoutput('python3 -m pip install' + self.pkgs))
-
-
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -32,10 +23,9 @@ setup(
         'console_scripts': ['ble2mqtt=ble2mqtt.__main__:main']
     },
     packages=find_packages(include=['ble2mqtt', 'ble2mqtt.*']),
-    cmdclass={'install': PostInstall},
     install_requires=[
         'aio-mqtt>=0.2.0',
-        # 'bleak @ http://github.com/hbldh/bleak/tarball/develop#egg=bleak-0.11.0a1',
+        'bleak>=0.11.0',
     ],
     classifiers=[
         'Programming Language :: Python :: 3.5',
