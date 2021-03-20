@@ -32,6 +32,11 @@ The configuration file is a JSON with the following content:
             "type": "redmond200"
         },
         {
+            "address": "11:22:33:aa:bb:cd",
+            "type": "mikettle",
+            "product_id": 275
+        },
+        {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
         },
@@ -65,6 +70,11 @@ Supported devices:
 
 **Kettles:**
 - Redmond G2xx series (redmond200)
+- Mi Kettle (mikettle)
+  Use correct `product_id` for your kettle:
+  - yunmi.kettle.v1: `131`
+  - yunmi.kettle.v2: `275` (default)
+  - yunmi.kettle.v7: `1116`
 
 **Humidity sensors:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
