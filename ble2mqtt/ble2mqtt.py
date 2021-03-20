@@ -3,7 +3,7 @@ import json
 import logging
 import typing as ty
 from contextlib import asynccontextmanager
-from pprint import pformat
+# from pprint import pformat
 from uuid import getnode
 
 import aio_mqtt
@@ -674,8 +674,7 @@ class Ble2Mqtt:
         for m in finished_managers:
             await m.close()
 
-        logger.info(f"_run_device_tasks: before exit: {pformat(futs)}")
-
+        # logger.info(f"_run_device_tasks: before exit: {pformat(futs)}")
         assert all(t.done() for t in tasks_to_check), \
             "Not all tasks finished to restart"
 
