@@ -187,8 +187,9 @@ class DeviceManager:
             ],
             'name': device.unique_id,
             'model': device.model,
-            'manufacturer': device.manufacturer,
         }
+        if device.manufacturer:
+            device_info['manufacturer'] = device.manufacturer
         if device.version:
             device_info['sw_version'] = device.version
 
