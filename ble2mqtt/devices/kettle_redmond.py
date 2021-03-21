@@ -112,11 +112,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
         state = {'linkquality': self.linkquality}
         for sensor_name, value in (
-            ('temperature', self._state.temperature),
+            (TEMPERATURE_ENTITY, self._state.temperature),
         ):
             if any(
                     x['name'] == sensor_name
-                    for x in self.entities.get('sensor', [])
+                    for x in self.entities.get(SENSOR_DOMAIN, [])
             ):
                 state[sensor_name] = self.transform_value(value)
 
@@ -133,14 +133,14 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         ):
             if any(
                 x['name'] == sensor_name
-                for x in self.entities.get('sensor', [])
+                for x in self.entities.get(SENSOR_DOMAIN, [])
             ):
                 coros.append(publish_topic(
                     topic='/'.join((self.unique_id, sensor_name)),
                     value=json.dumps(value),
                 ))
 
-        lights = self.entities.get('light', [])
+        lights = self.entities.get(LIGHT_DOMAIN, [])
         for light in lights:
             if light['name'] == LIGHT_ENTITY:
                 light_state = {
