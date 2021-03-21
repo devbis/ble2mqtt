@@ -3,7 +3,6 @@ import json
 import logging
 import typing as ty
 from contextlib import asynccontextmanager
-# from pprint import pformat
 from uuid import getnode
 
 import aio_mqtt
@@ -70,8 +69,6 @@ async def handle_returned_tasks(*tasks: aio.Future):
 
     results = []
 
-    for t in returned_normally:
-        results.append(await t)
     if raised:
         task_for_raise = raised.pop()
         for t in raised:
@@ -82,6 +79,8 @@ async def handle_returned_tasks(*tasks: aio.Future):
             except Exception:
                 logger.exception('Task raised an error')
         await task_for_raise
+    for t in returned_normally:
+        results.append(await t)
     return results
 
 
@@ -669,15 +668,12 @@ class Ble2Mqtt:
             else:
                 finished_managers.append(m)
 
-        # when mqtt server disconnects, multiple tasks can raise
-        # exceptions. We must fetch all of them
         for m in finished_managers:
             await m.close()
 
-        # logger.info(f"_run_device_tasks: before exit: {pformat(futs)}")
-        assert all(t.done() for t in tasks_to_check), \
-            "Not all tasks finished to restart"
-
+        # when mqtt server disconnects, multiple tasks can raise
+        # exceptions. We must fetch all of them
+        finished = [t for t in futs if t.done() and not t.cancelled()]
         await handle_returned_tasks(*finished)
 
     async def _connect_forever(self) -> None:
