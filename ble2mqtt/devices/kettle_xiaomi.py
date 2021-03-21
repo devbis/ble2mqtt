@@ -7,7 +7,8 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 
-from .base import SENSOR_DOMAIN, Device
+from ..protocols.xiaomi import XiaomiCipherMixin
+from .base import BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, Device
 from .uuids import SOFTWARE_VERSION
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,9 @@ UUID_VER = uuid.UUID('00000004-0000-1000-8000-00805f9b34fb')
 UUID_STATUS = uuid.UUID('0000aa02-0000-1000-8000-00805f9b34fb')
 
 TEMPERATURE_ENTITY = 'temperature'
+KETTLE_ENTITY = 'kettle'
+STATE_TOPIC = 'state'
+HEAT_ENTITY = 'heat'
 AUTH_MAGIC1 = bytes([0x90, 0xCA, 0x85, 0xDE])
 AUTH_MAGIC2 = bytes([0x92, 0xAB, 0x54, 0xFA])
 
@@ -76,78 +80,18 @@ class MiKettleState:
             temperature=current_temp,
             target_temperature=target_temp,
             keep_warm_type=KeepWarmType(keep_warm_type),
-            keep_warm_time=keep_warm_time,
+            keep_warm_time=keep_warm_time,  # minutes
         )
 
-
-class XiaomiCipherMixin:
-    # Picked from the https://github.com/drndos/mikettle/
-    @staticmethod
-    def generate_random_token() -> bytes:
-        return bytes([  # from component, maybe random is ok
-            0x01, 0x5C, 0xCB, 0xA8, 0x80, 0x0A, 0xBD, 0xC1, 0x2E, 0xB8,
-            0xED, 0x82,
-        ])
-        # return os.urandom(12)
-
-    @staticmethod
-    def reverse_mac(mac) -> bytes:
-        parts = mac.split(":")
-        reversed_mac = bytearray()
-        length = len(parts)
-        for i in range(1, length + 1):
-            reversed_mac.extend(bytearray.fromhex(parts[length - i]))
-        return reversed_mac
-
-    @staticmethod
-    def mix_a(mac, product_id) -> bytes:
-        return bytes([
-            mac[0], mac[2], mac[5], (product_id & 0xff), (product_id & 0xff),
-            mac[4], mac[5], mac[1],
-        ])
-
-    @staticmethod
-    def mix_b(mac, product_id) -> bytes:
-        return bytes([
-            mac[0], mac[2], mac[5], ((product_id >> 8) & 0xff), mac[4], mac[0],
-            mac[5], (product_id & 0xff),
-        ])
-
-    @staticmethod
-    def _cipher_init(key) -> bytes:
-        perm = bytearray()
-        for i in range(0, 256):
-            perm.extend(bytes([i & 0xff]))
-        keyLen = len(key)
-        j = 0
-        for i in range(0, 256):
-            j += perm[i] + key[i % keyLen]
-            j = j & 0xff
-            perm[i], perm[j] = perm[j], perm[i]
-        return perm
-
-    @staticmethod
-    def _cipher_crypt(input, perm) -> bytes:
-        index1 = 0
-        index2 = 0
-        output = bytearray()
-        for i in range(0, len(input)):
-            index1 = index1 + 1
-            index1 = index1 & 0xff
-            index2 += perm[index1]
-            index2 = index2 & 0xff
-            perm[index1], perm[index2] = perm[index2], perm[index1]
-            idx = perm[index1] + perm[index2]
-            idx = idx & 0xff
-            output_byte = input[i] ^ perm[idx]
-            output.extend(bytes([output_byte & 0xff]))
-
-        return output
-
-    @classmethod
-    def cipher(cls, key, input) -> bytes:
-        perm = cls._cipher_init(key)
-        return cls._cipher_crypt(input, perm)
+    def as_dict(self):
+        return {
+            'mode': self.mode.name.lower(),
+            'running_mode': self.led_mode.name.lower(),
+            'temperature': self.temperature,
+            'target_temperature': self.target_temperature,
+            'keep_warm_type': self.keep_warm_type.name.lower(),
+            'keep_warm_minutes_passed': self.keep_warm_time,
+        }
 
 
 class XiaomiKettle(XiaomiCipherMixin, Device):
@@ -174,9 +118,17 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         return {
             SENSOR_DOMAIN: [
                 {
-                    'name': TEMPERATURE_ENTITY,
-                    'device_class': 'temperature',
+                    'name': KETTLE_ENTITY,
+                    'icon': 'kettle',
+                    'json': True,
+                    'main_value': TEMPERATURE_ENTITY,
                     'unit_of_measurement': '\u00b0C',
+                },
+            ],
+            BINARY_SENSOR_DOMAIN: [
+                {
+                    'name': HEAT_ENTITY,
+                    'device_class': 'heat',
                 },
             ],
         }
@@ -231,19 +183,31 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         logger.info(f'[{self}] send state={self._state}')
         state = {}
         for sensor_name, value in (
-            ('temperature', self._state.temperature),
+            (KETTLE_ENTITY, self._state),
         ):
             if any(
-                    x['name'] == sensor_name
-                    for x in self.entities.get('sensor', [])
+                x['name'] == sensor_name
+                for x in self.entities.get(SENSOR_DOMAIN, [])
             ):
-                state[sensor_name] = self.transform_value(value)
+                state.update(value.as_dict())
+
         if state:
             state['linkquality'] = self.linkquality
             await publish_topic(
-                topic='/'.join((self.unique_id, 'state')),
+                topic='/'.join((self.unique_id, STATE_TOPIC)),
                 value=json.dumps(state),
             )
+        for sensor_name, value in (
+            (HEAT_ENTITY, self._state.mode in [Mode.HEATING, Mode.KEEP_WARM]),
+        ):
+            if any(
+                x['name'] == sensor_name
+                for x in self.entities.get(BINARY_SENSOR_DOMAIN, [])
+            ):
+                await publish_topic(
+                    topic='/'.join((self.unique_id, HEAT_ENTITY)),
+                    value=self.transform_value(value),
+                )
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         send_time = None
