@@ -54,6 +54,12 @@ def handle_exception(loop, context, service):
         logger.info("Ignore this exception.")
         return
 
+    if isinstance(context.get('exception'), BrokenPipeError):
+        # task = asyncio.ensure_future(self._cleanup_all())
+        # in bluezdbus/client.py: _parse_msg() can fail while remove_match()
+        logger.info("Ignore this exception.")
+        return
+
     logger.info("Shutting down...")
     aio.create_task(shutdown(loop, service))
 
