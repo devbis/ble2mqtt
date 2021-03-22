@@ -37,8 +37,10 @@ async def shutdown(loop, service: Ble2Mqtt, signal=None):
 def handle_exception(loop, context, service):
     logger.error(f"Caught exception: {context}")
     loop.default_exception_handler(context)
+    exception_str = context.get('task') or context.get('future') or ''
+    exception = context.get('exception')
     if 'BleakClientBlueZDBus._disconnect_monitor()' in \
-            str(repr(context.get('task', ''))):
+            str(repr(exception_str)):
         # There is some problem when Bleak waits for disconnect event
         # and asyncio destroys the task and raises
         # Task was destroyed but it is pending!
@@ -47,14 +49,16 @@ def handle_exception(loop, context, service):
         logger.info("Ignore this exception.")
         return
 
-    if "'NoneType' object has no attribute 'set'" in \
-            str(repr(context.get('exception', ''))):
+    if "'NoneType' object has no attribute" in \
+            str(repr(exception)):
         # lambda _: self._disconnecting_event.set()
         # AttributeError: 'NoneType' object has no attribute 'set'
+        # await self._disconnect_monitor_event.wait()
+        # AttributeError: 'NoneType' object has no attribute 'wait'
         logger.info("Ignore this exception.")
         return
 
-    if isinstance(context.get('exception'), BrokenPipeError):
+    if isinstance(exception, BrokenPipeError):
         # task = asyncio.ensure_future(self._cleanup_all())
         # in bluezdbus/client.py: _parse_msg() can fail while remove_match()
         logger.info("Ignore this exception.")
