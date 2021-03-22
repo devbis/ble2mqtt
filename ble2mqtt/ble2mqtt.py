@@ -41,25 +41,32 @@ async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
                                                ignore_futures=(),
                                                ) -> ty.Sequence[aio.Future]:
     async def cancel_tasks(_tasks):
-        for t in tasks:
+        # cancel first, then await. Because other tasks can raise exceptions
+        # while switching tasks
+        canceled = []
+        for t in _tasks:
             if t in ignore_futures:
                 continue
-            if not t.done() and not t.cancelled():
+            if not t.done():
                 t.cancel()
-                try:
-                    await t
-                except aio.CancelledError:
-                    pass
-
+                canceled.append(t)
+        for t in canceled:
+            try:
+                await t
+            except aio.CancelledError:
+                pass
+    assert all(isinstance(t, aio.Future) for t in tasks)
     try:
         done, pending = await aio.wait(tasks, return_when=return_when)
     except aio.CancelledError:
         await cancel_tasks(tasks)
         raise
 
+    # while switching tasks for await other pending tasks can raise an exception
+    # we need to append more tasks to the result if so
     await cancel_tasks(pending)
 
-    task_remains = [t for t in pending if not t.done()]
+    task_remains = [t for t in pending if not t.cancelled()]
     return [*done, *task_remains]
 
 
@@ -441,13 +448,16 @@ class DeviceManager:
                     await restart_bluetooth()
             finally:
                 try:
+                    canceled = []
                     for t in tasks:
                         if not t.done():
                             t.cancel()
-                            try:
-                                await t
-                            except aio.CancelledError:
-                                pass
+                            canceled.append(t)
+                    for t in canceled:
+                        try:
+                            await t
+                        except aio.CancelledError:
+                            pass
 
                     await device.close()
                 except aio.CancelledError:
@@ -499,7 +509,6 @@ class Ble2Mqtt:
             loop=self._loop,
         )
 
-        # self._device_manage_tasks = {}
         self._device_managers: ty.Dict[Device, DeviceManager] = {}
 
         self.availability_topic = '/'.join((
@@ -517,16 +526,6 @@ class Ble2Mqtt:
         )
         for t in result:
             await t
-
-    @staticmethod
-    async def stop_task(task: aio.Task):
-        logger.debug(f'stop_task task={task}')
-        if not task.done() and not task.cancelled():
-            task.cancel()
-            try:
-                await task
-            except aio.CancelledError:
-                pass
 
     async def close(self) -> None:
         for device, manager in self._device_managers.items():
