@@ -147,7 +147,7 @@ async def handle_ble_exceptions():
 
 class DeviceManager:
     def __init__(self, device, mqtt_client, topic_root):
-        self.device = device
+        self.device: Device = device
         self._mqtt_client = mqtt_client
         self._topic_root = topic_root
         self.manage_task = None
@@ -362,7 +362,7 @@ class DeviceManager:
                 async with handle_ble_exceptions():
                     await device.connect()
                     initial_coros = []
-                    if not device.passive:
+                    if not device.is_passive:
                         if not device.DEVICE_DROPS_CONNECTION:
                             initial_coros.append(device.disconnected_event.wait)
                         await device.get_device_data()
@@ -394,12 +394,10 @@ class DeviceManager:
                     tasks = [aio.create_task(t) for t in coros]
                     logger.debug(f'[{device}] tasks are created')
 
-                    finished = await run_tasks_and_cancel_on_first_return(
-                        *tasks,
-                    )
+                    await run_tasks_and_cancel_on_first_return(*tasks)
                     if device.disconnected_event.is_set():
                         logger.debug(f'{device} has disconnected')
-
+                    finished = [t for t in tasks if not t.cancelled()]
                     await handle_returned_tasks(*finished)
             except aio.CancelledError:
                 raise
@@ -542,7 +540,7 @@ class Ble2Mqtt:
     def register(self, device: Device):
         if not device:
             return
-        if not device.passive and not device.SUPPORT_ACTIVE:
+        if not device.is_passive and not device.SUPPORT_ACTIVE:
             raise NotImplementedError(
                 f'Device {device.dev_id} doesn\'t support active mode',
             )
@@ -613,7 +611,7 @@ class Ble2Mqtt:
                 if device.rssi:
                     # update rssi for all devices if available
                     reg_device.rssi = device.rssi
-                if reg_device.passive:
+                if reg_device.is_passive:
                     if device.name:
                         reg_device._model = device.name
                     reg_device.handle_advert(device, advertisement_data)
@@ -638,21 +636,26 @@ class Ble2Mqtt:
             await aio.sleep(1)
 
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
+        has_passive_devices = False
         for dev in self.device_registry:
             self._device_managers[dev] = \
                 DeviceManager(dev, self._mqtt_client, self.TOPIC_ROOT)
+            if dev.is_passive:
+                has_passive_devices = True
         logger.debug("Wait for network interruptions...")
-        scan_task = self._loop.create_task(self.scan_devices_task())
-        scan_task.add_done_callback(done_callback)
 
-        tasks_to_check = [
+        device_tasks = [
             manager.run_task()
             for manager in self._device_managers.values()
         ]
+        if has_passive_devices:
+            scan_task = self._loop.create_task(self.scan_devices_task())
+            scan_task.add_done_callback(done_callback)
+            device_tasks.append(scan_task)
+
         futs = [
             mqtt_connection_fut,
-            scan_task,
-            *tasks_to_check,
+            *device_tasks,
         ]
 
         finished = await run_tasks_and_cancel_on_first_return(

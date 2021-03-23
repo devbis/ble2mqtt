@@ -63,8 +63,12 @@ class BaseDevice(metaclass=RegisteredType):
             raise NotImplementedError(
                 'This device doesn\'t support passive mode',
             )
-        self.passive = kwargs.get('passive', self.SUPPORT_PASSIVE)
+        self._is_passive = kwargs.get('passive', self.SUPPORT_PASSIVE)
         self.config_sent = False
+
+    @property
+    def is_passive(self):
+        return self._is_passive
 
     async def close(self):
         pass
@@ -227,7 +231,7 @@ class Device(BaseDevice):
         return BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
 
     async def connect(self):
-        if self.passive:
+        if self.is_passive:
             return
 
         self.client = await self.get_client(
@@ -332,7 +336,7 @@ class Sensor(Device):
             await aio.sleep(self.PASSIVE_SLEEP_INTERVAL)
 
     async def handle(self, *args, **kwargs):
-        if self.passive:
+        if self.is_passive:
             return await self.handle_passive(*args, **kwargs)
         return await self.handle_active(*args, **kwargs)
 
