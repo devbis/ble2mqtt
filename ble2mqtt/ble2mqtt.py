@@ -60,6 +60,18 @@ async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
         done, pending = await aio.wait(tasks, return_when=return_when)
     except aio.CancelledError:
         await cancel_tasks(tasks)
+        # it could happen that tasks raised exception and canceling wait task
+        # abandons tasks with exception
+        for t in tasks:
+            if not t.done() or t.cancelled():
+                continue
+            try:
+                t.result()
+            # no CancelledError expected
+            except Exception:
+                logger.exception(
+                    f'Task raises exception while cancelling parent coroutine '
+                    f'that waits for it {t}')
         raise
 
     # while switching tasks for await other pending tasks can raise an exception
