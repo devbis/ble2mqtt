@@ -3,6 +3,7 @@ import json
 import logging
 import struct
 import time
+import typing as ty
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -110,8 +111,8 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
             self._token = bytes.fromhex(token)
         else:
             self._token = self.generate_random_token()
-        self.queue: aio.Queue = None
-        self._state = None
+        self.queue: ty.Optional[aio.Queue] = None
+        self._state: ty.Optional[MiKettleState] = None
 
     @property
     def entities(self):
@@ -211,12 +212,22 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         send_time = None
+        prev_state = None
         while True:
             await self.update_device_data(send_config)
+            new_state = prev_state
+            if self._state:
+                new_state = (
+                    self._state.mode,
+                    self._state.led_mode,
+                    self._state.keep_warm_type,
+                )
             if self._state and (
                 not send_time or
-                (time.time() - send_time) > self.SEND_INTERVAL
+                (time.time() - send_time) > self.SEND_INTERVAL or
+                new_state != prev_state
             ):
                 send_time = time.time()
+                prev_state = new_state
                 await self._notify_state(publish_topic)
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
