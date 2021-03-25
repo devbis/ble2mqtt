@@ -29,7 +29,8 @@ The configuration file is a JSON with the following content:
         },
         {
             "address": "11:22:33:aa:bb:cc",
-            "type": "redmond200"
+            "type": "redmond200",
+            "key": "ffffffffffffffff"
         },
         {
             "address": "11:22:33:aa:bb:cd",
@@ -70,6 +71,11 @@ Supported devices:
 
 **Kettles:**
 - Redmond G2xx series (redmond200)
+  The default key that is used is `"ffffffffffffffff"`
+  and can be omitted in the config.
+  In some cases kettles don't accept it. Just use another 
+  key in the config file for the device: 
+  `"key": "16 random hex numbers"`
 - Mi Kettle (mikettle)
   Use correct `product_id` for your kettle:
   - yunmi.kettle.v1: `131`
