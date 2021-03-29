@@ -194,8 +194,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 self._notify_state(publish_topic),
             )
             self.initial_status_sent = True
-            self._state = new_state
-            await self._notify_state(publish_topic)
+            if self._state != new_state:
+                self._state = new_state
+                await self._notify_state(publish_topic)
+            else:
+                self._state = new_state
         else:
             self._state = new_state
         self.update_multiplier()
