@@ -37,7 +37,7 @@ def done_callback(future: aio.Future):
         )
 
 
-class RegisteredType(type):
+class RegisteredType(abc.ABCMeta):
     def __new__(mcs, clsname, superclasses, attributedict):
         newclass = type.__new__(mcs, clsname, superclasses, attributedict)
         # condition to prevent base class registration
@@ -109,7 +109,7 @@ class BaseDevice(metaclass=RegisteredType):
         raise NotImplementedError()
 
 
-class Device(BaseDevice):
+class Device(BaseDevice, abc.ABC):
     MQTT_VALUES = None
     SET_POSTFIX = 'set'
     MAC_TYPE = 'public'

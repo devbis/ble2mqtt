@@ -1,3 +1,4 @@
+import abc
 import asyncio as aio
 import logging
 import struct
@@ -6,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..devices.base import BaseDevice
+from .base import BaseCommand, BLEQueueMixin, SendAndWaitReplyMixin
 
 logger = logging.getLogger(__name__)
 
@@ -111,16 +113,16 @@ class Kettle200State:
         )
 
 
-class KettleCommand:
-    def __init__(self, cmd, payload, wait_reply, timeout):
-        self.cmd = cmd
+class KettleCommand(BaseCommand):
+    def __init__(self, cmd, payload, wait_reply, timeout, *args, **kwargs):
+        super().__init__(cmd, *args, **kwargs)
         self.payload = payload
         self.wait_reply = wait_reply
         self.timeout = timeout
-        self.answer = aio.Future()
 
 
-class RedmondKettle200Protocol(BaseDevice):
+class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
+                               BaseDevice, abc.ABC):
     MAGIC_START = 0x55
     MAGIC_END = 0xaa
 
@@ -130,11 +132,11 @@ class RedmondKettle200Protocol(BaseDevice):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
-        self.wait_event = aio.Event()
-        self.received_data = None
-        self.cmd_queue = aio.Queue()
-        self.queue_handler = self._loop.create_task(self.handle_queue())
-        self.queue_handler.add_done_callback(self._queue_handler_done_callback)
+        self.notification_queue = aio.Queue()
+        self.run_queue_handler()
+        self._cmd_queue_task.add_done_callback(
+            self._queue_handler_done_callback,
+        )
 
     def _queue_handler_done_callback(self, future: aio.Future):
         exc_info = None
@@ -150,58 +152,33 @@ class RedmondKettle200Protocol(BaseDevice):
                 exc_info=exc_info,
             )
 
-    def notification_handler(self, sender: int, data: bytearray):
-        logger.debug("Notification: {0}: {1}".format(
-            sender,
-            ' '.join(format(x, '02x') for x in data),
-        ))
-        if not self.wait_event.is_set():
-            self.received_data = data
-            self.wait_event.set()
+    async def process_command(self, command: KettleCommand):
+        cmd = self._get_command(command.cmd.value, command.payload)
+        logger.debug(
+            f'... send cmd {command.cmd.value:04x} ['
+            f'{"".join(format(x, "02x") for x in command.payload)}] '
+            f'{" ".join(format(x, "02x") for x in cmd)}',
+        )
+        self.clear_ble_queue()
+        cmd_resp = await aio.wait_for(
+            self.client.write_gatt_char(self.TX_CHAR, cmd, True),
+            timeout=command.timeout,
+        )
+        if not command.wait_reply:
+            if command.answer.cancelled():
+                return
+            command.answer.set_result(cmd_resp)
 
-    async def handle_queue(self):
-        while True:
-            try:
-                command: KettleCommand = await self.cmd_queue.get()
-                cmd = self._get_command(command.cmd.value, command.payload)
-                logger.debug(
-                    f'... send cmd {command.cmd.value:04x} ['
-                    f'{"".join(format(x, "02x") for x in command.payload)}] '
-                    f'{" ".join(format(x, "02x") for x in cmd)}',
-                )
-                self.wait_event.clear()
-                cmd_resp = await aio.wait_for(
-                    self.client.write_gatt_char(
-                        self.TX_CHAR,
-                        cmd,
-                        True,
-                    ),
-                    timeout=command.timeout,
-                )
-                if not command.wait_reply:
-                    if command.answer.cancelled():
-                        continue
-                    command.answer.set_result(cmd_resp)
+        ble_notification = await aio.wait_for(
+            self.ble_get_notification(),
+            timeout=command.timeout,
+        )
 
-                await aio.wait_for(
-                    self.wait_event.wait(),
-                    timeout=command.timeout,
-                )
-
-                # extract payload from container
-                cmd_resp = bytes(self.received_data[3:-1])
-                self.wait_event.clear()
-                self.received_data = None
-                if command.answer.cancelled():
-                    continue
-                command.answer.set_result(cmd_resp)
-            except aio.CancelledError:
-                logger.debug(f'{self} handle_queue is cancelled!')
-                raise
-            except Exception:
-                logger.exception(
-                    f'{self} raise an error in handle_queue, ignore it',
-                )
+        # extract payload from container
+        cmd_resp = bytes(ble_notification[1][3:-1])
+        if command.answer.cancelled():
+            return
+        command.answer.set_result(cmd_resp)
 
     async def protocol_start(self):
         # we assume that every time protocol starts it uses new blank
@@ -211,8 +188,7 @@ class RedmondKettle200Protocol(BaseDevice):
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
         assert self.client.is_connected
-        assert not self.queue_handler.cancelled()
-        assert not self.queue_handler.done()
+        assert not self._cmd_queue_task.done()
         # check for fresh client
         assert not self.client._notification_callbacks
         logger.debug(f'Enable BLE notifications from [{self.client.address}]')
@@ -223,7 +199,7 @@ class RedmondKettle200Protocol(BaseDevice):
         )
         await self.client.start_notify(
             self.RX_CHAR,
-            self.notification_handler,
+            self.notification_callback,
         )
 
     async def protocol_stop(self):
@@ -357,5 +333,5 @@ class RedmondKettle200Protocol(BaseDevice):
         return starts
 
     async def close(self):
-        self.cmd_queue._queue.clear()
+        self.clear_cmd_queue()
         await super().close()

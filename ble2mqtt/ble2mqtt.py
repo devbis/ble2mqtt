@@ -165,8 +165,7 @@ class DeviceManager:
         self.manage_task = None
 
     async def close(self):
-        if self.manage_task and not self.manage_task.done() and \
-                not self.manage_task.cancelled():
+        if self.manage_task and not self.manage_task.done():
             self.manage_task.cancel()
             try:
                 await self.manage_task
@@ -458,6 +457,12 @@ class DeviceManager:
                     await restart_bluetooth()
             finally:
                 try:
+                    await aio.wait_for(device.close(), timeout=10)
+                except aio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception(f'{device} problem on device.close()')
+                try:
                     canceled = []
                     for t in tasks:
                         if not t.done():
@@ -465,11 +470,9 @@ class DeviceManager:
                             canceled.append(t)
                     for t in canceled:
                         try:
-                            await t
+                            t.result()
                         except aio.CancelledError:
                             pass
-
-                    await device.close()
                 except aio.CancelledError:
                     raise
                 except Exception:
@@ -479,7 +482,6 @@ class DeviceManager:
                 await restart_bluetooth()
                 failure_count = 0
             try:
-                await device.close()
                 if not device.disconnected_event.is_set():
                     await aio.wait_for(
                         device.disconnected_event.wait(),

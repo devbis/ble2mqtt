@@ -10,28 +10,31 @@ from .devices import registered_device_types
 
 logger = logging.getLogger(__name__)
 
-is_shutting_down = False
+is_shutting_down: aio.Lock = aio.Lock()
 
 
 async def shutdown(loop, service: Ble2Mqtt, signal=None):
     """Cleanup tasks tied to the service's shutdown."""
-    global is_shutting_down
-
-    if is_shutting_down:
+    if is_shutting_down.locked():
         return
-    is_shutting_down = True
-    if signal:
-        logger.info(f"Received exit signal {signal.name}...")
-    logger.info("Closing ble2mqtt service")
-    await service.close()
-    tasks = [t for t in aio.all_tasks() if t is not aio.current_task()]
+    async with is_shutting_down:
+        if signal:
+            logger.info(f"Received exit signal {signal.name}...")
+        logger.info("Closing ble2mqtt service")
+        await service.close()
+        tasks = [t for t in aio.all_tasks() if t is not aio.current_task()]
 
-    [task.cancel() for task in tasks]
+        [task.cancel() for task in tasks]
 
-    logger.info(f"Cancelling {len(tasks)} outstanding tasks")
-    await aio.gather(*tasks, return_exceptions=True)
-    loop.stop()
-    is_shutting_down = False
+        logger.info(f"Cancelling {len(tasks)} outstanding tasks")
+        try:
+            await aio.wait_for(
+                aio.gather(*tasks, return_exceptions=True),
+                timeout=10,
+            )
+        except (Exception, aio.CancelledError):
+            logger.exception(f'Cancelling caused error: {tasks}')
+        loop.stop()
 
 
 def handle_exception(loop, context, service):
