@@ -2,8 +2,8 @@ MAX_RSSI = 10
 MIN_RSSI = -87
 
 
-def format_binary(data: bytes):
-    return ' '.join(format(x, '02x') for x in data)
+def format_binary(data: bytes, delimiter=' '):
+    return delimiter.join(format(x, '02x') for x in data)
 
 
 def cr2032_voltage_to_percent(mvolts: int):

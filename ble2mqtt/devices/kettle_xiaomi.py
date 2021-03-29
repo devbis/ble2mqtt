@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..protocols.xiaomi import XiaomiCipherMixin
+from ..utils import format_binary
 from .base import BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, Device
 from .uuids import SOFTWARE_VERSION
 
@@ -137,7 +138,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
     def notification_handler(self, sender: int, data: bytearray):
         logger.debug("Notification: {0}: {1}".format(
             sender,
-            ' '.join(format(x, '02x') for x in data),
+            format_binary(data),
         ))
         if sender == HANDLE_STATUS:
             self._state = MiKettleState.from_bytes(data)

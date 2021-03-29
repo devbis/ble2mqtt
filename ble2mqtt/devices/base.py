@@ -5,8 +5,8 @@ import logging
 
 from bleak import BleakClient, BleakError
 
-from ble2mqtt.devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
-from ble2mqtt.utils import rssi_to_linkquality
+from ..devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
+from ..utils import format_binary, rssi_to_linkquality
 
 logger = logging.getLogger(__name__)
 registered_device_types = {}
@@ -352,7 +352,7 @@ class SubscribeAndSetDataMixin:
         logger.debug("{0} notification: {1}: {2}".format(
             self,
             sender,
-            ' '.join(format(x, '02x') for x in data),
+            format_binary(data),
         ))
         if self.filter_notifications(sender):
             self.process_data(data)
