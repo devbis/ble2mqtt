@@ -374,10 +374,42 @@ class Ble2Mqtt:
 
         self.device_registry: ty.List[Device] = []
 
+    async def monitor_tasks(self):
+        while True:
+            all_tasks = aio.all_tasks()
+            device_tasks = {
+                d: m.manage_task for d, m in self._device_managers.items()
+            }
+            other_tasks = list(set(all_tasks) - set(device_tasks.values()))
+            device_sub_tasks = [
+                t
+                for t in other_tasks
+                if (
+                    'Sensor.handle()' in str(t) or
+                    'RedmondKettle.handle()' in str(t) or
+                    'RedmondKettle.handle_messages()' in str(t) or
+                    'XiaomiHumidityTemperature.read_and_send_data()' in str(t) or
+                    'SendAndWaitReplyMixin._handle_cmd_queue()' in str(t) or
+                    'Ble2Mqtt.scan_devices_task()' in str(t)
+                )
+            ]
+            other_tasks = list(set(other_tasks) - set(device_sub_tasks))
+            logger.info(
+                f"======= DEVICE TASKS: {len(device_tasks)} ============\n"
+                f"{pformat(device_tasks)}\n"
+                f"======== DEVICE SUB TASKS: {len(device_sub_tasks)} ==========\n"
+                f"{pformat(device_sub_tasks)}\n"
+                f"======== OTHER TASKS: {len(other_tasks)} ==========\n"
+                f"{pformat(other_tasks)}\n"
+                f"===================\n",
+            )
+            await aio.sleep(120)
+
     async def start(self):
         result = await run_tasks_and_cancel_on_first_return(
             self._loop.create_task(self._connect_mqtt_forever()),
             self._loop.create_task(self._handle_messages()),
+            self._loop.create_task(self.monitor_tasks())
         )
         for t in result:
             await t
