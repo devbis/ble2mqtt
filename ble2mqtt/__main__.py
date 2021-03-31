@@ -73,7 +73,6 @@ def handle_exception(loop, context, service):
 
 
 def main():
-    logger.info(f'Starting BLE2MQTT version {VERSION}')
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')
     config = {}
     if os.path.exists(os.environ['BLE2MQTT_CONFIG']):
@@ -92,6 +91,7 @@ def main():
 
     logging.basicConfig(level=config['log_level'].upper())
     # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
+    logger.info(f'Starting BLE2MQTT version {VERSION}')
     loop = aio.get_event_loop()
 
     service = Ble2Mqtt(
