@@ -40,7 +40,7 @@ async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
                                                return_when=aio.FIRST_COMPLETED,
                                                ignore_futures=(),
                                                ) -> ty.Sequence[aio.Future]:
-    async def cancel_tasks(_tasks):
+    async def cancel_tasks(_tasks) -> ty.List[aio.Task]:
         # cancel first, then await. Because other tasks can raise exceptions
         # while switching tasks
         canceled = []
@@ -50,13 +50,23 @@ async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
             if not t.done():
                 t.cancel()
                 canceled.append(t)
+        tasks_raise_exceptions = []
         for t in canceled:
             try:
                 await t
             except aio.CancelledError:
                 pass
+            except Exception:
+                logger.exception(
+                    f'Unexpected exception while cancelling tasks! {t}',
+                )
+                tasks_raise_exceptions.append(t)
+        return tasks_raise_exceptions
+
     assert all(isinstance(t, aio.Future) for t in tasks)
     try:
+        # NB: pending tasks can still raise exception or finish
+        # while tasks are switching
         done, pending = await aio.wait(tasks, return_when=return_when)
     except aio.CancelledError:
         await cancel_tasks(tasks)
@@ -180,6 +190,8 @@ class DeviceManager:
             logger.exception(f'Problem on closing device {self.device}')
 
     def run_task(self) -> aio.Task:
+        assert not self.manage_task, \
+            f'{self.device} Previous task was not finished! {self.manage_task}'
         self.manage_task = aio.create_task(self.manage_device())
         return self.manage_task
 
