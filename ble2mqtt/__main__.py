@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 
+from ble2mqtt.__version__ import VERSION
 from ble2mqtt.ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
@@ -72,6 +73,7 @@ def handle_exception(loop, context, service):
 
 
 def main():
+    logger.info(f'Starting BLE2MQTT version {VERSION}')
     os.environ.setdefault('BLE2MQTT_CONFIG', '/etc/ble2mqtt.json')
     config = {}
     if os.path.exists(os.environ['BLE2MQTT_CONFIG']):
