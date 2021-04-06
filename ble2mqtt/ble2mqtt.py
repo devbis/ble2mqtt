@@ -643,7 +643,13 @@ class Ble2Mqtt:
                     reg_device.handle_advert(device, advertisement_data)
 
     async def scan_devices_task(self):
+        empty_scans = 0
         while True:
+            # 10 empty scans in a row means that bluetooth restart is required
+            if empty_scans >= 10:
+                empty_scans = 0
+                await restart_bluetooth()
+
             try:
                 async with handle_ble_exceptions():
                     async with BleakScanner(scanning_mode='passive') as scanner:
@@ -652,6 +658,10 @@ class Ble2Mqtt:
                         )
                         await aio.sleep(3)
                         devices = await scanner.get_discovered_devices()
+                        if not devices:
+                            empty_scans += 1
+                        else:
+                            empty_scans = 0
                     logger.debug(f'found {len(devices)} devices')
             except KeyboardInterrupt:
                 raise
@@ -659,6 +669,7 @@ class Ble2Mqtt:
                 raise
             except ListOfConnectionErrors as e:
                 logger.exception(e)
+                empty_scans += 1
             await aio.sleep(1)
 
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
