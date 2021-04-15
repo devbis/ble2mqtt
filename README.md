@@ -84,8 +84,11 @@ Supported devices:
 
 **Humidity sensors:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
-- Xiaomi LYWSD03MMC (xiaomilywsd)
+- Xiaomi LYWSD03MMC (xiaomilywsd) (due to the connection to the device on 
+  every data fetch, it consumes more battery power. Flashing to the custom
+  firmware is recommended)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
+  - supported both atc1441 and pvvx formats
 
 **Dosimeters**
 - Atom Fast (atomfast)
