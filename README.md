@@ -1,6 +1,7 @@
 # Service to export BLE devices to MQTT with Home Assistant discovery
 
-## !!! It is a very early alpha release !!! 
+## Known issues:
+- High cpu usage due to underlying library to work with bluetooth
 
 **Use this software at your own risk.**
 
@@ -102,7 +103,7 @@ To use connection to the device provide `"passive": false` parameter.
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
 
 
-## OpenWRT installation
+## Installation on OpenWRT
 
 Execute the following commands in the terminal:
 
@@ -128,7 +129,48 @@ Run the service in background
 ble2mqtt 2> /tmp/ble2mqtt.log &
 ```
 
-## Container
+Add a service script to start:
+
+```
+cat <<EOF > /etc/init.d/ble2mqtt
+#!/bin/sh /etc/rc.common
+
+START=98
+USE_PROCD=1
+
+start_service()
+{
+    procd_open_instance
+
+    procd_set_param env BLE2MQTT_CONFIG=/etc/ble2mqtt.json
+    procd_set_param command /usr/bin/ble2mqtt
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}
+EOF
+chmod +x /etc/init.d/ble2mqtt
+/etc/init.d/ble2mqtt enable
+/etc/init.d/ble2mqtt start
+```
+
+## Running on Xiaomi Zigbee Gateway
+
+Due to small CPU power and increasing number of messages from bluetoothd
+it is recommended to do several workarounds:
+
+1. Use passive mode for those sensors for which this is possible. E.g. use
+   custom ATC firmware for lywsd03mmc sensors
+1. Restart `bluetoothd` daily and restart ble2mqtt several times a day to 
+   reduce increasing CPU usage. 
+   Put the following lines to the `/etc/crontabs/root`
+
+ ```
+10 0,7,17 * * * /etc/init.d/ble2mqtt restart
+1 4,14 * * * /etc/init.d/bluetoothd restart
+```
+
+## Running in Container
 
 Build the image as:
 
