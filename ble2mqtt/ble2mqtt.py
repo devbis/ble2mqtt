@@ -168,10 +168,10 @@ async def handle_ble_exceptions():
 
 
 class DeviceManager:
-    def __init__(self, device, mqtt_client, topic_root):
+    def __init__(self, device, mqtt_client, base_topic):
         self.device: Device = device
         self._mqtt_client = mqtt_client
-        self._topic_root = topic_root
+        self._base_topic = base_topic
         self.manage_task = None
 
     async def close(self):
@@ -199,14 +199,14 @@ class DeviceManager:
         logger.debug(f'call publish callback topic={topic} value={value}')
         await self._mqtt_client.publish(
             aio_mqtt.PublishableMessage(
-                topic_name='/'.join((self._topic_root, topic)),
+                topic_name='/'.join((self._base_topic, topic)),
                 payload=value,
                 qos=aio_mqtt.QOSLevel.QOS_1,
             ),
         )
 
     def _get_topic(self, dev_id, subtopic, *args):
-        return '/'.join((self._topic_root, dev_id, subtopic, *args))
+        return '/'.join((self._base_topic, dev_id, subtopic, *args))
 
     async def send_device_config(self):
         device = self.device
@@ -214,7 +214,7 @@ class DeviceManager:
             'identifiers': [
                 device.unique_id,
             ],
-            'name': device.unique_id,
+            'name': device.unique_name,
             'model': device.model,
         }
         if device.manufacturer:
@@ -395,7 +395,7 @@ class DeviceManager:
                     if device.subscribed_topics:
                         await self._mqtt_client.subscribe(*[
                             (
-                                '/'.join((self._topic_root, topic)),
+                                '/'.join((self._base_topic, topic)),
                                 aio_mqtt.QOSLevel.QOS_1,
                             )
                             for topic in device.subscribed_topics
@@ -520,23 +520,28 @@ class Ble2Mqtt:
             password: ty.Optional[str] = None,
             reconnection_interval: int = 10,
             loop: ty.Optional[aio.AbstractEventLoop] = None,
+            *,
+            base_topic,
+            mqtt_prefix,
     ) -> None:
         self._mqtt_host = host
         self._mqtt_port = port
         self._mqtt_user = user
         self._mqtt_password = password
+        self._base_topic = base_topic
+        self._mqtt_prefix = mqtt_prefix
 
         self._reconnection_interval = reconnection_interval
         self._loop = loop or aio.get_event_loop()
         self._mqtt_client = aio_mqtt.Client(
-            client_id_prefix='ble2mqtt_',
+            client_id_prefix=f'{base_topic}_',
             loop=self._loop,
         )
 
         self._device_managers: ty.Dict[Device, DeviceManager] = {}
 
         self.availability_topic = '/'.join((
-            self.TOPIC_ROOT,
+            self._base_topic,
             self.BRIDGE_TOPIC,
             SENSOR_STATE_TOPIC,
         ))
@@ -563,7 +568,9 @@ class Ble2Mqtt:
             except Exception as e:
                 logger.warning(f'Error on MQTT  disconnecting: {repr(e)}')
 
-    def register(self, device: Device):
+    def register(self, device_class: ty.Type[Device], *args, **kwargs):
+        kwargs.setdefault('prefix', self._mqtt_prefix)
+        device = device_class(*args, **kwargs)
         if not device:
             return
         if not device.is_passive and not device.SUPPORT_ACTIVE:
@@ -575,14 +582,14 @@ class Ble2Mqtt:
     @property
     def subscribed_topics(self):
         return [
-            '/'.join((self.TOPIC_ROOT, topic))
+            '/'.join((self._base_topic, topic))
             for device in self.device_registry
             for topic in device.subscribed_topics
         ]
 
     async def _handle_messages(self) -> None:
         async for message in self._mqtt_client.delivered_messages(
-            f'{self.TOPIC_ROOT}/#',
+            f'{self._base_topic}/#',
         ):
             logger.debug(message)
             while True:
@@ -590,7 +597,7 @@ class Ble2Mqtt:
                     await aio.sleep(0)
                     continue
 
-                prefix = f'{self.TOPIC_ROOT}/'
+                prefix = f'{self._base_topic}/'
                 if message.topic_name.startswith(prefix):
                     topic_wo_prefix = message.topic_name[len(prefix):]
                 else:
@@ -676,7 +683,7 @@ class Ble2Mqtt:
         has_passive_devices = False
         for dev in self.device_registry:
             self._device_managers[dev] = \
-                DeviceManager(dev, self._mqtt_client, self.TOPIC_ROOT)
+                DeviceManager(dev, self._mqtt_client, self._base_topic)
             if dev.is_passive:
                 has_passive_devices = True
         logger.debug("Wait for network interruptions...")

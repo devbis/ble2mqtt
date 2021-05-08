@@ -61,4 +61,3 @@ class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature):
                     f'Advert received for {self}, {format_binary(adv_data)}, '
                     f'current state: {self._state}',
                 )
-

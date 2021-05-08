@@ -65,6 +65,12 @@ The configuration file is a JSON with the following content:
 
 You can omit a line, then default value will be used.
 
+Extra configuration parameters:
+- `"base_topic"`- the default value is 'ble2mqtt'
+- `"mqtt_prefix"`- a prefix to distinguish ble devices from other instances and
+  programs. The default value is 'b2m_'.
+
+
 Supported devices:
 
 **Any device**

@@ -100,7 +100,11 @@ class BaseDevice(metaclass=RegisteredType):
 
     @property
     def unique_id(self):
-        raise None
+        raise NotImplementedError()
+
+    @property
+    def unique_name(self):
+        raise NotImplementedError()
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         raise NotImplementedError()
@@ -122,11 +126,12 @@ class Device(BaseDevice, abc.ABC):
     # secs to sleep if not connected or no data in passive mode
     NOT_READY_SLEEP_INTERVAL = 5
 
-    def __init__(self, mac, *args, **kwargs) -> None:
+    def __init__(self, mac, *args, prefix, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.disconnected_event = aio.Event()
         self.message_queue = aio.Queue()
         self.mac = mac
+        self.prefix = prefix
         self._model = None
         self._version = None
         self._manufacturer = self.MANUFACTURER
@@ -173,6 +178,14 @@ class Device(BaseDevice, abc.ABC):
 
     @property
     def unique_id(self):
+        # name and manufacturer can change while working, e.g. when
+        # a device sends his name. To avoid changing topics use
+        # the ID based on mac address only
+        return f'{self.prefix}{self.dev_id}'
+
+    @property
+    def unique_name(self):
+        # can change over time. Don't use it as an identifier
         parts = [self.manufacturer, self.model, self.dev_id]
         return '_'.join([p.replace(' ', '_') for p in parts if p])
 
@@ -211,7 +224,7 @@ class Device(BaseDevice, abc.ABC):
             self.rssi = props.get('RSSI')
 
     def __str__(self):
-        return self.unique_id
+        return self.unique_name
 
     def __repr__(self):
         return f'<Device:{str(self)}>'
