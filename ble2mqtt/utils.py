@@ -1,5 +1,5 @@
 MAX_RSSI = 10
-MIN_RSSI = -87
+MIN_RSSI = -100
 
 
 def format_binary(data: bytes, delimiter=' '):
