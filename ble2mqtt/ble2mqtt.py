@@ -9,9 +9,9 @@ import aio_mqtt
 from bleak import BleakError, BleakScanner
 from bleak.backends.device import BLEDevice
 
-from .devices.base import (BINARY_SENSOR_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
-                           SWITCH_DOMAIN, ConnectionTimeoutError, Device,
-                           done_callback)
+from .devices.base import (BINARY_SENSOR_DOMAIN, COVER_DOMAIN, LIGHT_DOMAIN,
+                           SENSOR_DOMAIN, SWITCH_DOMAIN,
+                           ConnectionTimeoutError, Device, done_callback)
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +245,10 @@ class DeviceManager:
                 'name': 'linkquality',
                 'unit_of_measurement': 'lqi',
                 'icon': 'signal',
+                **(
+                    {'topic': device.LINKQUALITY_TOPIC}
+                    if device.LINKQUALITY_TOPIC else {}
+                ),
             },
         )
         entities = {
@@ -356,6 +360,49 @@ class DeviceManager:
                         'state_topic': state_topic,
                         'command_topic': set_topic,
                     })
+                    logger.debug(
+                        f'Publish config topic={config_topic}: {payload}',
+                    )
+                    messages_to_send.append(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+            if cls == COVER_DOMAIN:
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    set_topic = self._get_topic(
+                        device.unique_id,
+                        entity_name,
+                        device.SET_POSTFIX,
+                    )
+                    set_position_topic = self._get_topic(
+                        device.unique_id,
+                        entity_name,
+                        device.SET_POSITION_POSTFIX,
+                    )
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        device.dev_id,
+                        entity_name,
+                        'config',
+                    ))
+                    config_params = {
+                        **get_generic_vals(entity),
+                        'state_topic': state_topic,
+                        'position_topic': state_topic,
+                        'json_attributes_topic': state_topic,
+                        'value_template': '{{ value_json.state }}',
+                        'position_template': '{{ value_json.position }}',
+                        'command_topic': set_topic,
+                        'set_position_topic': set_position_topic,
+                    }
+                    payload = json.dumps(config_params)
                     logger.debug(
                         f'Publish config topic={config_topic}: {payload}',
                     )
@@ -659,16 +706,21 @@ class Ble2Mqtt:
 
             try:
                 async with handle_ble_exceptions():
-                    async with BleakScanner(scanning_mode='passive') as scanner:
-                        scanner.register_detection_callback(
-                            self.device_detection_callback,
-                        )
-                        await aio.sleep(3)
-                        devices = await scanner.get_discovered_devices()
-                        if not devices:
-                            empty_scans += 1
-                        else:
-                            empty_scans = 0
+                    scanner = BleakScanner()
+                    scanner.register_detection_callback(
+                        self.device_detection_callback,
+                    )
+                    try:
+                        await aio.wait_for(scanner.start(), 10)
+                    except aio.TimeoutError:
+                        logger.error('Scanner start failed with timeout')
+                    await aio.sleep(3)
+                    devices = await scanner.get_discovered_devices()
+                    await scanner.stop()
+                    if not devices:
+                        empty_scans += 1
+                    else:
+                        empty_scans = 0
                     logger.debug(f'found {len(devices)} devices')
             except KeyboardInterrupt:
                 raise

@@ -2,6 +2,7 @@ import abc
 import asyncio as aio
 import json
 import logging
+import uuid
 
 from bleak import BleakClient, BleakError
 
@@ -16,6 +17,7 @@ BINARY_SENSOR_DOMAIN = 'binary_sensor'
 SENSOR_DOMAIN = 'sensor'
 LIGHT_DOMAIN = 'light'
 SWITCH_DOMAIN = 'switch'
+COVER_DOMAIN = 'cover'
 
 
 class ConnectionTimeoutError(ConnectionError):
@@ -116,12 +118,14 @@ class BaseDevice(metaclass=RegisteredType):
 class Device(BaseDevice, abc.ABC):
     MQTT_VALUES = None
     SET_POSTFIX = 'set'
+    SET_POSITION_POSTFIX = 'set_position'  # for covers. Consider rework
     MAC_TYPE = 'public'
     MANUFACTURER = None
     CONNECTION_FAILURES_LIMIT = 100
     RECONNECTION_SLEEP_INTERVAL = 60
     ACTIVE_SLEEP_INTERVAL = 60
     PASSIVE_SLEEP_INTERVAL = 60
+    LINKQUALITY_TOPIC = None
 
     # secs to sleep if not connected or no data in passive mode
     NOT_READY_SLEEP_INTERVAL = 5
@@ -142,14 +146,19 @@ class Device(BaseDevice, abc.ABC):
             SENSOR_DOMAIN,
             LIGHT_DOMAIN,
             SWITCH_DOMAIN,
+            COVER_DOMAIN,
         }
 
-    def get_entity_from_topic(self, topic: str):
+    def get_entity_from_topic(self, topic: str) -> tuple:
+        subtopic = None
         if topic.startswith(self.unique_id):
             topic = topic[len(self.unique_id):]
-        if topic.endswith(self.SET_POSTFIX):
-            topic = topic[:-len(self.SET_POSTFIX)]
-        return topic.strip('/')
+        for postfix in [self.SET_POSTFIX, self.SET_POSITION_POSTFIX]:
+            if topic.endswith(postfix):
+                subtopic = postfix
+                topic = topic[:-len(postfix)]
+                break
+        return topic.strip('/'), subtopic
 
     @property
     def subscribed_topics(self):
@@ -157,7 +166,12 @@ class Device(BaseDevice, abc.ABC):
             f'{self.unique_id}/{entity["name"]}/{self.SET_POSTFIX}'
             for cls, items in self.entities.items()
             for entity in items
-            if cls in [SWITCH_DOMAIN, LIGHT_DOMAIN]
+            if cls in [SWITCH_DOMAIN, LIGHT_DOMAIN, COVER_DOMAIN]
+        ] + [
+            f'{self.unique_id}/{entity["name"]}/{self.SET_POSITION_POSTFIX}'
+            for cls, items in self.entities.items()
+            for entity in items
+            if cls in [COVER_DOMAIN]
         ]
 
     @property
@@ -355,10 +369,12 @@ class Sensor(Device):
 
 
 class SubscribeAndSetDataMixin:
+    DATA_CHAR: uuid.UUID = None
+
     def filter_notifications(self, sender):
         return True
 
-    def process_data(self, data):
+    def process_data(self, data: bytearray):
         self._state = self.SENSOR_CLASS.from_data(data)
 
     def notification_handler(self, sender, data: bytearray):
@@ -371,8 +387,9 @@ class SubscribeAndSetDataMixin:
             self.process_data(data)
 
     async def get_device_data(self):
-        await self.client.start_notify(
-            self.DATA_CHAR,
-            self.notification_handler,
-        )
+        if self.DATA_CHAR:
+            await self.client.start_notify(
+                self.DATA_CHAR,
+                self.notification_handler,
+            )
         await super().get_device_data()

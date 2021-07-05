@@ -264,7 +264,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 await aio.sleep(1)
                 continue
             value = message['value']
-            entity_name = self.get_entity_from_topic(message['topic'])
+            entity_name, _ = self.get_entity_from_topic(message['topic'])
             if entity_name == BOIL_ENTITY:
                 value = self.transform_value(value)
                 logger.info(
