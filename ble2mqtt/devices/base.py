@@ -3,6 +3,7 @@ import asyncio as aio
 import json
 import logging
 import uuid
+from enum import Enum
 
 from bleak import BleakClient, BleakError
 
@@ -20,6 +21,14 @@ SWITCH_DOMAIN = 'switch'
 COVER_DOMAIN = 'cover'
 
 DEFAULT_STATE_TOPIC = ''  # send to the parent topic
+
+
+class CoverRunState(Enum):
+    OPEN = 'open'
+    OPENING = 'opening'
+    CLOSED = 'closed'
+    CLOSING = 'closing'
+    STOPPED = 'stopped'
 
 
 class ConnectionTimeoutError(ConnectionError):
