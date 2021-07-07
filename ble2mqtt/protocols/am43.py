@@ -1,9 +1,8 @@
 import abc
 import asyncio as aio
 import logging
-from dataclasses import dataclass
 
-from ..devices.base import BaseDevice, CoverRunState
+from ..devices.base import BaseDevice
 from ..utils import format_binary
 from .base import BLEQueueMixin
 
@@ -21,15 +20,6 @@ AM43_RESPONSE_ACK = 0x5a
 AM43_RESPONSE_NACK = 0xa5
 AM43_REPLY_UNKNOWN1 = 0xa8
 AM43_REPLY_UNKNOWN2 = 0xa9
-
-
-@dataclass
-class AM43State:
-    battery: int = None
-    position: int = 0
-    light: int = None
-    run_state: CoverRunState = CoverRunState.CLOSED
-    target_position: int = None
 
 
 class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):

@@ -167,16 +167,22 @@ class Device(BaseDevice, abc.ABC):
     def _get_topic_for_entity(self, entity):
         return self._get_topic(entity.get('topic', self.STATE_TOPIC))
 
-    def get_entity_from_topic(self, topic: str) -> tuple:
-        subtopic = None
+    def get_entity_by_name(self, domain: str, name: str):
+        return next(
+            (e for e in self.entities.get(domain, []) if e['name'] == name),
+            None,
+        )
+
+    def get_entity_subtopic_from_topic(self, topic: str) -> tuple:
+        action_postfix = None
         if topic.startswith(self.unique_id):
             topic = topic[len(self.unique_id):]
         for postfix in [self.SET_POSTFIX, self.SET_POSITION_POSTFIX]:
             if topic.endswith(postfix):
-                subtopic = postfix
+                action_postfix = postfix
                 topic = topic[:-len(postfix)]
                 break
-        return topic.strip('/'), subtopic
+        return topic.strip('/'), action_postfix
 
     @property
     def subscribed_topics(self):

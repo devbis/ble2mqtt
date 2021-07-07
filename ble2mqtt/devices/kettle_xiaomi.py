@@ -201,11 +201,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         for sensor_name, value in (
             (HEAT_ENTITY, self._state.mode in [Mode.HEATING, Mode.KEEP_WARM]),
         ):
-            entity = next((
-                x['name'] == sensor_name
-                for x in self.entities.get(BINARY_SENSOR_DOMAIN, [])
-            ), None)
-
+            entity = self.get_entity_by_name(BINARY_SENSOR_DOMAIN, sensor_name)
             if entity:
                 await publish_topic(
                     topic=self._get_topic_for_entity(entity),

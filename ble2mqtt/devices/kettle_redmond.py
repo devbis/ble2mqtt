@@ -133,10 +133,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         for sensor_name, value in (
             ('statistics', self._statistics),
         ):
-            entity = next((
-                x['name'] == sensor_name
-                for x in self.entities.get(SENSOR_DOMAIN, [])
-            ), None)
+            entity = self.get_entity_by_name(SENSOR_DOMAIN, sensor_name)
             if entity:
                 coros.append(publish_topic(
                     topic=self._get_topic_for_entity(entity),
@@ -265,11 +262,14 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 await aio.sleep(1)
                 continue
             value = message['value']
-            entity_name, _ = self.get_entity_from_topic(message['topic'])
-            if entity_name == BOIL_ENTITY:  # compare topic
+            entity_topic, _ = self.get_entity_subtopic_from_topic(
+                message['topic'],
+            )
+            entity = self.get_entity_by_name(SWITCH_DOMAIN, BOIL_ENTITY)
+            if entity_topic == self._get_topic_for_entity(entity):
                 value = self.transform_value(value)
                 logger.info(
-                    f'[{self}] switch kettle {entity_name} value={value}',
+                    f'[{self}] switch kettle {BOIL_ENTITY} value={value}',
                 )
                 while True:
                     try:
@@ -278,7 +278,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                         await self.get_mode()
                         await aio.gather(
                             publish_topic(
-                                topic=self._get_topic(entity_name),
+                                topic=self._get_topic_for_entity(entity),
                                 value=self.transform_value(value),
                             ),
                             self._notify_state(publish_topic),
@@ -288,7 +288,10 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     except ConnectionError as e:
                         logger.exception(str(e))
                     await aio.sleep(5)
-            if entity_name == LIGHT_ENTITY:
+                break
+
+            entity = self.get_entity_by_name(LIGHT_DOMAIN, LIGHT_ENTITY)
+            if entity_topic == self._get_topic_for_entity(entity):
                 logger.info(f'set backlight {value}')
                 if value.get('state'):
                     await self._switch_backlight(value['state'])

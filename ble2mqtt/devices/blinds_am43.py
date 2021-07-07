@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..protocols.am43 import AM43Protocol
-from .base import COVER_DOMAIN, SENSOR_DOMAIN, Device
+from .base import COVER_DOMAIN, SENSOR_DOMAIN, CoverRunState, Device
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +15,9 @@ COVER_ENTITY = 'cover'
 BLINDS_CONTROL = uuid.UUID("0000fe51-0000-1000-8000-00805f9b34fb")
 
 
-class RunState(Enum):
-    OPEN = 'open'
-    OPENING = 'opening'
-    CLOSED = 'closed'
-    CLOSING = 'closing'
-    STOPPED = 'stopped'
+class MovementType(Enum):
+    STOP = 0
+    POSITION = 1
 
 
 @dataclass
@@ -28,7 +25,7 @@ class AM43State:
     battery: int = None
     position: int = 0
     illuminance: int = 0
-    run_state: RunState = RunState.CLOSED
+    run_state: CoverRunState = CoverRunState.CLOSED
     target_position: int = None
 
 
@@ -108,8 +105,8 @@ class AM43Cover(AM43Protocol, Device):
             await self.update_device_data(send_config)
             # if running notify every 5 seconds, 60 sec otherwise
             is_running = self._state.run_state in [
-                RunState.OPENING,
-                RunState.CLOSING,
+                CoverRunState.OPENING,
+                CoverRunState.CLOSING,
             ]
             multiplier = (
                 1 if is_running else self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
@@ -124,12 +121,12 @@ class AM43Cover(AM43Protocol, Device):
                         logger.info(
                             f'[{self}] Minimum position reached. Set to CLOSED',
                         )
-                        self._state.run_state = RunState.CLOSED
+                        self._state.run_state = CoverRunState.CLOSED
                     elif self._state.position == self.OPEN_POSITION:
                         logger.info(
                             f'[{self}] Maximum position reached. Set to OPEN',
                         )
-                        self._state.run_state = RunState.OPEN
+                        self._state.run_state = CoverRunState.OPEN
                 else:
                     logger.debug(f'[{self}] check for full state')
                     await self._get_full_state()
@@ -146,24 +143,25 @@ class AM43Cover(AM43Protocol, Device):
     def handle_illuminance(self, value):
         self._state.illuminance = value
 
-    async def _do_movement(self, movement_type, target_position):
-        if movement_type == 'position' and target_position is not None:
+    async def _do_movement(self, movement_type: MovementType, target_position):
+        if movement_type == MovementType.POSITION and \
+                target_position is not None:
             if self.CLOSED_POSITION <= target_position <= self.OPEN_POSITION:
                 await self._set_position(target_position)
                 if self._state.position > target_position:
                     self._state.target_position = target_position
-                    self._state.run_state = RunState.CLOSING
+                    self._state.run_state = CoverRunState.CLOSING
                 elif self._state.position < target_position:
                     self._state.target_position = target_position
-                    self._state.run_state = RunState.OPENING
+                    self._state.run_state = CoverRunState.OPENING
                 else:
                     self._state.target_position = None
                     if target_position == self.OPEN_POSITION:
-                        self._state.run_state = RunState.OPEN
+                        self._state.run_state = CoverRunState.OPEN
                     elif target_position == self.CLOSED_POSITION:
-                        self._state.run_state = RunState.CLOSED
+                        self._state.run_state = CoverRunState.CLOSED
                     else:
-                        self._state.run_state = RunState.STOPPED
+                        self._state.run_state = CoverRunState.STOPPED
             else:
                 logger.error(
                     f'[{self}] Incorrect position value: '
@@ -171,7 +169,7 @@ class AM43Cover(AM43Protocol, Device):
                 )
         else:
             await self._stop()
-            self._state.run_state = RunState.STOPPED
+            self._state.run_state = CoverRunState.STOPPED
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
@@ -186,26 +184,30 @@ class AM43Cover(AM43Protocol, Device):
                 await aio.sleep(1)
                 continue
             value = message['value']
-            entity_name, postfix = self.get_entity_from_topic(message['topic'])
-            if entity_name == COVER_ENTITY:
+            entity_topic, postfix = self.get_entity_subtopic_from_topic(
+                message['topic'],
+            )
+            if entity_topic == self._get_topic_for_entity(
+                self.get_entity_by_name(COVER_DOMAIN, COVER_ENTITY),
+            ):
                 value = self.transform_value(value)
                 target_position = None
                 if postfix == self.SET_POSTFIX:
                     logger.info(
-                        f'[{self}] set mode {entity_name} value={value}',
+                        f'[{self}] set mode {entity_topic} to "{value}"',
                     )
                     if value.lower() == 'open':
-                        movement_type = 'position'
+                        movement_type = MovementType.POSITION
                         target_position = self.OPEN_POSITION
                     elif value.lower() == 'close':
-                        movement_type = 'position'
+                        movement_type = MovementType.POSITION
                         target_position = self.CLOSED_POSITION
                     else:
-                        movement_type = 'stop'
+                        movement_type = MovementType.STOP
                 elif postfix == self.SET_POSITION_POSTFIX:
-                    movement_type = 'position'
+                    movement_type = MovementType.POSITION
                     logger.info(
-                        f'[{self}] set position {entity_name} value={value}',
+                        f'[{self}] set position {entity_topic} to "{value}"',
                     )
                     try:
                         target_position = int(value)
