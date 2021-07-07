@@ -73,9 +73,6 @@ class AM43Cover(BLEQueueMixin, Device):
                     'name': 'battery',
                     'device_class': 'battery',
                     'unit_of_measurement': '%',
-                    'topic': 'cover',
-                    'json': True,
-                    'main_value': 'battery',
                 },
             ],
         }
@@ -192,7 +189,7 @@ class AM43Cover(BLEQueueMixin, Device):
                     'light': self._state.light,
                 }
                 coros.append(publish_topic(
-                    topic='/'.join((self.unique_id, cover['name'])),
+                    topic=self._get_topic_for_entity(cover),
                     value=json.dumps(cover_state),
                 ))
         if coros:

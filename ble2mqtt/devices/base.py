@@ -19,6 +19,8 @@ LIGHT_DOMAIN = 'light'
 SWITCH_DOMAIN = 'switch'
 COVER_DOMAIN = 'cover'
 
+DEFAULT_STATE_TOPIC = ''  # send to the parent topic
+
 
 class ConnectionTimeoutError(ConnectionError):
     pass
@@ -126,6 +128,7 @@ class Device(BaseDevice, abc.ABC):
     ACTIVE_SLEEP_INTERVAL = 60
     PASSIVE_SLEEP_INTERVAL = 60
     LINKQUALITY_TOPIC = None
+    STATE_TOPIC = DEFAULT_STATE_TOPIC
 
     # secs to sleep if not connected or no data in passive mode
     NOT_READY_SLEEP_INTERVAL = 5
@@ -148,6 +151,12 @@ class Device(BaseDevice, abc.ABC):
             SWITCH_DOMAIN,
             COVER_DOMAIN,
         }
+
+    def _get_topic(self, topic):
+        return '/'.join(filter(None, (self.unique_id, topic)))
+
+    def _get_topic_for_entity(self, entity):
+        return self._get_topic(entity.get('topic', self.STATE_TOPIC))
 
     def get_entity_from_topic(self, topic: str) -> tuple:
         subtopic = None
@@ -332,7 +341,7 @@ class Sensor(Device):
         if state:
             state['linkquality'] = self.linkquality
             await publish_topic(
-                topic='/'.join((self.unique_id, 'state')),
+                topic=self._get_topic(self.STATE_TOPIC),
                 value=json.dumps(state),
             )
 

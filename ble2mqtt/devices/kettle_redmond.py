@@ -51,6 +51,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             SWITCH_DOMAIN: [
                 {
                     'name': BOIL_ENTITY,
+                    'topic': BOIL_ENTITY,
                     'icon': 'kettle',
                 },
             ],
@@ -72,6 +73,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             LIGHT_DOMAIN: [
                 {
                     'name': LIGHT_ENTITY,
+                    'topic': LIGHT_ENTITY,
                 },
             ],
         }
@@ -122,7 +124,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
         if state:
             coros.append(publish_topic(
-                topic='/'.join((self.unique_id, 'state')),
+                topic=self._get_topic(self.STATE_TOPIC),
                 value=json.dumps(state),
             ))
 
@@ -131,12 +133,13 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         for sensor_name, value in (
             ('statistics', self._statistics),
         ):
-            if any(
+            entity = next((
                 x['name'] == sensor_name
                 for x in self.entities.get(SENSOR_DOMAIN, [])
-            ):
+            ), None)
+            if entity:
                 coros.append(publish_topic(
-                    topic='/'.join((self.unique_id, sensor_name)),
+                    topic=self._get_topic_for_entity(entity),
                     value=json.dumps(value),
                 ))
 
@@ -158,7 +161,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     },
                 }
                 coros.append(publish_topic(
-                    topic='/'.join((self.unique_id, light['name'])),
+                    topic=self._get_topic_for_entity(light),
                     value=json.dumps(light_state),
                 ))
         if coros:
@@ -186,10 +189,8 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             }
             await aio.gather(
                 *[
-                    publish_topic(
-                        topic='/'.join((self.unique_id, topic)),
-                        value=value,
-                    ) for topic, value in topics.items()
+                    publish_topic(topic=self._get_topic(topic), value=value)
+                    for topic, value in topics.items()
                 ],
                 self._notify_state(publish_topic),
             )
@@ -265,7 +266,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 continue
             value = message['value']
             entity_name, _ = self.get_entity_from_topic(message['topic'])
-            if entity_name == BOIL_ENTITY:
+            if entity_name == BOIL_ENTITY:  # compare topic
                 value = self.transform_value(value)
                 logger.info(
                     f'[{self}] switch kettle {entity_name} value={value}',
@@ -277,7 +278,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                         await self.get_mode()
                         await aio.gather(
                             publish_topic(
-                                topic='/'.join((self.unique_id, entity_name)),
+                                topic=self._get_topic(entity_name),
                                 value=self.transform_value(value),
                             ),
                             self._notify_state(publish_topic),

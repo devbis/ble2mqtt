@@ -16,7 +16,7 @@ from .devices.base import (BINARY_SENSOR_DOMAIN, COVER_DOMAIN, LIGHT_DOMAIN,
 logger = logging.getLogger(__name__)
 
 CONFIG_MQTT_NAMESPACE = 'homeassistant'
-SENSOR_STATE_TOPIC = 'state'
+BRIDGE_STATE_TOPIC = 'state'
 BLUETOOTH_ERROR_RECONNECTION_TIMEOUT = 60
 FAILURE_LIMIT = 5
 
@@ -206,7 +206,9 @@ class DeviceManager:
         )
 
     def _get_topic(self, dev_id, subtopic, *args):
-        return '/'.join((self._base_topic, dev_id, subtopic, *args))
+        return '/'.join(
+            filter(None, (self._base_topic, dev_id, subtopic, *args)),
+        )
 
     async def send_device_config(self):
         device = self.device
@@ -261,7 +263,7 @@ class DeviceManager:
                     entity_name = entity['name']
                     state_topic = self._get_topic(
                         device.unique_id,
-                        entity.get('topic', SENSOR_STATE_TOPIC),
+                        entity.get('topic', device.STATE_TOPIC),
                     )
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
@@ -302,7 +304,10 @@ class DeviceManager:
             if cls == SWITCH_DOMAIN:
                 for entity in entities:
                     entity_name = entity['name']
-                    state_topic = self._get_topic(device.unique_id, entity_name)
+                    state_topic = self._get_topic(
+                        device.unique_id,
+                        entity.get('topic', device.STATE_TOPIC),
+                    )
                     command_topic = '/'.join((state_topic, device.SET_POSTFIX))
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
@@ -339,12 +344,11 @@ class DeviceManager:
             if cls == LIGHT_DOMAIN:
                 for entity in entities:
                     entity_name = entity['name']
-                    state_topic = self._get_topic(device.unique_id, entity_name)
-                    set_topic = self._get_topic(
+                    state_topic = self._get_topic(
                         device.unique_id,
-                        entity_name,
-                        device.SET_POSTFIX,
+                        entity.get('topic', device.STATE_TOPIC),
                     )
+                    set_topic = '/'.join((state_topic, device.SET_POSTFIX))
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
@@ -374,16 +378,13 @@ class DeviceManager:
             if cls == COVER_DOMAIN:
                 for entity in entities:
                     entity_name = entity['name']
-                    state_topic = self._get_topic(device.unique_id, entity_name)
-                    set_topic = self._get_topic(
+                    state_topic = self._get_topic(
                         device.unique_id,
-                        entity_name,
-                        device.SET_POSTFIX,
+                        entity.get('topic', device.STATE_TOPIC),
                     )
-                    set_position_topic = self._get_topic(
-                        device.unique_id,
-                        entity_name,
-                        device.SET_POSITION_POSTFIX,
+                    set_topic = '/'.join((state_topic, device.SET_POSTFIX))
+                    set_position_topic = '/'.join(
+                        (state_topic, device.SET_POSITION_POSTFIX),
                     )
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
@@ -590,7 +591,7 @@ class Ble2Mqtt:
         self.availability_topic = '/'.join((
             self._base_topic,
             self.BRIDGE_TOPIC,
-            SENSOR_STATE_TOPIC,
+            BRIDGE_STATE_TOPIC,
         ))
 
         self.device_registry: ty.List[Device] = []
