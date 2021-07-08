@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
+from bleak import BleakError
+
 from ..devices.base import BaseDevice
 from ..utils import format_binary
 from .base import BaseCommand, BLEQueueMixin, SendAndWaitReplyMixin
@@ -135,23 +137,6 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         self._cmd_counter = 0
         self.notification_queue = aio.Queue()
         self.run_queue_handler()
-        self._cmd_queue_task.add_done_callback(
-            self._queue_handler_done_callback,
-        )
-
-    def _queue_handler_done_callback(self, future: aio.Future):
-        exc_info = None
-        try:
-            exc_info = future.exception()
-        except aio.CancelledError:
-            pass
-
-        if exc_info is not None:
-            exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
-            logger.exception(
-                f'{self} handle_queue() stopped unexpectedly',
-                exc_info=exc_info,
-            )
 
     async def process_command(self, command: KettleCommand):
         cmd = self._get_command(command.cmd.value, command.payload)
@@ -189,7 +174,6 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
         assert self.client.is_connected
-        assert not self._cmd_queue_task.done()
         # check for fresh client
         assert not self.client._notification_callbacks
         logger.debug(f'Enable BLE notifications from [{self.client.address}]')
@@ -205,7 +189,10 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
 
     async def protocol_stop(self):
         # NB: not used for now as we don't disconnect from our side
-        await self.client.stop_notify(self.RX_CHAR)
+        try:
+            await self.client.stop_notify(self.RX_CHAR)
+        except BleakError:
+            pass
 
     @staticmethod
     def _check_success(response,
@@ -238,7 +225,7 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
     async def send_command(self, cmd: Command, payload: bytes = b'',
                            wait_reply=True, timeout=25):
         cmd = KettleCommand(cmd, payload, wait_reply, timeout)
-        await self.cmd_queue.put(cmd)
+        await self.add_cmd_to_queue(cmd)
         return await aio.wait_for(cmd.answer, timeout)
 
     async def login(self, key):
@@ -333,6 +320,6 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         _, _, starts, *_ = struct.unpack('<BHHHHHHHB', resp)
         return starts
 
-    async def close(self):
+    async def disconnect(self):
         self.clear_cmd_queue()
-        await super().close()
+        await super().disconnect()

@@ -2,10 +2,13 @@ import asyncio as aio
 import json
 import logging
 import uuid
+from functools import partial
 
+from ..helpers import done_callback
 from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
                                  RedmondKettle200Protocol, RunState)
-from .base import LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device
+from .base import (LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device,
+                   SupportOnDemandConnection)
 from .uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
@@ -19,7 +22,8 @@ TEMPERATURE_ENTITY = 'temperature'
 LIGHT_ENTITY = 'backlight'
 
 
-class RedmondKettle(RedmondKettle200Protocol, Device):
+class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
+                    Device):
     MAC_TYPE = 'random'
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
@@ -78,7 +82,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             ],
         }
 
-    async def get_device_data(self):
+    async def on_first_connection(self):
         await self.protocol_start()
         await self.login(self._key)
         model = await self._read_with_timeout(DEVICE_NAME)
@@ -97,6 +101,29 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             self.initial_status_sent = False
         await self.set_time()
         await self._update_statistics()
+
+    async def on_each_connection(self):
+        await self.protocol_start()
+        await self.login(self._key)
+        version = await self.get_version()
+        if version:
+            self._version = f'{version[0]}.{version[1]}'
+        state = await self.get_mode()
+        if state:
+            self._state = state
+            self.update_multiplier()
+            self.initial_status_sent = False
+        await self.set_time()
+        await self._update_statistics()
+        await super().on_each_connection()
+
+    def _on_disconnect(self, client, *args):
+        super()._on_disconnect(client, *args)
+        task = aio.create_task(self.protocol_stop())
+        task.add_done_callback(partial(
+            done_callback,
+            f'{self} protocol_stop() stopped unexpectedly',
+        ))
 
     def update_multiplier(self, state: Kettle200State = None):
         if state is None:
@@ -210,16 +237,21 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         }
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
+        # works while disconnected too
         counter = 0
         while True:
+            await self.connected_event.wait()
+            await self.initialized_event.wait()
             await self.update_device_data(send_config)
             # if boiling notify every 5 seconds, 60 sec otherwise
             new_state = await self.get_mode()
             await self.notify_run_state(new_state, publish_topic)
-            counter += 1
+            counter += self.ACTIVE_SLEEP_INTERVAL
+            if new_state.mode == Mode.BOIL and new_state.state == RunState.ON:
+                await self.init_disconnect_timer()
 
             if counter > (
-                    self.SEND_DATA_PERIOD * self._send_data_period_multiplier
+                self.SEND_DATA_PERIOD * self._send_data_period_multiplier
             ):
                 await self._update_statistics()
                 await self._notify_state(publish_topic)
@@ -251,16 +283,26 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
-            try:
+            if self.on_demand_connection:
+                message = await self.message_queue.get()
+                logger.info(f'[{self}] New message {message}')
+                # await self.cancel_disconnect_timer()
                 if not self.client.is_connected:
-                    raise ConnectionError()
-                message = await aio.wait_for(
-                    self.message_queue.get(),
-                    timeout=60,
-                )
-            except aio.TimeoutError:
-                await aio.sleep(1)
-                continue
+                    logger.info(f'[{self}] set need_reconnection event')
+                    self.need_reconnection.set()
+                await self.initialized_event.wait()
+            else:
+                try:
+                    message = await aio.wait_for(
+                        self.message_queue.get(),
+                        timeout=60,
+                    )
+                    if not self.client.is_connected:
+                        raise ConnectionError()
+                except aio.TimeoutError:
+                    await aio.sleep(1)
+                    continue
+
             value = message['value']
             entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
                 message['topic'],
@@ -291,6 +333,9 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     except ConnectionError as e:
                         logger.exception(str(e))
                     await aio.sleep(5)
+                if value != RunState.ON.name:
+                    # we don't disconnect until kettle is boiled
+                    await self.init_disconnect_timer()
                 continue
 
             entity = self.get_entity_by_name(LIGHT_DOMAIN, LIGHT_ENTITY)
@@ -315,3 +360,4 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                         *self._color,
                         self._brightness,
                     )
+            await self.init_disconnect_timer()

@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..protocols.am43 import AM43Protocol
-from .base import COVER_DOMAIN, SENSOR_DOMAIN, CoverRunState, Device
+from .base import (COVER_DOMAIN, SENSOR_DOMAIN, CoverRunState, Device,
+                   SupportOnDemandConnection)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class AM43State:
     target_position: int = None
 
 
-class AM43Cover(AM43Protocol, Device):
+class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
     NAME = 'am43'
     MANUFACTURER = 'Blind'
     DATA_CHAR = BLINDS_CONTROL
@@ -105,6 +106,8 @@ class AM43Cover(AM43Protocol, Device):
 
         timer = 0
         while True:
+            await self.connected_event.wait()
+            await self.initialized_event.wait()
             await self.update_device_data(send_config)
             # if running notify every 5 seconds, 60 sec otherwise
             is_running = self._state.run_state in [
@@ -180,16 +183,23 @@ class AM43Cover(AM43Protocol, Device):
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
-            try:
+            if self.on_demand_connection:
+                # await self.cancel_disconnect_timer()
+                message = await self.message_queue.get()
                 if not self.client.is_connected:
-                    raise ConnectionError()
-                message = await aio.wait_for(
-                    self.message_queue.get(),
-                    timeout=60,
-                )
-            except aio.TimeoutError:
-                await aio.sleep(1)
-                continue
+                    self.need_reconnection.set()
+                await self.connected_event.wait()
+            else:
+                try:
+                    if not self.client.is_connected:
+                        raise ConnectionError()
+                    message = await aio.wait_for(
+                        self.message_queue.get(),
+                        timeout=60,
+                    )
+                except aio.TimeoutError:
+                    await aio.sleep(1)
+                    continue
             value = message['value']
             entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
                 message['topic'],
@@ -235,3 +245,5 @@ class AM43Cover(AM43Protocol, Device):
                     except ConnectionError as e:
                         logger.exception(str(e))
                     await aio.sleep(5)
+
+                await self.init_disconnect_timer()

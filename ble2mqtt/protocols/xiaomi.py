@@ -48,7 +48,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor):
             except ValueError as e:
                 logger.error(f'[{self}] Cannot read values {str(e)}')
             else:
-                await self.close()
+                await self.disconnect()
                 return
             await aio.sleep(1)
 

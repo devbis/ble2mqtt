@@ -1,7 +1,9 @@
 import asyncio as aio
 import logging
 import typing as ty
+from functools import partial
 
+from ..helpers import done_callback
 from ..utils import format_binary
 
 logger = logging.getLogger(__name__)
@@ -16,7 +18,9 @@ class BLEQueueMixin:
         """
         This method must be used as notification callback for BLE connection
         """
-        logger.debug(f'Notification: {sender_handle}: {format_binary(data)}')
+        logger.debug(
+            f'{self} notification: {sender_handle}: {format_binary(data)}',
+        )
         self._ble_queue.put_nowait((sender_handle, data))
 
     def clear_ble_queue(self):
@@ -37,10 +41,17 @@ class SendAndWaitReplyMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cmd_queue: aio.Queue[BaseCommand] = aio.Queue()
-        self._cmd_queue_task = ty.Optional[aio.Task]
+        self._cmd_queue_task: ty.Optional[aio.Task] = None
+
+    async def add_cmd_to_queue(self, cmd: BaseCommand):
+        await self.cmd_queue.put(cmd)
 
     def run_queue_handler(self):
         self._cmd_queue_task = aio.ensure_future(self._handle_cmd_queue())
+        self._cmd_queue_task.add_done_callback(partial(
+            done_callback,
+            f'{self} handle_queue() stopped unexpectedly',
+        ))
 
     def clear_cmd_queue(self):
         if hasattr(self.cmd_queue, '_queue'):
@@ -52,7 +63,7 @@ class SendAndWaitReplyMixin:
             try:
                 await self.process_command(command)
             except aio.CancelledError:
-                logger.exception(f'{self} _handle_cmd_queue is cancelled!')
+                logger.info(f'{self} cmd queue handler stopped')
                 raise
             except Exception as e:
                 if command and not command.answer.done():
