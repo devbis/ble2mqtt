@@ -722,7 +722,7 @@ class Ble2Mqtt:
                         empty_scans += 1
                     else:
                         empty_scans = 0
-                    logger.debug(f'found {len(devices)} devices')
+                    logger.debug(f'found {len(devices)} devices: {devices}')
             except KeyboardInterrupt:
                 raise
             except aio.IncompleteReadError:

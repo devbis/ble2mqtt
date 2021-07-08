@@ -262,11 +262,14 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 await aio.sleep(1)
                 continue
             value = message['value']
-            entity_topic, _ = self.get_entity_subtopic_from_topic(
+            entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
                 message['topic'],
             )
             entity = self.get_entity_by_name(SWITCH_DOMAIN, BOIL_ENTITY)
-            if entity_topic == self._get_topic_for_entity(entity):
+            if entity_topic == self._get_topic_for_entity(
+                entity,
+                skip_unique_id=True,
+            ):
                 value = self.transform_value(value)
                 logger.info(
                     f'[{self}] switch kettle {BOIL_ENTITY} value={value}',
@@ -291,7 +294,10 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 break
 
             entity = self.get_entity_by_name(LIGHT_DOMAIN, LIGHT_ENTITY)
-            if entity_topic == self._get_topic_for_entity(entity):
+            if entity_topic == self._get_topic_for_entity(
+                entity,
+                skip_unique_id=True,
+            ):
                 logger.info(f'set backlight {value}')
                 if value.get('state'):
                     await self._switch_backlight(value['state'])

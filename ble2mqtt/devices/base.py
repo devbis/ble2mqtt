@@ -164,8 +164,11 @@ class Device(BaseDevice, abc.ABC):
     def _get_topic(self, topic):
         return '/'.join(filter(None, (self.unique_id, topic)))
 
-    def _get_topic_for_entity(self, entity):
-        return self._get_topic(entity.get('topic', self.STATE_TOPIC))
+    def _get_topic_for_entity(self, entity, *, skip_unique_id=False):
+        subtopic = entity.get('topic', self.STATE_TOPIC)
+        if skip_unique_id:
+            return subtopic
+        return self._get_topic(subtopic)
 
     def get_entity_by_name(self, domain: str, name: str):
         return next(

@@ -184,15 +184,16 @@ class AM43Cover(AM43Protocol, Device):
                 await aio.sleep(1)
                 continue
             value = message['value']
-            entity_topic, postfix = self.get_entity_subtopic_from_topic(
+            entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
                 message['topic'],
             )
             if entity_topic == self._get_topic_for_entity(
                 self.get_entity_by_name(COVER_DOMAIN, COVER_ENTITY),
+                skip_unique_id=True,
             ):
                 value = self.transform_value(value)
                 target_position = None
-                if postfix == self.SET_POSTFIX:
+                if action_postfix == self.SET_POSTFIX:
                     logger.info(
                         f'[{self}] set mode {entity_topic} to "{value}"',
                     )
@@ -204,7 +205,7 @@ class AM43Cover(AM43Protocol, Device):
                         target_position = self.CLOSED_POSITION
                     else:
                         movement_type = MovementType.STOP
-                elif postfix == self.SET_POSITION_POSTFIX:
+                elif action_postfix == self.SET_POSITION_POSTFIX:
                     movement_type = MovementType.POSITION
                     logger.info(
                         f'[{self}] set position {entity_topic} to "{value}"',
