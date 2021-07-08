@@ -7,6 +7,8 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
+from bleak import BleakError
+
 from ..devices.base import BaseDevice
 from ..utils import format_binary
 from .base import BaseCommand, BLEQueueMixin, SendAndWaitReplyMixin
@@ -335,7 +337,6 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         assert self.RX_CHAR and self.TX_CHAR
         # if not self.notification_started:
         assert self.client.is_connected
-        assert not self._cmd_queue_task.done()
         # check for fresh client
         assert not self.client._notification_callbacks
         _LOGGER.debug(f'Enable BLE notifications from [{self.client.address}]')
@@ -351,11 +352,14 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
 
     async def protocol_stop(self):
         # NB: not used for now as we don't disconnect from our side
-        await self.client.stop_notify(self.RX_CHAR)
+        try:
+            await self.client.stop_notify(self.RX_CHAR)
+        except BleakError:
+            pass
 
-    async def close(self):
+    async def disconnect(self):
         self.clear_cmd_queue()
-        await super().close()
+        await super().disconnect()
 
     @staticmethod
     def _check_success(response,

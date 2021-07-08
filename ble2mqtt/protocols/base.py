@@ -73,6 +73,9 @@ class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
             self._queue_handler_done_callback,
         )
 
+    async def add_cmd_to_queue(self, cmd: BaseCommand):
+        await self.cmd_queue.put(cmd)
+
     def clear_cmd_queue(self):
         if hasattr(self.cmd_queue, '_queue'):
             self.cmd_queue._queue.clear()
@@ -83,7 +86,7 @@ class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
             try:
                 await self.process_command(command)
             except aio.CancelledError:
-                _LOGGER.exception(f'{self} _handle_cmd_queue is cancelled!')
+                _LOGGER.info(f'{self} _handle_cmd_queue is stopped')
                 raise
             except Exception as e:
                 if command and not command.answer.done():

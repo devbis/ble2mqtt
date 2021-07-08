@@ -213,6 +213,8 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         send_time = None
         prev_state = None
         while True:
+            await self.connected_event.wait()
+            await self.initialized_event.wait()
             await self.update_device_data(send_config)
             new_state = prev_state
             if self._state:
