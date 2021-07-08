@@ -293,8 +293,9 @@ class Device(BaseDevice, abc.ABC):
         )
         self.disconnected_event.clear()
         try:
-            await self.client.connect()
+            await aio.wait_for(self.client.connect(), timeout=15.0)
         except aio.TimeoutError as e:
+            logger.warning(f'[{self}] timed out on connect.')
             self.disconnected_event.set()
             raise ConnectionTimeoutError() from e
         except (Exception, aio.CancelledError):
@@ -420,3 +421,10 @@ class SubscribeAndSetDataMixin:
                 self.notification_handler,
             )
         await super().get_device_data()
+
+
+class Cover(Device):
+    async def handle(self, publish_topic, send_config, *args, **kwargs):
+        pass
+
+
