@@ -39,6 +39,9 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12 * 5  # 5 minutes
     LINKQUALITY_TOPIC = COVER_ENTITY
 
+    ON_DEMAND_CONNECTION = True
+    ON_DEMAND_POLL_TIME = 15 * 60  # 15 minutes
+
     # HA notation. We convert value on setting and receiving data
     CLOSED_POSITION = 0
     OPEN_POSITION = 100
@@ -183,23 +186,10 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
-            if self.on_demand_connection:
-                # await self.cancel_disconnect_timer()
-                message = await self.message_queue.get()
-                if not self.client.is_connected:
-                    self.need_reconnection.set()
-                await self.connected_event.wait()
-            else:
-                try:
-                    if not self.client.is_connected:
-                        raise ConnectionError()
-                    message = await aio.wait_for(
-                        self.message_queue.get(),
-                        timeout=60,
-                    )
-                except aio.TimeoutError:
-                    await aio.sleep(1)
-                    continue
+            message = await self.wait_for_mqtt_message()
+            if message is None:
+                continue
+
             value = message['value']
             entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
                 message['topic'],

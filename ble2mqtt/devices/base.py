@@ -249,6 +249,29 @@ class Device(BaseDevice, abc.ABC):
         while True:
             await aio.sleep(1)
 
+    async def wait_for_mqtt_message(self):
+        if self.on_demand_connection:
+            message = await self.message_queue.get()
+            logger.info(f'[{self}] New message {message}')
+            # await self.cancel_disconnect_timer()
+            if not self.client.is_connected:
+                logger.info(f'[{self}] set need_reconnection event')
+                self.need_reconnection.set()
+            await self.initialized_event.wait()
+            return message
+        else:
+            try:
+                message = await aio.wait_for(
+                    self.message_queue.get(),
+                    timeout=60,
+                )
+                if not self.client.is_connected:
+                    raise ConnectionError()
+                return message
+            except aio.TimeoutError:
+                await aio.sleep(1)
+        return None
+
     async def update_device_data(self, send_config):
         """
         Call this method on each iteration in handle.
@@ -466,14 +489,17 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
             await self.cancel_disconnect_timer()
         if self.on_demand_connection:
             async def _sleep_and_disconnect():
-                logger.info(
-                    f'[{self}] sleeping for {self.ON_DEMAND_KEEP_ALIVE_TIME} '
-                    f'secs before disconnect')
                 await aio.sleep(self.ON_DEMAND_KEEP_ALIVE_TIME)
-                logger.info(f'[{self}] disconnect due to on-demand connection')
+                logger.info(
+                    f'[{self}] disconnect after inactivity due to '
+                    f'on-demand policy',
+                )
                 await self.disconnect()
 
-            logger.info(f'{self} set callback for disconnection')
+            logger.info(
+                f'{self} set callback for disconnection, sleep for '
+                f'{self.ON_DEMAND_KEEP_ALIVE_TIME} and then disconnect',
+            )
             self.disconnect_delay_task = aio.create_task(
                 _sleep_and_disconnect(),
             )
