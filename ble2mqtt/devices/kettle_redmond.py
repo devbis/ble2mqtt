@@ -297,25 +297,9 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:
-            if self.on_demand_connection:
-                message = await self.message_queue.get()
-                _LOGGER.info(f'[{self}] New message {message}')
-                # await self.cancel_disconnect_timer()
-                if not self.client.is_connected:
-                    _LOGGER.info(f'[{self}] set need_reconnection event')
-                    self.need_reconnection.set()
-                await self.initialized_event.wait()
-            else:
-                try:
-                    message = await aio.wait_for(
-                        self.message_queue.get(),
-                        timeout=60,
-                    )
-                    if not self.client.is_connected:
-                        raise ConnectionError()
-                except aio.TimeoutError:
-                    await aio.sleep(1)
-                    continue
+            message = await self.wait_for_mqtt_message()
+            if message is None:
+                continue
 
             value = message['value']
             entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
