@@ -83,8 +83,7 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
         }
 
     async def on_first_connection(self):
-        await self.protocol_start()
-        await self.login(self._key)
+        await self.on_each_connection()
         model = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(model, (bytes, bytearray)):
             self._model = model.decode()

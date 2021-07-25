@@ -136,7 +136,6 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
         self.notification_queue = aio.Queue()
-        self.run_queue_handler()
 
     async def process_command(self, command: KettleCommand):
         cmd = self._get_command(command.cmd.value, command.payload)
@@ -176,6 +175,9 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         assert self.client.is_connected
         # check for fresh client
         assert not self.client._notification_callbacks
+
+        self._cmd_counter = 0
+        self.run_queue_handler()
         logger.debug(f'Enable BLE notifications from [{self.client.address}]')
         await self.client.write_gatt_char(
             self.TX_CHAR,
@@ -188,8 +190,9 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         )
 
     async def protocol_stop(self):
-        # NB: not used for now as we don't disconnect from our side
         try:
+            await self.stop_queue_handler()
+            self.clear_cmd_queue()
             await self.client.stop_notify(self.RX_CHAR)
         except BleakError:
             pass
