@@ -278,6 +278,7 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
+        self.notification_queue = aio.Queue()
 
     def _get_command(self, cmd: int, payload: bytes):
         container = struct.pack(
@@ -340,6 +341,10 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         # check for fresh client
         assert not self.client._notification_callbacks
         _LOGGER.debug(f'Enable BLE notifications from [{self.client.address}]')
+
+        self._cmd_counter = 0
+        self.run_queue_handler()
+        _LOGGER.debug(f'Enable BLE notifications from [{self.client.address}]')
         await self.client.write_gatt_char(
             self.TX_CHAR,
             bytearray(0x01.to_bytes(2, byteorder="little")),
@@ -351,8 +356,9 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         )
 
     async def protocol_stop(self):
-        # NB: not used for now as we don't disconnect from our side
         try:
+            await self.stop_queue_handler()
+            self.clear_cmd_queue()
             await self.client.stop_notify(self.RX_CHAR)
         except BleakError:
             pass

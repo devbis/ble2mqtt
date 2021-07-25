@@ -2,7 +2,9 @@ import abc
 import asyncio as aio
 import logging
 import typing as ty
+from functools import partial
 
+from ..helpers import done_callback
 from ..devices.base import BaseDevice
 from ..utils import format_binary
 
@@ -65,16 +67,28 @@ class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cmd_queue: aio.Queue[BaseCommand] = aio.Queue(loop=self._loop)
-        self._cmd_queue_task = aio.ensure_future(
-            self._handle_cmd_queue(),
-            loop=self._loop,
-        )
-        self._cmd_queue_task.add_done_callback(
-            self._queue_handler_done_callback,
-        )
+        self._cmd_queue_task: ty.Optional[aio.Task] = None
+        self.run_queue_handler()
 
     async def add_cmd_to_queue(self, cmd: BaseCommand):
         await self.cmd_queue.put(cmd)
+
+    def run_queue_handler(self):
+        self.clear_cmd_queue()
+        self._cmd_queue_task = aio.ensure_future(self._handle_cmd_queue())
+        self._cmd_queue_task.add_done_callback(partial(
+            done_callback,
+            f'{self} handle_queue() stopped unexpectedly',
+        ))
+
+    async def stop_queue_handler(self):
+        if self._cmd_queue_task is not None:
+            self._cmd_queue_task.cancel()
+            try:
+                await self._cmd_queue_task
+            except aio.CancelledError:
+                pass
+            self._cmd_queue_task = None
 
     def clear_cmd_queue(self):
         if hasattr(self.cmd_queue, '_queue'):
