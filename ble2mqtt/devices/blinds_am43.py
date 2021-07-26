@@ -60,17 +60,20 @@ class AM43Cover(AM43Protocol, Device):
             ],
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, pin=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._model = 'AM43'
         self._state = AM43State()
+        self._pin = pin
 
-    async def get_device_data(self):
+    async def on_each_connection(self):
         await super().get_device_data()
         await self.client.start_notify(
             self.DATA_CHAR,
             self.notification_callback,
         )
+        if self._pin is not None:
+            await self.login(self._pin)
         await self._get_full_state()
 
     async def _notify_state(self, publish_topic):
@@ -133,6 +136,10 @@ class AM43Cover(AM43Protocol, Device):
                 await self._notify_state(publish_topic)
                 timer = 0
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
+
+    def handle_login(self, value):
+        if not value:
+            logger.error(f'[{self}] incorrect pin')
 
     def handle_battery(self, value):
         self._state.battery = value
