@@ -80,15 +80,24 @@ class BaseConnectionManager:
                     return_when=aio.FIRST_COMPLETED,
                 )
             else:
-                logger.info(
-                    f'{self.device} sleep for '
-                    f'{self.device.ON_DEMAND_POLL_TIME} seconds '
-                    f'due to on-demand policy',
-                )
+                reason = ''
+                if self.device.on_demand_connection:
+                    reason = ' due to on-demand policy'
+                    logger.info(
+                        f'{self.device} sleep for '
+                        f'{self.device.ON_DEMAND_POLL_TIME} seconds{reason}',
+                    )
+                    wait_time = self.device.ON_DEMAND_POLL_TIME
+                else:
+                    logger.info(
+                        f'{self.device} sleep for '
+                        f'{self.device.ON_DEMAND_POLL_TIME} seconds{reason}',
+                    )
+                    wait_time = self.device.RECONNECTION_SLEEP_INTERVAL
                 await aio.wait(
                     [
                         self.device.need_reconnection.wait(),
-                        aio.sleep(self.device.ON_DEMAND_POLL_TIME),
+                        aio.sleep(wait_time),
                     ],
                     return_when=aio.FIRST_COMPLETED,
                 )
