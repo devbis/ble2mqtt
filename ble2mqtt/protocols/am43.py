@@ -8,8 +8,10 @@ from .base import BLEQueueMixin
 
 _LOGGER = logging.getLogger(__name__)
 
+AM43_DEFAULT_PIN = 8888
 # command IDs
 AM43_CMD_MOVE = 0x0a
+AM43_CMD_LOGIN = 0x17
 AM43_CMD_GET_BATTERY = 0xa2
 AM43_CMD_GET_ILLUMINANCE = 0xaa
 AM43_CMD_GET_POSITION = 0xa7
@@ -18,10 +20,12 @@ AM43_NOTIFY_POSITION = 0xa1
 
 AM43_RESPONSE_ACK = 0x5a
 AM43_RESPONSE_NACK = 0xa5
+# https://github.com/cpmeister/openhab-addons/commit/f56e6f9793be09a731dfe05dedebf8d60d00e59e#diff-057b414e114be8976f6258b888e463a249753cde37531bc06ec490abb77723ecR354
 # 9a a8 0a 01 00 7f 09 1e 01 64 7f 11 00 5a
-AM43_REPLY_UNKNOWN1 = 0xa8
+AM43_REPLY_TIMERS = 0xa8  # get_timers
+# https://github.com/cpmeister/openhab-addons/commit/f56e6f9793be09a731dfe05dedebf8d60d00e59e#diff-057b414e114be8976f6258b888e463a249753cde37531bc06ec490abb77723ecR383
 # 9a a9 10 00 00 00 11 00 00 00 00 01 00 00 11 00 00 00 00 22
-AM43_REPLY_UNKNOWN2 = 0xa9
+AM43_REPLY_SEASON = 0xa9  # get_season
 
 
 class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
@@ -62,6 +66,12 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
             ret = bytes(ble_notification[1])
         return ret
 
+    async def login(self, pin):
+        return await self.send_command(
+            AM43_CMD_LOGIN,
+            list(int(pin).to_bytes(2, byteorder='big')),
+        )
+
     async def _get_position(self):
         await self.send_command(AM43_CMD_GET_POSITION, [0x01], True)
 
@@ -95,6 +105,10 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
         await self._get_illuminance()
 
     @abc.abstractmethod
+    def handle_login(self, value):
+        pass
+
+    @abc.abstractmethod
     def handle_battery(self, value):
         pass
 
@@ -107,7 +121,9 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
         pass
 
     def process_data(self, data: bytearray):
-        if data[1] == AM43_CMD_GET_BATTERY:
+        if data[1] == AM43_CMD_LOGIN:
+            self.handle_login(data[3] == AM43_RESPONSE_ACK)
+        elif data[1] == AM43_CMD_GET_BATTERY:
             # b'\x9a\xa2\x05\x00\x00\x00\x00Ql'
             self.handle_battery(int(data[7]))
         elif data[1] == AM43_NOTIFY_POSITION:
@@ -116,8 +132,8 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
             # [9a a7 07 0e 32 00 00 00 00 30 36]
             # Bytes in this packet are:
             #  3: Configuration flags, bits are:
-            #    1: direction
-            #    2: operation mode
+            #    1: direction (0 - Reverse, 1 - Forward)
+            #    2: operation mode (0 - continuous, 1 - inching)
             #    3: top limit set
             #    4: bottom limit set
             #    5: has light sensor
@@ -134,9 +150,11 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
         elif data[1] in [AM43_CMD_MOVE, AM43_CMD_SET_POSITION]:
             if data[3] != AM43_RESPONSE_ACK:
                 _LOGGER.error(f'[{self}] Problem with moving: NACK')
-        elif data[1] in [AM43_REPLY_UNKNOWN1, AM43_REPLY_UNKNOWN2]:
+        elif data[1] in [AM43_REPLY_TIMERS, AM43_REPLY_SEASON]:
             # [9a a8 00 32]
+            #        ^______ Number of timers
             # [9a a9 10 00 00 00 11 00 00 00 00 01 00 00 11 00 00 00 00 22]
+
             pass
         else:
             _LOGGER.error(
