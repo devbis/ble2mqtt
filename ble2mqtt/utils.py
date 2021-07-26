@@ -12,4 +12,4 @@ def cr2032_voltage_to_percent(mvolts: int):
 
 
 def rssi_to_linkquality(rssi):
-    return min(int(round(255 * (rssi - MIN_RSSI) / (MAX_RSSI - MIN_RSSI))), 0)
+    return max(int(round(255 * (rssi - MIN_RSSI) / (MAX_RSSI - MIN_RSSI))), 0)
