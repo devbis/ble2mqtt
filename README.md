@@ -39,6 +39,10 @@ The configuration file is a JSON with the following content:
             "product_id": 275
         },
         {
+            "address": "11:22:33:aa:bb:de",
+            "type": "am43"
+        },
+        {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
         },
@@ -96,6 +100,9 @@ Supported devices:
   firmware is recommended)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
   - supported both atc1441 and pvvx formats
+
+**Blinds:**
+- Generic AM43 (am43) Manufacturer can be A-OK, Zemismart, etc.
 
 **Dosimeters**
 - Atom Fast (atomfast)

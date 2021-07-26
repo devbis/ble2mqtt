@@ -17,6 +17,10 @@
             "product_id": 275
         },
         {
+            "address": "11:22:33:aa:bb:de",
+            "type": "am43"
+        },
+        {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
         },

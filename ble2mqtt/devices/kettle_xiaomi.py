@@ -25,7 +25,6 @@ UUID_STATUS = uuid.UUID('0000aa02-0000-1000-8000-00805f9b34fb')
 
 TEMPERATURE_ENTITY = 'temperature'
 KETTLE_ENTITY = 'kettle'
-STATE_TOPIC = 'state'
 HEAT_ENTITY = 'heat'
 AUTH_MAGIC1 = bytes([0x90, 0xCA, 0x85, 0xDE])
 AUTH_MAGIC2 = bytes([0x92, 0xAB, 0x54, 0xFA])
@@ -196,18 +195,16 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         if state:
             state['linkquality'] = self.linkquality
             await publish_topic(
-                topic='/'.join((self.unique_id, STATE_TOPIC)),
+                topic=self._get_topic(self.STATE_TOPIC),
                 value=json.dumps(state),
             )
         for sensor_name, value in (
             (HEAT_ENTITY, self._state.mode in [Mode.HEATING, Mode.KEEP_WARM]),
         ):
-            if any(
-                x['name'] == sensor_name
-                for x in self.entities.get(BINARY_SENSOR_DOMAIN, [])
-            ):
+            entity = self.get_entity_by_name(BINARY_SENSOR_DOMAIN, sensor_name)
+            if entity:
                 await publish_topic(
-                    topic='/'.join((self.unique_id, HEAT_ENTITY)),
+                    topic=self._get_topic_for_entity(entity),
                     value=self.transform_value(value),
                 )
 

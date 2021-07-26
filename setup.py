@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 
-from subprocess import getoutput
-
 from setuptools import find_packages, setup
-from setuptools.command.install import install
 
 from ble2mqtt.__version__ import VERSION
 
