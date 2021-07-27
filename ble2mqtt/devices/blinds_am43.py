@@ -69,6 +69,7 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
         self._model = 'AM43'
         self._state = AM43State()
         self._pin = pin
+        self.initial_status_sent = False
 
     async def on_first_connection(self):
         await self.on_each_connection()
@@ -125,7 +126,8 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
             )
 
             timer += self.ACTIVE_SLEEP_INTERVAL
-            if timer >= self.SEND_DATA_PERIOD * multiplier:
+            if not self.initial_status_sent or \
+                    timer >= self.SEND_DATA_PERIOD * multiplier:
                 if is_running:
                     logger.debug(f'[{self}] check for position')
                     await self._get_position()
@@ -143,6 +145,7 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
                     logger.debug(f'[{self}] check for full state')
                     await self._get_full_state()
                 await self._notify_state(publish_topic)
+                self.initial_status_sent = True
                 timer = 0
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
 
