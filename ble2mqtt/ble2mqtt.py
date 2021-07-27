@@ -303,7 +303,9 @@ class DeviceManager:
 
     async def on_connect(self):
         # call on_first_connection if it is the first connection
-        # (e.g. to fetch device info) and on_each_connection otherwise
+        # (e.g. to fetch device info)
+        # on_each_connection is called on every connection
+        await self.device.on_each_connection()
         if not self.was_initial_connection:
             if self.device.subscribed_topics:
                 await self._mqtt_client.subscribe(*[
@@ -316,8 +318,6 @@ class DeviceManager:
             logger.debug(f'[{self.device}] mqtt subscribed')
             self.was_initial_connection = True
             await self.device.on_first_connection()
-        else:
-            await self.device.on_each_connection()
         self.device.initialized_event.set()
 
     async def manage_device(self):

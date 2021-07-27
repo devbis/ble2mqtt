@@ -3,7 +3,6 @@ import asyncio as aio
 import json
 import logging
 import uuid
-import warnings
 from enum import Enum
 
 from bleak import BleakClient, BleakError
@@ -295,11 +294,6 @@ class Device(BaseDevice, abc.ABC):
             'value': value,
         })
 
-    async def get_device_data(self):
-        """Here put the initial configuration for the device"""
-        warnings.warn("Deprecated")
-        return await self.on_first_connection()
-
     async def on_first_connection(self):
         """
         Here put the initial configuration for the device on first connection
@@ -373,7 +367,7 @@ class Sensor(Device):
     def entities(self):
         raise NotImplementedError()
 
-    async def get_device_data(self):
+    async def on_first_connection(self):
         name = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(name, (bytes, bytearray)):
             self._model = name.decode().strip('\0')
@@ -455,13 +449,13 @@ class SubscribeAndSetDataMixin:
         if self.filter_notifications(sender):
             self.process_data(data)
 
-    async def get_device_data(self):
+    async def on_each_connection(self):
         if self.DATA_CHAR:
             await self.client.start_notify(
                 self.DATA_CHAR,
                 self.notification_handler,
             )
-        await super().get_device_data()
+        await super().on_each_connection()
 
 
 class SupportOnDemandConnection(BaseDevice, abc.ABC):

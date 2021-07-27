@@ -170,7 +170,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         await self.client.read_gatt_char(UUID_VER)
         await self.client.stop_notify(UUID_AUTH)
 
-    async def get_device_data(self):
+    async def on_first_connection(self):
         self.queue = aio.Queue()
         await self.auth()
         self._model = 'MiKettle'
@@ -178,6 +178,8 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         if version:
             self._version = version.decode()
         logger.debug(f'{self} version: {version}')
+
+    async def on_each_connection(self):
         await self.client.start_notify(UUID_STATUS, self.notification_handler)
 
     async def _notify_state(self, publish_topic):
