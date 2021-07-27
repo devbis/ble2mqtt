@@ -215,7 +215,10 @@ class AM43Cover(AM43Protocol, Device):
                     except ValueError:
                         pass
                 else:
-                    raise NotImplementedError()
+                    logger.warning(
+                        f'[{self}] unknows action postfix {action_postfix}',
+                    )
+                    continue
 
                 while True:
                     try:
