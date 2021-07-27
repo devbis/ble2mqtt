@@ -479,7 +479,6 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
         self.on_demand_connection = self.ON_DEMAND_CONNECTION
         if 'on_demand_connection' in kwargs:
             self.on_demand_connection = kwargs['on_demand_connection']
-        self.was_initial_connection = False
         self.need_reconnection = aio.Event()
         self.disconnect_delay_task = None
 
@@ -520,5 +519,4 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
         await super().connect()
         self.need_reconnection.clear()
         if not self.is_passive:
-            self.was_initial_connection = True
             await self.init_disconnect_timer()

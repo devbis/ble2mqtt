@@ -37,6 +37,7 @@ class DeviceManager:
         self.device: Device = device
         self._mqtt_client = mqtt_client
         self._base_topic = base_topic
+        self.was_initial_connection = False
         self.manage_task = None
 
     async def close(self):
@@ -300,24 +301,30 @@ class DeviceManager:
             )
         return coros
 
-    async def on_first_connection(self):
-        if self.device.subscribed_topics:
-            await self._mqtt_client.subscribe(*[
-                (
-                    '/'.join((self._base_topic, topic)),
-                    aio_mqtt.QOSLevel.QOS_1,
-                )
-                for topic in self.device.subscribed_topics
-            ])
-        logger.debug(f'[{self.device}] mqtt subscribed')
-        await self.device.on_first_connection()
+    async def on_connect(self):
+        # call on_first_connection if it is the first connection
+        # (e.g. to fetch device info) and on_each_connection otherwise
+        if not self.was_initial_connection:
+            if self.device.subscribed_topics:
+                await self._mqtt_client.subscribe(*[
+                    (
+                        '/'.join((self._base_topic, topic)),
+                        aio_mqtt.QOSLevel.QOS_1,
+                    )
+                    for topic in self.device.subscribed_topics
+                ])
+            logger.debug(f'[{self.device}] mqtt subscribed')
+            self.was_initial_connection = True
+            await self.device.on_first_connection()
+        else:
+            await self.device.on_each_connection()
         self.device.initialized_event.set()
 
     async def manage_device(self):
         await ActiveConnectionManager(
             self.device,
             self._mqtt_client,
-            on_connect=self.on_first_connection,
+            on_connect=self.on_connect,
         ).run(self.get_coros)
 
 

@@ -70,8 +70,11 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
         self._state = AM43State()
         self._pin = pin
 
+    async def on_first_connection(self):
+        await self.on_each_connection()
+
     async def on_each_connection(self):
-        await super().get_device_data()
+        await super().on_each_connection()
         await self.client.start_notify(
             self.DATA_CHAR,
             self.notification_callback,
