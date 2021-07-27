@@ -91,23 +91,13 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
         }
 
     async def on_first_connection(self):
-        await self.on_each_connection()
+        await super().on_first_connection()
         model = await self._read_with_timeout(DEVICE_NAME)
         if isinstance(model, (bytes, bytearray)):
             self._model = model.decode()
         else:
             # macos can't access characteristic
             self._model = 'G200S'
-        version = await self.get_version()
-        if version:
-            self._version = f'{version[0]}.{version[1]}'
-        state = await self.get_mode()
-        if state:
-            self._state = state
-            self.update_multiplier()
-            self.initial_status_sent = False
-        await self.set_time()
-        await self._update_statistics()
 
     async def on_each_connection(self):
         await self.protocol_start()
