@@ -210,6 +210,8 @@ class Device(BaseDevice, abc.ABC):
 
     @property
     def subscribed_topics(self):
+
+        # TOOD: rebase _get_topic_for_entity ????
         return [
             '/'.join(filter(None, (
                 self.unique_id,
