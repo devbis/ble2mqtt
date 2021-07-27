@@ -291,7 +291,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     except ConnectionError as e:
                         logger.exception(str(e))
                     await aio.sleep(5)
-                break
+                continue
 
             entity = self.get_entity_by_name(LIGHT_DOMAIN, LIGHT_ENTITY)
             if entity_topic == self._get_topic_for_entity(
