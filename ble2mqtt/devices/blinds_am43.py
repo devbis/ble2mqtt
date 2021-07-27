@@ -37,7 +37,6 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
     ACTIVE_SLEEP_INTERVAL = 1
     SEND_DATA_PERIOD = 5
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12 * 5  # 5 minutes
-    LINKQUALITY_TOPIC = COVER_ENTITY
 
     ON_DEMAND_CONNECTION = True
     ON_DEMAND_POLL_TIME = 15 * 60  # 15 minutes
