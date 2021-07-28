@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..protocols.am43 import AM43Protocol
-from .base import (COVER_DOMAIN, SENSOR_DOMAIN, CoverRunState, Device,
-                   SupportOnDemandConnection)
+from .base import (COVER_DOMAIN, SENSOR_DOMAIN, ActiveDeviceHandler,
+                   CoverRunState, Device, SupportOnDemandCommand)
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,8 @@ class AM43State:
     target_position: int = None
 
 
-class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
+# MRO makes sense
+class AM43Cover(SupportOnDemandCommand, AM43Protocol, Device):
     NAME = 'am43'
     MANUFACTURER = 'Blind'
     DATA_CHAR = BLINDS_CONTROL
@@ -102,49 +103,44 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
         if coros:
             await aio.gather(*coros)
 
-    async def handle(self, publish_topic, send_config, *args, **kwargs):
+    async def handle_loop(self, publish_topic, handler: ActiveDeviceHandler,
+                          *args, **kwargs):
+        # works while disconnected too
+
         # request every SEND_DATA_PERIOD if running and
         # SEND_DATA_PERIOD * STANDBY_SEND_DATA_PERIOD_MULTIPLIER if in
         # standby mode
-
-        timer = 0
-        while True:
-            await self.connected_event.wait()
-            await self.initialized_event.wait()
-            await self.update_device_data(send_config)
-            # if running notify every 5 seconds, 60 sec otherwise
-            is_running = self._state.run_state in [
-                CoverRunState.OPENING,
-                CoverRunState.CLOSING,
-            ]
-            multiplier = (
-                1 if is_running else self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
-            )
-
-            timer += self.ACTIVE_SLEEP_INTERVAL
-            if not self.initial_status_sent or \
-                    timer >= self.SEND_DATA_PERIOD * multiplier:
-                if is_running:
-                    logger.debug(f'[{self}] check for position')
-                    await self._get_position()
-                    if self._state.position == self.CLOSED_POSITION:
-                        logger.info(
-                            f'[{self}] Minimum position reached. Set to CLOSED',
-                        )
-                        self._state.run_state = CoverRunState.CLOSED
-                    elif self._state.position == self.OPEN_POSITION:
-                        logger.info(
-                            f'[{self}] Maximum position reached. Set to OPEN',
-                        )
-                        self._state.run_state = CoverRunState.OPEN
-                else:
-                    logger.debug(f'[{self}] check for full state')
-                    await self._get_full_state()
-                await self._notify_state(publish_topic)
-                self.initial_status_sent = True
-                self.can_disconnect.set()
-                timer = 0
-            await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
+        is_running = self._state.run_state in [
+            CoverRunState.OPENING,
+            CoverRunState.CLOSING,
+        ]
+        multiplier = (
+            1 if is_running else self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
+        )
+        if not self.initial_status_sent or \
+                handler.timer >= self.SEND_DATA_PERIOD * multiplier:
+            if is_running:
+                logger.debug(f'[{self}] check for position')
+                await self._get_position()
+                if self._state.position == self.CLOSED_POSITION:
+                    logger.info(
+                        f'[{self}] Minimum position reached. '
+                        f'Set to CLOSED',
+                    )
+                    self._state.run_state = CoverRunState.CLOSED
+                elif self._state.position == self.OPEN_POSITION:
+                    logger.info(
+                        f'[{self}] Maximum position reached. '
+                        f'Set to OPEN',
+                    )
+                    self._state.run_state = CoverRunState.OPEN
+            else:
+                logger.debug(f'[{self}] check for full state')
+                await self._get_full_state()
+            await self._notify_state(publish_topic)
+            self.initial_status_sent = True
+            self.can_disconnect.set()
+            handler.reset_timer()
 
     def handle_login(self, value):
         if not value:

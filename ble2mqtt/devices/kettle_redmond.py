@@ -7,8 +7,8 @@ from functools import partial
 from ..helpers import done_callback
 from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
                                  RedmondKettle200Protocol, RunState)
-from .base import (LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device,
-                   SupportOnDemandConnection)
+from .base import (LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN,
+                   ActiveDeviceHandler, Device, SupportOnDemandCommand)
 from .uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,8 @@ TEMPERATURE_ENTITY = 'temperature'
 LIGHT_ENTITY = 'backlight'
 
 
-class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
-                    Device):
+# MRO makes sense
+class RedmondKettle(SupportOnDemandCommand, RedmondKettle200Protocol, Device):
     MAC_TYPE = 'random'
     NAME = 'redmond200'
     TX_CHAR = UUID_NORDIC_TX
@@ -48,6 +48,7 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
         self._send_data_period_multiplier = \
             self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         self.initial_status_sent = False
+        self.command_in_progress = aio.Lock()
 
     @property
     def entities(self):
@@ -106,7 +107,12 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
         await self._update_statistics()
         await super().on_each_connection()
 
+    async def disconnect(self):
+        await self.protocol_stop()
+        return await super().disconnect()
+
     def _on_disconnect(self, client, *args):
+        # clear items after device disconnected
         super()._on_disconnect(client, *args)
         task = aio.create_task(self.protocol_stop())
         task.add_done_callback(partial(
@@ -225,28 +231,21 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
             'Working time (minutes)': round(statistics['seconds_run']/60, 1),
         }
 
-    async def handle(self, publish_topic, send_config, *args, **kwargs):
+    async def handle_loop(self, publish_topic, handler: ActiveDeviceHandler,
+                          *args, **kwargs):
         # works while disconnected too
-        counter = 0
-        while True:
-            await self.connected_event.wait()
-            await self.initialized_event.wait()
-            await self.update_device_data(send_config)
-            # if boiling notify every 5 seconds, 60 sec otherwise
-            new_state = await self.get_mode()
-            await self.notify_run_state(new_state, publish_topic)
-            counter += self.ACTIVE_SLEEP_INTERVAL
-            if new_state.mode == Mode.BOIL and new_state.state == RunState.ON:
-                await self.init_disconnect_timer()
-            self.can_disconnect.set()
+        new_state = await self.get_mode()
+        await self.notify_run_state(new_state, publish_topic)
+        if new_state.mode == Mode.BOIL and new_state.state == RunState.ON:
+            await self.init_disconnect_timer()
+        self.can_disconnect.set()
 
-            if counter > (
+        if handler.timer > (
                 self.SEND_DATA_PERIOD * self._send_data_period_multiplier
-            ):
-                await self._update_statistics()
-                await self._notify_state(publish_topic)
-                counter = 0
-            await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
+        ):
+            await self._update_statistics()
+            await self._notify_state(publish_topic)
+            handler.reset_timer()
 
     async def _switch_mode(self, mode, value):
         if value == RunState.ON.name:

@@ -190,12 +190,13 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         )
 
     async def protocol_stop(self):
-        try:
-            await self.stop_queue_handler()
-            self.clear_cmd_queue()
-            await self.client.stop_notify(self.RX_CHAR)
-        except BleakError:
-            pass
+        await self.stop_queue_handler()
+        self.clear_cmd_queue()
+        if self.client.is_connected:
+            try:
+                await self.client.stop_notify(self.RX_CHAR)
+            except BleakError:
+                pass
 
     @staticmethod
     def _check_success(response,

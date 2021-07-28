@@ -48,7 +48,7 @@ class SendAndWaitReplyMixin:
 
     def run_queue_handler(self):
         self.clear_cmd_queue()
-        self._cmd_queue_task = aio.ensure_future(self._handle_cmd_queue())
+        self._cmd_queue_task = aio.create_task(self._handle_cmd_queue())
         self._cmd_queue_task.add_done_callback(partial(
             done_callback,
             f'{self} handle_queue() stopped unexpectedly',

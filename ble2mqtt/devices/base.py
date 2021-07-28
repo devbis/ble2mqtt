@@ -23,6 +23,10 @@ COVER_DOMAIN = 'cover'
 DEFAULT_STATE_TOPIC = ''  # send to the parent topic
 
 
+class DeviceIsDisconnected(ConnectionError):
+    pass
+
+
 class CoverRunState(Enum):
     OPEN = 'open'
     OPENING = 'opening'
@@ -499,6 +503,7 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
             self.on_demand_keep_alive_time = \
                 int(kwargs['on_demand_keep_alive_time'])
         self.disconnect_delay_task = None
+        self.command_in_progress = aio.Lock()
 
     async def init_disconnect_timer(self, period=None):
         if self.disconnect_delay_task:
@@ -547,3 +552,44 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
         self.need_reconnection.clear()
         if not self.is_passive:
             await self.init_disconnect_timer()
+
+    async def disconnect(self):
+        async with self.command_in_progress:
+            return await super().disconnect()
+
+
+class ActiveDeviceHandler:
+    def __init__(self, device, publish_topic, *args, **kwargs):
+        self.device = device
+        self.publish_topic = publish_topic
+        self.timer = 0
+
+    async def handle_wrapper(self, send_config, handle_loop):
+        while True:
+            await self.device.connected_event.wait()
+            await self.device.initialized_event.wait()
+            await self.device.update_device_data(send_config)
+            try:
+                await handle_loop(self.publish_topic, self)
+                self.timer += self.device.ACTIVE_SLEEP_INTERVAL
+            except DeviceIsDisconnected:
+                continue
+            await aio.sleep(self.device.ACTIVE_SLEEP_INTERVAL)
+
+    def reset_timer(self):
+        self.timer = 0
+
+
+class SupportOnDemandCommand(SupportOnDemandConnection):
+    async def handle_loop(self, publish_topic, handler: ActiveDeviceHandler):
+        raise NotImplementedError()
+
+    async def handle(self, publish_topic, send_config, *args, **kwargs):
+        handler = ActiveDeviceHandler(self, publish_topic)
+        await handler.handle_wrapper(send_config, self.handle_loop)
+
+    async def send_command(self, *args, **kwargs):
+        async with self.command_in_progress:
+            if not self.client.is_connected:
+                raise DeviceIsDisconnected()
+            return await super().send_command(*args, **kwargs)
