@@ -227,7 +227,7 @@ class DeviceManager:
         def get_generic_vals(entity: dict):
             name = entity.pop('name')
             result = {
-                'name': f'{name}_{device.dev_id}',
+                'name': f'{name}_{device.friendly_id}',
                 'unique_id': f'{name}_{device.dev_id}',
                 'device': device_info,
             }

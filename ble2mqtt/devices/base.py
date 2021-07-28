@@ -148,6 +148,7 @@ class Device(BaseDevice, abc.ABC):
         self.message_queue = aio.Queue()
         self.mac = mac
         self.prefix = prefix
+        self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
         self._version = None
         self._manufacturer = self.MANUFACTURER
@@ -218,6 +219,11 @@ class Device(BaseDevice, abc.ABC):
         return self.mac.replace(':', '').lower()
 
     @property
+    def friendly_id(self):
+        # should be used in entity names in homeassistant
+        return self.friendly_name or self.dev_id
+
+    @property
     def unique_id(self):
         # name and manufacturer can change while working, e.g. when
         # a device sends his name. To avoid changing topics use
@@ -227,7 +233,7 @@ class Device(BaseDevice, abc.ABC):
     @property
     def unique_name(self):
         # can change over time. Don't use it as an identifier
-        parts = [self.manufacturer, self.model, self.dev_id]
+        parts = [self.manufacturer, self.model, self.friendly_id]
         return '_'.join([p.replace(' ', '_') for p in parts if p])
 
     @property

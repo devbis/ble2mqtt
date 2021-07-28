@@ -74,6 +74,9 @@ Extra configuration parameters:
 - `"mqtt_prefix"`- a prefix to distinguish ble devices from other instances and
   programs. The default value is 'b2m_'.
 
+Devices accept `friendly_name` parameter to replace mac address in device
+names for Home Assistant.
+
 
 Supported devices:
 
