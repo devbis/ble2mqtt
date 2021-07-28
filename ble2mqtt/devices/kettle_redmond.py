@@ -252,6 +252,7 @@ class RedmondKettle(RedmondKettle200Protocol, SupportOnDemandConnection,
             if new_state.mode == KettleG200Mode.BOIL and \
                     new_state.state == KettleRunState.ON:
                 await self.init_disconnect_timer()
+            self.can_disconnect.set()
 
             if counter > (
                     self.SEND_DATA_PERIOD * self._send_data_period_multiplier

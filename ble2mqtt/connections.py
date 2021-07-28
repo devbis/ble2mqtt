@@ -9,7 +9,7 @@ import aio_mqtt
 
 from .bt import (BLUETOOTH_RESTARTING, ListOfBtConnectionErrors,
                  handle_ble_exceptions, restart_bluetooth)
-from .devices.base import ConnectionTimeoutError, Device
+from .devices.base import ConnectionTimeoutError, Device, ConnectionReason
 from .helpers import (done_callback, handle_returned_tasks,
                       run_tasks_and_cancel_on_first_return)
 
@@ -50,7 +50,13 @@ class BaseConnectionManager:
         while True:
             async with self.safe_run() as sr:
                 try:
-                    await self.device.connect()
+                    await self.device.connect(
+                        reason=(
+                            self.device.connection_reason if
+                            self.device.need_reconnection.is_set()
+                            else ConnectionReason.PERIODIC
+                        )
+                    )
                     self.missing_device_count = 0
                     self.failure_count = 0
                 except ConnectionTimeoutError:
@@ -85,13 +91,13 @@ class BaseConnectionManager:
                     reason = ' due to on-demand policy'
                     logger.info(
                         f'{self.device} sleep for '
-                        f'{self.device.ON_DEMAND_POLL_TIME} seconds{reason}',
+                        f'{self.device.on_demand_poll_time} seconds{reason}',
                     )
-                    wait_time = self.device.ON_DEMAND_POLL_TIME
+                    wait_time = self.device.on_demand_poll_time
                 else:
                     logger.info(
                         f'{self.device} sleep for '
-                        f'{self.device.ON_DEMAND_POLL_TIME} seconds{reason}',
+                        f'{self.device.on_demand_poll_time} seconds{reason}',
                     )
                     wait_time = self.device.RECONNECTION_SLEEP_INTERVAL
                 await aio.wait(

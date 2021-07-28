@@ -147,6 +147,7 @@ class AM43Cover(AM43Protocol, SupportOnDemandConnection, Device):
                     await self._get_full_state()
                 await self._notify_state(publish_topic)
                 self.initial_status_sent = True
+                self.can_disconnect.set()
                 timer = 0
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
 
