@@ -9,7 +9,7 @@ import aio_mqtt
 
 from .bt import (BLUETOOTH_RESTARTING, ListOfBtConnectionErrors,
                  handle_ble_exceptions, restart_bluetooth)
-from .devices.base import ConnectionTimeoutError, Device, ConnectionReason
+from .devices.base import ConnectionReason, ConnectionTimeoutError, Device
 from .helpers import (done_callback, handle_returned_tasks,
                       run_tasks_and_cancel_on_first_return)
 
@@ -55,7 +55,7 @@ class BaseConnectionManager:
                             self.device.connection_reason if
                             self.device.need_reconnection.is_set()
                             else ConnectionReason.PERIODIC
-                        )
+                        ),
                     )
                     self.missing_device_count = 0
                     self.failure_count = 0
@@ -157,7 +157,8 @@ class BaseConnectionManager:
                 self.missing_device_count = 0
                 await restart_bluetooth()
         finally:
-            await self.device.disconnect()
+            if self.device.connected_event.is_set():
+                await self.device.disconnect()
             try:
                 if postprocess:
                     await postprocess()

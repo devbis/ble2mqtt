@@ -356,12 +356,13 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         )
 
     async def protocol_stop(self):
-        try:
-            await self.stop_queue_handler()
-            self.clear_cmd_queue()
-            await self.client.stop_notify(self.RX_CHAR)
-        except BleakError:
-            pass
+        await self.stop_queue_handler()
+        self.clear_cmd_queue()
+        if self.client.is_connected:
+            try:
+                await self.client.stop_notify(self.RX_CHAR)
+            except BleakError:
+                pass
 
     async def disconnect(self):
         self.clear_cmd_queue()
