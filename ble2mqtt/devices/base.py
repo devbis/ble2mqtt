@@ -576,7 +576,7 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
                 )
                 await self.disconnect()
 
-            _LOGGER.info(
+            _LOGGER.debug(
                 f'{self} set callback for disconnection, sleep for '
                 f'{self.on_demand_keep_alive_time} secs and then disconnect',
             )
@@ -586,7 +586,7 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
 
     async def cancel_disconnect_timer(self):
         if self.disconnect_delay_task:
-            _LOGGER.info(f'{self} cancel disconnected callback')
+            _LOGGER.debug(f'{self} cancel disconnected callback')
             self.disconnect_delay_task.cancel()
             try:
                 await self.disconnect_delay_task
