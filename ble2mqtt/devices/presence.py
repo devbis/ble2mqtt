@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from bleak.backends.device import BLEDevice
 
-from .base import BINARY_SENSOR_DOMAIN, Sensor
+from .base import BINARY_SENSOR_DOMAIN, DEVICE_TRACKER_DOMAIN, Sensor
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 class SensorState:
     presence: bool = False
     last_check: datetime = None
+
+    @property
+    def device_tracker(self):
+        return 'home' if self.presence else 'not_home'
 
 
 class Presence(Sensor):
@@ -36,6 +40,11 @@ class Presence(Sensor):
                 {
                     'name': 'presence',
                     'device_class': 'presence',
+                },
+            ],
+            DEVICE_TRACKER_DOMAIN: [
+                {
+                    'name': 'device_tracker',
                 },
             ],
         }

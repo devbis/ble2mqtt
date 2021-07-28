@@ -19,6 +19,7 @@ SENSOR_DOMAIN = 'sensor'
 LIGHT_DOMAIN = 'light'
 SWITCH_DOMAIN = 'switch'
 COVER_DOMAIN = 'cover'
+DEVICE_TRACKER_DOMAIN = 'device_tracker'
 
 DEFAULT_STATE_TOPIC = ''  # send to the parent topic
 
@@ -160,6 +161,7 @@ class Device(BaseDevice, abc.ABC):
             LIGHT_DOMAIN,
             SWITCH_DOMAIN,
             COVER_DOMAIN,
+            DEVICE_TRACKER_DOMAIN,
         }
 
     def _get_topic(self, topic):
