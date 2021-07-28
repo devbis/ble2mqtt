@@ -112,6 +112,12 @@ class BaseDevice(metaclass=RegisteredType):
         raise NotImplementedError()
 
 
+class ConnectionReason(Enum):
+    NONE = 0
+    MANUAL = 1
+    PERIODIC = 2
+
+
 class Device(BaseDevice, abc.ABC):
     MQTT_VALUES = None
     SET_POSTFIX = 'set'
@@ -124,7 +130,6 @@ class Device(BaseDevice, abc.ABC):
     PASSIVE_SLEEP_INTERVAL = 60
     LINKQUALITY_TOPIC = None
     STATE_TOPIC = DEFAULT_STATE_TOPIC
-    ON_DEMAND_POLL_TIME = RECONNECTION_SLEEP_INTERVAL
 
     # secs to sleep if not connected or no data in passive mode
     NOT_READY_SLEEP_INTERVAL = 5
@@ -147,6 +152,12 @@ class Device(BaseDevice, abc.ABC):
         self._manufacturer = self.MANUFACTURER
         self._rssi = None
         self.on_demand_connection = False
+        self.need_reconnection = aio.Event()  # used in on-demand connections
+        # used in on-demand connections
+        # if set, provides connection manager info that it already processed all
+        # periodic tasks and can be disconnected until next poll
+        self.can_disconnect = aio.Event()
+        self.connection_reason: ConnectionReason = ConnectionReason.NONE
 
         assert set(self.entities.keys()) <= {
             BINARY_SENSOR_DOMAIN,
@@ -248,6 +259,10 @@ class Device(BaseDevice, abc.ABC):
         while True:
             await aio.sleep(1)
 
+    def request_for_connection(self, reason: ConnectionReason):
+        self.connection_reason = reason
+        self.need_reconnection.set()
+
     async def wait_for_mqtt_message(self):
         if self.on_demand_connection:
             message = await self.message_queue.get()
@@ -255,7 +270,7 @@ class Device(BaseDevice, abc.ABC):
             # await self.cancel_disconnect_timer()
             if not self.client.is_connected:
                 logger.info(f'[{self}] set need_reconnection event')
-                self.need_reconnection.set()
+                self.request_for_connection(ConnectionReason.MANUAL)
             await self.initialized_event.wait()
             return message
         else:
@@ -308,7 +323,7 @@ class Device(BaseDevice, abc.ABC):
         assert self.MAC_TYPE in ('public', 'random')
         return BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
 
-    async def connect(self):
+    async def connect(self, reason: ConnectionReason):
         if self.is_passive:
             return
 
@@ -318,6 +333,7 @@ class Device(BaseDevice, abc.ABC):
         self.disconnected_event.clear()
         try:
             await aio.wait_for(self.client.connect(), timeout=15.0)
+            self.connection_reason = reason
         except aio.TimeoutError as e:
             logger.warning(f'[{self}] timed out on connect.')
             self.disconnected_event.set()
@@ -330,9 +346,11 @@ class Device(BaseDevice, abc.ABC):
 
     def _on_disconnect(self, client, *args):
         logger.debug(f'Client {client.address} disconnected, device={self}')
+        self.connection_reason = ConnectionReason.NONE
         self.disconnected_event.set()
         self.connected_event.clear()
         self.initialized_event.clear()
+        self.can_disconnect.clear()
 
     async def disconnect(self):
         try:
@@ -471,27 +489,42 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.on_demand_connection = self.ON_DEMAND_CONNECTION
+        self.on_demand_poll_time = self.ON_DEMAND_POLL_TIME
+        self.on_demand_keep_alive_time = self.ON_DEMAND_KEEP_ALIVE_TIME
         if 'on_demand_connection' in kwargs:
-            self.on_demand_connection = kwargs['on_demand_connection']
-        self.need_reconnection = aio.Event()
+            self.on_demand_connection = bool(kwargs['on_demand_connection'])
+        if 'on_demand_poll_time' in kwargs:
+            self.on_demand_poll_time = int(kwargs['on_demand_poll_time'])
+        if 'on_demand_keep_alive_time' in kwargs:
+            self.on_demand_keep_alive_time = \
+                int(kwargs['on_demand_keep_alive_time'])
         self.disconnect_delay_task = None
 
-    async def init_disconnect_timer(self):
+    async def init_disconnect_timer(self, period=None):
         if self.disconnect_delay_task:
             # postpone disconnection
             await self.cancel_disconnect_timer()
         if self.on_demand_connection:
             async def _sleep_and_disconnect():
-                await aio.sleep(self.ON_DEMAND_KEEP_ALIVE_TIME)
+                coros = [
+                    aio.sleep(self.on_demand_keep_alive_time),
+                ]
+                if self.connection_reason == ConnectionReason.PERIODIC:
+                    coros.append(self.can_disconnect.wait())
+                await aio.wait(
+                    coros,
+                    return_when=aio.FIRST_COMPLETED,
+                )
                 logger.info(
                     f'[{self}] disconnect after inactivity due to '
-                    f'on-demand policy',
+                    f'on-demand policy, '
+                    f'connection reason: {self.connection_reason.name}',
                 )
                 await self.disconnect()
 
             logger.info(
                 f'{self} set callback for disconnection, sleep for '
-                f'{self.ON_DEMAND_KEEP_ALIVE_TIME} and then disconnect',
+                f'{self.on_demand_keep_alive_time} secs and then disconnect',
             )
             self.disconnect_delay_task = aio.create_task(
                 _sleep_and_disconnect(),
@@ -507,10 +540,10 @@ class SupportOnDemandConnection(BaseDevice, abc.ABC):
                 pass
             self.disconnect_delay_task = None
 
-    async def connect(self):
+    async def connect(self, *args, **kwargs):
         if self.disconnect_delay_task:
             await self.cancel_disconnect_timer()
-        await super().connect()
+        await super().connect(*args, **kwargs)
         self.need_reconnection.clear()
         if not self.is_passive:
             await self.init_disconnect_timer()
