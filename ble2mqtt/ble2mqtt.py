@@ -59,6 +59,10 @@ class DeviceManager:
         assert not self.manage_task, \
             f'{self.device} Previous task was not finished! {self.manage_task}'
         self.manage_task = aio.create_task(self.manage_device())
+        self.manage_task.add_done_callback(partial(
+            done_callback,
+            f'{self.device} DeviceManager.manage_task stopped unexpectedly',
+        ))
         return self.manage_task
 
     async def publish_topic_callback(self, topic, value):
