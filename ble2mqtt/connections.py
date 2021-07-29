@@ -131,7 +131,7 @@ class BaseConnectionManager:
             context.exception = e
             if 'Device with address' in str(e) and 'was not found' in str(e):
                 self.missing_device_count += 1
-                logger.exception(
+                logger.error(
                     f'Error while connecting to {self.device}, {e} {repr(e)}, '
                     f'attempts={self.missing_device_count}',
                 )
@@ -231,7 +231,8 @@ class ActiveConnectionManager(BaseConnectionManager):
         try:
             yield
         finally:
+            self.connection_manager_task.cancel()
             try:
-                self.connection_manager_task.cancel()
+                await self.connection_manager_task
             except aio.CancelledError:
                 pass
