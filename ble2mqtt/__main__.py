@@ -67,6 +67,18 @@ def handle_exception(loop, context, service):
         _LOGGER.info("Ignore this exception.")
         return
 
+    if 'BleakClientBlueZDBus.connect() done' in str(repr(exception_str)):
+        # {'message': 'Task exception was never retrieved',
+        # 'exception': TimeoutError(), 'future':
+        # <Task finished coro=<BleakClientBlueZDBus.connect() done,
+        # defined at /usr/lib/python3.7/site-packages/bleak/backends/
+        # bluezdbus/client.py:106> exception=TimeoutError()>}
+        #
+        # cannot catch this issue,
+        # Skip this exception for now.
+        _LOGGER.info("Ignore this exception.")
+        return
+
     _LOGGER.info("Shutting down...")
     aio.create_task(shutdown(loop, service))
 
