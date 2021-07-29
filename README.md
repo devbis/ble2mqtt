@@ -147,6 +147,22 @@ Extra configuration parameters:
 Devices accept `friendly_name` parameter to replace mac address in device
 names for Home Assistant.
 
+### On-demand mode
+Some devices support on-demand connection to reduce battery drain. In this
+mode ble2mqtt connects periodically to fetch status and on request from 
+MQTT to execute a command.
+
+Devices with on-demand connection support:
+- AM43 blinds
+- Redmond Kettles G2xxS (disabled by default)
+
+Options that supported for this devices:
+
+```
+"on_demand_connection": true,  # to enable/disable
+"on_demand_poll_time": 600,  # will poll status every 10 minutes (600 secs)
+"on_demand_keep_alive_time": 120,  # keep connection for 2 minutes after connecting from MQTT
+```
 
 ## Installation on OpenWRT
 
