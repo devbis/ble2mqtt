@@ -1,5 +1,6 @@
 import asyncio as aio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from bleak import BleakError
@@ -31,27 +32,32 @@ def hardware_exception_occurred(exception):
     )
 
 
-async def restart_bluetooth():
+async def restart_bluetooth(interface='hci0'):
     if BLUETOOTH_RESTARTING.locked():
         await aio.sleep(9)
         return
     async with BLUETOOTH_RESTARTING:
         logger.warning('Restarting bluetoothd...')
         proc = await aio.create_subprocess_exec(
-            'hciconfig', 'hci0', 'down',
+            'hciconfig', interface, 'down',
         )
         await proc.wait()
-        proc = await aio.create_subprocess_exec(
-            '/etc/init.d/bluetoothd', 'restart',
-        )
+        if os.path.exists('/etc/openwrt_release'):
+            proc = await aio.create_subprocess_exec(
+                '/etc/init.d/bluetoothd', 'restart',
+            )
+        else:
+            proc = await aio.create_subprocess_exec(
+                'hciconfig', interface, 'reset',
+            )
         await proc.wait()
         await aio.sleep(3)
         proc = await aio.create_subprocess_exec(
-            'hciconfig', 'hci0', 'up',
+            'hciconfig', interface, 'up',
         )
         await proc.wait()
         await aio.sleep(5)
-        logger.warning('Restarting bluetoothd finished')
+        logger.warning(f'Restarting {interface} interface finished')
 
 
 @asynccontextmanager
