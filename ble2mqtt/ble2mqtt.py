@@ -385,6 +385,7 @@ class Ble2Mqtt:
                 t
                 for t in other_tasks
                 if (
+                    'BaseConnectionManager.handle_bt_connection()' in str(t) or
                     'Sensor.handle()' in str(t) or
                     'RedmondKettle.handle()' in str(t) or
                     'RedmondKettle.handle_messages()' in str(t) or
@@ -405,11 +406,19 @@ class Ble2Mqtt:
             )
             await aio.sleep(120)
 
+    async def debug_bluetooth_restart(self):
+        from random import randint
+        while True:
+            await aio.sleep(randint(120, 240))
+            logger.info('---> DEBUG RESTARTING BLUETOOTH')
+            await restart_bluetooth()
+
     async def start(self):
         result = await run_tasks_and_cancel_on_first_return(
             self._loop.create_task(self._connect_mqtt_forever()),
             self._loop.create_task(self._handle_messages()),
-            self._loop.create_task(self.monitor_tasks())
+            self._loop.create_task(self.monitor_tasks()),
+            self._loop.create_task(self.debug_bluetooth_restart()),
         )
         for t in result:
             await t

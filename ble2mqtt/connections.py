@@ -50,6 +50,7 @@ class BaseConnectionManager:
         while True:
             async with self.safe_run() as sr:
                 try:
+                    logger.info(f'> {self.device} connecting...')
                     await self.device.connect(
                         reason=(
                             self.device.connection_reason if
@@ -69,6 +70,7 @@ class BaseConnectionManager:
                     continue
 
                 await self.device.connected_event.wait()
+                logger.info(f'> {self.device} connected!')
                 if self.on_connect:
                     await self.on_connect()
                 await self.device.disconnected_event.wait()
@@ -110,8 +112,9 @@ class BaseConnectionManager:
 
     @asynccontextmanager
     async def safe_run(self, postprocess=None) -> SafeRunContext:
+        assert postprocess is None or not aio.iscoroutinefunction(postprocess)
         async with BLUETOOTH_RESTARTING:
-            logger.debug(f'[{self.device}] safe_run: Check for lock')
+            logger.info(f'[{self.device}] safe_run: Check for lock')
         context = SafeRunContext()
         try:
             async with handle_ble_exceptions():
@@ -160,11 +163,12 @@ class BaseConnectionManager:
             if self.device.connected_event.is_set():
                 await self.device.disconnect()
             try:
-                if postprocess:
-                    await postprocess()
+                if postprocess is not None:
+                    postprocess()
             except aio.CancelledError:
                 raise
-            except Exception:
+            except Exception as e:
+                logger.exception(f"{self.device} NEW!: exception during postprocess {str(e)}")
                 pass
 
         if self.failure_count >= FAILURE_LIMIT:
