@@ -4,6 +4,11 @@ import logging
 import os
 
 from ble2mqtt.__version__ import VERSION
+
+from .bleak_patch import add_bluepy_backend
+
+add_bluepy_backend()
+
 from ble2mqtt.ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
