@@ -30,7 +30,8 @@ class AsyncCharacteristic(Characteristic):
             # the handle for the value descriptor and stop when we reach
             # the handle for the next characteristic or service
             self.descs = []
-            for desc in await self.peripheral.getDescriptors(self.valHandle+1, hndEnd):
+            for desc in await self.peripheral.getDescriptors(self.valHandle + 1,
+                                                             hndEnd):
                 if desc.uuid in (0x2800, 0x2801, 0x2803):
                     # Stop if we reach another characteristic or service
                     break
@@ -53,7 +54,8 @@ class Descriptor:
         return await self.peripheral.readCharacteristic(self.handle)
 
     async def write(self, val, withResponse=False):
-        await self.peripheral.writeCharacteristic(self.handle, val, withResponse)
+        await self.peripheral.writeCharacteristic(self.handle, val,
+                                                  withResponse)
 
 
 # class SubprocessProtocol(asyncio.SubprocessProtocol):
@@ -91,7 +93,6 @@ class AsyncBluepyHelper:
     def __init__(self):
         self._helper = None
         self._lineq = None
-        # self._stderr = None
         self._mtu = 0
         self.delegate = DefaultDelegate()
         self.reader_task = None
@@ -103,46 +104,24 @@ class AsyncBluepyHelper:
         self.delegate = delegate_
         return self
 
-    async def _startHelper(self,iface=None):
+    async def _startHelper(self, iface=None):
         if self._helper is None:
-            # logger.debug("Running ", helperExe)
+            logger.debug("Running ", helperExe)
             self._lineq = asyncio.Queue()
             self._responseq = asyncio.Queue()
             self._mtu = 0
-            # self._stderr = open(os.devnull, "w")
-            args=[helperExe]
-            if iface is not None: args.append(str(iface))
-
-            # loop = asyncio.get_running_loop()
-            # exit_future = asyncio.Future(loop=loop)
-            # transport, protocol = await loop.subprocess_exec(
-            #     lambda: SubprocessProtocol(self._lineq, exit_future),
-            #     *args,
-            #     # stdin=None,
-            #     stderr=None,
-            # )
-            #
-            # # Wait for the subprocess exit using the process_exited()
-            # # method of the protocol.
-            # await exit_future
-            #
-            # # Close the stdout pipe.
-            # transport.close()
+            args = [helperExe]
+            if iface is not None:
+                args.append(str(iface))
 
             self._helper = await asyncio.subprocess.create_subprocess_exec(
                 helperExe,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
-                # universal_newlines=True,
-                # preexec_fn = preexec_function,
             )
             self.reader_task = asyncio.create_task(self._readToQueue())
             self.parser_task = asyncio.create_task(self._parse_queue_messages())
-
-            # t = Thread(target=self._readToQueue)
-            # t.daemon = True               # don't wait for it to exit
-            # t.start()
 
     async def _readToQueue(self):
         """Thread to read lines from stdout and insert in queue."""
@@ -163,7 +142,7 @@ class AsyncBluepyHelper:
                     f"Helper exited with {self._helper.returncode}")
 
             rv = await self._lineq.get()
-            logger.info("Got:" + repr(rv))
+            logger.debug("Got:" + repr(rv))
             if rv.startswith('#') or rv == '\n' or len(rv) == 0:
                 continue
 
@@ -184,43 +163,12 @@ class AsyncBluepyHelper:
                     if 'state' in resp and len(resp['state']) > 0 and \
                             resp['state'][0] == 'disc':
                         await self._stopHelper()
-                        raise BTLEDisconnectError("Device disconnected", resp)
+                        # raise BTLEDisconnectError("Device disconnected", resp)
                 await self._responseq.put(resp)
-
-            # respType = resp['rsp'][0]
-            #
-            # # always check for MTU updates
-            # if 'mtu' in resp and len(resp['mtu']) > 0:
-            #     new_mtu = int(resp['mtu'][0])
-            #     if self._mtu != new_mtu:
-            #         self._mtu = new_mtu
-            #         logger.debug("Updated MTU: " + str(self._mtu))
-            #
-            # if respType == 'stat':
-            #     if 'state' in resp and len(resp['state']) > 0 and resp['state'][
-            #         0] == 'disc':
-            #         await self._stopHelper()
-            #         raise BTLEDisconnectError("Device disconnected", resp)
-            # elif respType == 'err':
-            #     errcode = resp['code'][0]
-            #     if errcode == 'nomgmt':
-            #         raise BTLEManagementError(
-            #             "Management not available (permissions problem?)", resp)
-            #     elif errcode == 'atterr':
-            #         raise BTLEGattError("Bluetooth command failed", resp)
-            #     else:
-            #         raise BTLEException(
-            #             "Error from bluepy-helper (%s)" % errcode, resp)
-            # elif respType == 'scan':
-            #     # Scan response when we weren't interested. Ignore it
-            #     continue
-            # else:
-            #     raise BTLEInternalError("Unexpected response (%s)" % respType,
-            #                             resp)
 
     async def _stopHelper(self):
         if self._helper is not None:
-            # logger.debug("Stopping ", helperExe)
+            logger.debug("Stopping ", helperExe)
             self._helper.stdin.write(b"quit\n")
             await self._helper.stdin.drain()
             await self._helper.wait()
@@ -230,32 +178,21 @@ class AsyncBluepyHelper:
                 await self.reader_task
             except asyncio.CancelledError:
                 pass
+            self.reader_task = None
             self.parser_task.cancel()
             try:
                 await self.parser_task
             except asyncio.CancelledError:
                 pass
-        # if self._stderr is not None:
-        #     self._stderr.close()
-        #     self._stderr = None
+            self.parser_task = None
 
     async def _writeCmd(self, cmd):
         if self._helper is None:
-            raise BTLEInternalError("Helper not started (did you call connect()?)")
-        # logger.debug("Sent: ", cmd)
-        print(f'--> {cmd.encode()}')
+            raise BTLEInternalError(
+                "Helper not started (did you call connect()?)")
+        logger.debug("Sent: ", cmd)
         self._helper.stdin.write(f"{cmd}\n".encode())
         await self._helper.stdin.drain()
-        #
-        # stdout, stderr = await self._helper.communicate(input=cmd.encode())
-        # print(stdout, stderr)
-        # if stdout:
-        #     # for t in re.split(r'[\x1e\n]', stdout.decode()):
-        #     for t in stdout.decode().split('\n'):
-        #         print(f'<-- {t}')
-        #         await self._lineq.put(t)
-        # self._helper.stdin.write(cmd)
-        # self._helper.stdin.flush()
 
     async def _mgmtCmd(self, cmd):
         await self._writeCmd(cmd + '\n')
@@ -294,23 +231,10 @@ class AsyncBluepyHelper:
     async def _waitResp(self, wantType, timeout=None):
         while True:
             if self._helper.returncode is not None:
-                raise BTLEInternalError(f"Helper exited with {self._helper.returncode}")
+                raise BTLEInternalError(
+                    f"Helper exited with {self._helper.returncode}")
 
             resp = await self._responseq.get()
-            # try:
-            #     rv = await asyncio.wait_for(self._lineq.get(), timeout=timeout)
-            # except asyncio.TimeoutError:
-            #     logger.info("Queue timeout")
-            #     return None
-            #
-            # logger.info("Got:" + repr(rv))
-            # if rv.startswith('#') or rv == '\n' or len(rv) == 0:
-            #     continue
-            #
-            # resp = self.parseResp(rv)
-            # if 'rsp' not in resp:
-            #     raise BTLEInternalError("No response type indicator", resp)
-
             respType = resp['rsp'][0]
 
             # always check for MTU updates
@@ -323,23 +247,35 @@ class AsyncBluepyHelper:
             if respType in wantType:
                 return resp
             elif respType == 'stat':
-                if 'state' in resp and len(resp['state']) > 0 and resp['state'][0] == 'disc':
+                if (
+                        'state' in resp and
+                        len(resp['state']) > 0 and
+                        resp['state'][0] == 'disc'
+                ):
                     await self._stopHelper()
                     raise BTLEDisconnectError("Device disconnected", resp)
             elif respType == 'err':
                 errcode = resp['code'][0]
                 if errcode == 'nomgmt':
                     raise BTLEManagementError(
-                        "Management not available (permissions problem?)", resp)
+                        "Management not available (permissions problem?)",
+                        resp,
+                    )
                 elif errcode == 'atterr':
                     raise BTLEGattError("Bluetooth command failed", resp)
                 else:
-                    raise BTLEException("Error from bluepy-helper (%s)" % errcode, resp)
+                    raise BTLEException(
+                        "Error from bluepy-helper (%s)" % errcode,
+                        resp,
+                    )
             elif respType == 'scan':
                 # Scan response when we weren't interested. Ignore it
                 continue
             else:
-                raise BTLEInternalError("Unexpected response (%s)" % respType, resp)
+                raise BTLEInternalError(
+                    "Unexpected response (%s)" % respType,
+                    resp,
+                )
 
     async def status(self):
         await self._writeCmd("stat\n")
@@ -347,17 +283,19 @@ class AsyncBluepyHelper:
 
 
 class AsyncPeripheral(AsyncBluepyHelper):
-    def __init__(self, deviceAddr=None, addrType='public', iface=None, timeout=None):
+    def __init__(self, deviceAddr=None, addrType='public', iface=None,
+                 timeout=None):
         super().__init__()
         self._serviceMap = None  # Indexed by UUID
         (self.deviceAddr, self.addrType, self.iface) = (None, None, None)
 
         if isinstance(deviceAddr, ScanEntry):
-            self._connect(deviceAddr.addr, deviceAddr.addrType, deviceAddr.iface, timeout)
+            self._connect(deviceAddr.addr, deviceAddr.addrType,
+                          deviceAddr.iface, timeout)
         elif deviceAddr is not None:
             self._connect(deviceAddr, addrType, iface, timeout)
 
-    def setDelegate(self, delegate_): # same as withDelegate(), deprecated
+    def setDelegate(self, delegate_):  # same as withDelegate(), deprecated
         return self.withDelegate(delegate_)
 
     def __aenter__(self):
@@ -372,18 +310,10 @@ class AsyncPeripheral(AsyncBluepyHelper):
 
         while True:
             resp = await self._waitResp(wantType + ['ntfy', 'ind'], timeout)
-            print('resp: ', resp)
             if resp is None:
                 return None
 
             respType = resp['rsp'][0]
-            # if respType == 'ntfy' or respType == 'ind':
-            #     hnd = resp['hnd'][0]
-            #     data = resp['d'][0]
-            #
-            #     print(respType, hnd, data, self.delegate)
-            #     if self.delegate is not None:
-            #         self.delegate.handleNotification(hnd, data)
             if respType not in wantType:
                 continue
             return resp
@@ -392,13 +322,19 @@ class AsyncPeripheral(AsyncBluepyHelper):
         if len(addr.split(":")) != 6:
             raise ValueError("Expected MAC address, got %s" % repr(addr))
         if addrType not in (ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM):
-            raise ValueError("Expected address type public or random, got {}".format(addrType))
+            raise ValueError(
+                "Expected address type public or random, got {}".format(
+                    addrType,
+                ),
+            )
         await self._startHelper(iface)
         self.addr = addr
         self.addrType = addrType
         self.iface = iface
         if iface is not None:
-            await self._writeCmd("conn %s %s %s\n" % (addr, addrType, "hci"+str(iface)))
+            await self._writeCmd(
+                "conn %s %s %s\n" % (addr, addrType, "hci" + str(iface)),
+            )
         else:
             await self._writeCmd("conn %s %s\n" % (addr, addrType))
         rsp = await self._getResp('stat', timeout)
@@ -408,17 +344,18 @@ class AsyncPeripheral(AsyncBluepyHelper):
             (addr, addrType), rsp)
         if rsp is None:
             raise timeout_exception
-        print('rsp', rsp)
         while rsp and rsp['state'][0] == 'tryconn':
             rsp = await self._getResp('stat', timeout)
-            print('rsp', rsp)
         if rsp is None or rsp['state'][0] != 'conn':
             await self._stopHelper()
             if rsp is None:
                 raise timeout_exception
             else:
-                raise BTLEDisconnectError("Failed to connect to peripheral %s, addr type: %s"
-                                          % (addr, addrType), rsp)
+                raise BTLEDisconnectError(
+                    "Failed to connect to peripheral %s, addr type: %s"
+                    % (addr, addrType),
+                    rsp,
+                )
 
     async def connect(self, addr, addrType='public', iface=None, timeout=None):
         if isinstance(addr, ScanEntry):
@@ -446,7 +383,8 @@ class AsyncPeripheral(AsyncBluepyHelper):
         assert (len(starts) == nSvcs and len(ends) == nSvcs)
         self._serviceMap = {}
         for i in range(nSvcs):
-            self._serviceMap[UUID(uuids[i])] = Service(self, uuids[i], starts[i], ends[i])
+            self._serviceMap[UUID(uuids[i])] = \
+                Service(self, uuids[i], starts[i], ends[i])
         return self._serviceMap
 
     async def getState(self):
@@ -468,7 +406,10 @@ class AsyncPeripheral(AsyncBluepyHelper):
         await self._writeCmd("svcs %s\n" % uuid)
         rsp = await self._getResp('find')
         if 'hstart' not in rsp:
-            raise BTLEGattError("Service %s not found" % (uuid.getCommonName()), rsp)
+            raise BTLEGattError(
+                "Service %s not found" % (uuid.getCommonName()),
+                rsp,
+            )
         svc = Service(self, uuid, rsp['hstart'][0], rsp['hend'][0])
 
         if self._serviceMap is None:
@@ -488,9 +429,16 @@ class AsyncPeripheral(AsyncBluepyHelper):
         await self._writeCmd(cmd + "\n")
         rsp = await self._getResp('find')
         nChars = len(rsp['hnd'])
-        return [AsyncCharacteristic(self, rsp['uuid'][i], rsp['hnd'][i],
-                               rsp['props'][i], rsp['vhnd'][i])
-                for i in range(nChars)]
+        return [
+            AsyncCharacteristic(
+                self,
+                rsp['uuid'][i],
+                rsp['hnd'][i],
+                rsp['props'][i],
+                rsp['vhnd'][i],
+            )
+            for i in range(nChars)
+        ]
 
     async def getDescriptors(self, startHnd=1, endHnd=0xFFFF):
         await self._writeCmd("desc %X %X\n" % (startHnd, endHnd))
@@ -504,7 +452,8 @@ class AsyncPeripheral(AsyncBluepyHelper):
         # This was broken in earlier versions.
         resp = await self._getResp('desc')
         ndesc = len(resp['hnd'])
-        return [Descriptor(self, resp['uuid'][i], resp['hnd'][i]) for i in range(ndesc)]
+        return [Descriptor(self, resp['uuid'][i], resp['hnd'][i]) for i in
+                range(ndesc)]
 
     async def readCharacteristic(self, handle):
         await self._writeCmd("rd %X\n" % handle)
@@ -516,11 +465,16 @@ class AsyncPeripheral(AsyncBluepyHelper):
         await self._writeCmd("rdu %s %X %X\n" % (UUID(uuid), startHnd, endHnd))
         return await self._getResp('rd')
 
-    async def writeCharacteristic(self, handle, val, withResponse=False, timeout=None):
+    async def writeCharacteristic(self, handle, val, withResponse=False,
+                                  timeout=None):
         # Without response, a value too long for one packet will be truncated,
         # but with response, it will be sent as a queued write
         cmd = "wrr" if withResponse else "wr"
-        await self._writeCmd("%s %X %s\n" % (cmd, handle, binascii.b2a_hex(val).decode('utf-8')))
+        await self._writeCmd("%s %X %s\n" % (
+            cmd,
+            handle,
+            binascii.b2a_hex(val).decode('utf-8'),
+        ))
         return await self._getResp('wr', timeout)
 
     async def setSecurityLevel(self, level):
@@ -541,7 +495,7 @@ class AsyncPeripheral(AsyncBluepyHelper):
         return await self._getResp('stat')
 
     async def waitForNotifications(self, timeout):
-        resp = await self._getResp(['ntfy','ind'], timeout)
+        resp = await self._getResp(['ntfy', 'ind'], timeout)
         return resp is not None
 
     async def _setRemoteOOB(self, address, address_type, oob_data, iface=None):
@@ -563,9 +517,14 @@ class AsyncPeripheral(AsyncBluepyHelper):
         if len(address.split(":")) != 6:
             raise ValueError("Expected MAC address, got %s" % repr(address))
         if address_type not in (ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM):
-            raise ValueError("Expected address type public or random, got {}".format(address_type))
+            raise ValueError(
+                "Expected address type public or random, got {}".format(
+                    address_type,
+                ),
+            )
         if isinstance(address, ScanEntry):
-            return await self._setRemoteOOB(address.addr, address.addrType, oob_data, address.iface)
+            return await self._setRemoteOOB(address.addr, address.addrType,
+                                            oob_data, address.iface)
         elif address is not None:
             return self._setRemoteOOB(address, address_type, oob_data, iface)
 
@@ -581,80 +540,44 @@ class AsyncPeripheral(AsyncBluepyHelper):
                 raise BTLEManagementError(
                     "Failed to get local OOB data.")
             if struct.unpack_from('<B', data, 0)[0] != 8 or \
-                struct.unpack_from('<B', data, 1)[0] != 0x1b:
+                    struct.unpack_from('<B', data, 1)[0] != 0x1b:
                 raise BTLEManagementError(
                     "Malformed local OOB data (address).")
             address = data[2:8]
             address_type = data[8:9]
             if struct.unpack_from('<B', data, 9)[0] != 2 or \
-                struct.unpack_from('<B', data, 10)[0] != 0x1c:
+                    struct.unpack_from('<B', data, 10)[0] != 0x1c:
                 raise BTLEManagementError(
                     "Malformed local OOB data (role).")
             role = data[11:12]
             if struct.unpack_from('<B', data, 12)[0] != 17 or \
-                struct.unpack_from('<B', data, 13)[0] != 0x22:
+                    struct.unpack_from('<B', data, 13)[0] != 0x22:
                 raise BTLEManagementError(
                     "Malformed local OOB data (confirm).")
             confirm = data[14:30]
             if struct.unpack_from('<B', data, 30)[0] != 17 or \
-                struct.unpack_from('<B', data, 31)[0] != 0x23:
+                    struct.unpack_from('<B', data, 31)[0] != 0x23:
                 raise BTLEManagementError(
                     "Malformed local OOB data (random).")
             random = data[32:48]
             if struct.unpack_from('<B', data, 48)[0] != 2 or \
-                struct.unpack_from('<B', data, 49)[0] != 0x1:
+                    struct.unpack_from('<B', data, 49)[0] != 0x1:
                 raise BTLEManagementError(
                     "Malformed local OOB data (flags).")
             flags = data[50:51]
             return {'Address': ''.join(
                 ["%02X" % struct.unpack('<B', c)[0] for c in address]),
-                    'Type': ''.join(["%02X" % struct.unpack('<B', c)[0] for c in
-                                     address_type]),
-                    'Role': ''.join(
-                        ["%02X" % struct.unpack('<B', c)[0] for c in role]),
-                    'C_256': ''.join(
-                        ["%02X" % struct.unpack('<B', c)[0] for c in confirm]),
-                    'R_256': ''.join(
-                        ["%02X" % struct.unpack('<B', c)[0] for c in random]),
-                    'Flags': ''.join(
-                        ["%02X" % struct.unpack('<B', c)[0] for c in flags]),
-                    }
-
-    # def __del__(self):
-    #     self.disconnect()
-
-
-
-#
-# class QueuePeripheral(Peripheral):
-#     # add async code
-#
-#     async def connect(self, address, type, timeout):
-#         loop = asyncio.get_running_loop()
-#         try:
-#             result = await loop.run_in_executor(
-#                 None, partial(self._connect, address, type, timeout=timeout))
-#         except BTLEException as e:
-#             raise BleakError() from e
-#         print('default thread pool', result)
-#
-#     async def disconnect(self):
-#         loop = asyncio.get_running_loop()
-#         try:
-#             result = await loop.run_in_executor(
-#                 None, super().disconnect)
-#         except BTLEException as e:
-#             raise BleakError() from e
-#
-#     def _start_notify(self, uuid):
-#         ch = self.getCharacteristics(uuid=uuid)[0]
-#         desc = ch.getDescriptors(forUUID=AssignedNumbers.client_characteristic_configuration)[0]
-#         desc.write(0x01.to_bytes(2, byteorder="little"), withResponse=True)
-#
-#     async def start_notify(self, uuid):
-#         loop = asyncio.get_running_loop()
-#         await loop.run_in_executor(
-#                         None, partial(self._start_notify, uuid))
+                'Type': ''.join(["%02X" % struct.unpack('<B', c)[0] for c in
+                                 address_type]),
+                'Role': ''.join(
+                    ["%02X" % struct.unpack('<B', c)[0] for c in role]),
+                'C_256': ''.join(
+                    ["%02X" % struct.unpack('<B', c)[0] for c in confirm]),
+                'R_256': ''.join(
+                    ["%02X" % struct.unpack('<B', c)[0] for c in random]),
+                'Flags': ''.join(
+                    ["%02X" % struct.unpack('<B', c)[0] for c in flags]),
+            }
 
 
 class BleakClientBluePy(BaseBleakClient):
@@ -681,7 +604,8 @@ class BleakClientBluePy(BaseBleakClient):
         self.peripheral.setDelegate(ClientNotificationDelegate(self))
 
         ach = (await self.peripheral.getCharacteristics(uuid=char_specifier))[0]
-        desc = (await ach.getDescriptors(forUUID=AssignedNumbers.client_characteristic_configuration))[0]
+        desc = (await ach.getDescriptors(
+            forUUID=AssignedNumbers.client_characteristic_configuration))[0]
         await self.peripheral.writeCharacteristic(
             desc.handle,
             0x01.to_bytes(2, byteorder="little"),
@@ -689,12 +613,13 @@ class BleakClientBluePy(BaseBleakClient):
         )
 
     async def stop_notify(self, char_specifier: Union[
-            BleakGATTCharacteristic, int, str, uuid.UUID]) -> None:
+        BleakGATTCharacteristic, int, str, uuid.UUID]) -> None:
         if not self.peripheral:
             raise BleakError('Not connected')
 
         ach = (await self.peripheral.getCharacteristics(uuid=char_specifier))[0]
-        desc = (await ach.getDescriptors(forUUID=AssignedNumbers.client_characteristic_configuration))[0]
+        desc = (await ach.getDescriptors(
+            forUUID=AssignedNumbers.client_characteristic_configuration))[0]
         await self.peripheral.writeCharacteristic(
             desc.handle,
             0x00.to_bytes(2, byteorder="little"),
