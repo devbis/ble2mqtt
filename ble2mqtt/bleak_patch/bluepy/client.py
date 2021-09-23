@@ -1,24 +1,20 @@
 import asyncio
 import binascii
 import logging
-import os
-import re
 import struct
 import uuid
-from functools import partial
 from typing import Callable, Optional, Union
-
-from bluepy.btle import (AssignedNumbers, BTLEException, BTLEInternalError,
-                         DefaultDelegate, Peripheral, helperExe,
-                         BTLEManagementError, BTLEDisconnectError,
-                         BTLEGattError, ScanEntry, ADDR_TYPE_PUBLIC,
-                         ADDR_TYPE_RANDOM, Service, Characteristic, UUID)
 
 from bleak import BleakError
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.client import BaseBleakClient
 from bleak.backends.device import BLEDevice
 from bleak.backends.service import BleakGATTServiceCollection
+from bluepy.btle import (ADDR_TYPE_PUBLIC, ADDR_TYPE_RANDOM, UUID,
+                         AssignedNumbers, BTLEDisconnectError, BTLEException,
+                         BTLEGattError, BTLEInternalError, BTLEManagementError,
+                         Characteristic, DefaultDelegate, ScanEntry, Service,
+                         helperExe)
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +102,7 @@ class AsyncBluepyHelper:
 
     async def _startHelper(self, iface=None):
         if self._helper is None:
-            logger.debug("Running ", helperExe)
+            logger.debug(f"Running {helperExe}")
             self._lineq = asyncio.Queue()
             self._responseq = asyncio.Queue()
             self._mtu = 0
@@ -129,7 +125,6 @@ class AsyncBluepyHelper:
         while True:
             c = await self._helper.stdout.read(1)
             if c == b'\n' and output:
-                print('stdout', output)
                 self._lineq.put_nowait(output.decode())
                 output.clear()
                 continue
@@ -137,9 +132,10 @@ class AsyncBluepyHelper:
 
     async def _parse_queue_messages(self, timeout=None):
         while True:
-            if self._helper.returncode is not None:
-                raise BTLEInternalError(
-                    f"Helper exited with {self._helper.returncode}")
+            if self._helper and self._helper.returncode is not None:
+                return
+                # raise BTLEInternalError(
+                #     f"Helper exited with {self._helper.returncode}")
 
             rv = await self._lineq.get()
             logger.debug("Got:" + repr(rv))
@@ -155,7 +151,6 @@ class AsyncBluepyHelper:
                 hnd = resp['hnd'][0]
                 data = resp['d'][0]
 
-                print(respType, hnd, data, self.delegate)
                 if self.delegate is not None:
                     self.delegate.handleNotification(hnd, data)
             else:
@@ -168,7 +163,7 @@ class AsyncBluepyHelper:
 
     async def _stopHelper(self):
         if self._helper is not None:
-            logger.debug("Stopping ", helperExe)
+            logger.debug(f"Stopping {helperExe}")
             self._helper.stdin.write(b"quit\n")
             await self._helper.stdin.drain()
             await self._helper.wait()
@@ -190,7 +185,7 @@ class AsyncBluepyHelper:
         if self._helper is None:
             raise BTLEInternalError(
                 "Helper not started (did you call connect()?)")
-        logger.debug("Sent: ", cmd)
+        logger.debug(f"Sent: {cmd}")
         self._helper.stdin.write(f"{cmd}\n".encode())
         await self._helper.stdin.drain()
 
@@ -338,9 +333,9 @@ class AsyncPeripheral(AsyncBluepyHelper):
         else:
             await self._writeCmd("conn %s %s\n" % (addr, addrType))
         rsp = await self._getResp('stat', timeout)
-        print('!', rsp)
         timeout_exception = BTLEDisconnectError(
-            "Timed out while trying to connect to peripheral %s, addr type: %s" %
+            "Timed out while trying to connect to peripheral %s, "
+            "addr type: %s" %
             (addr, addrType), rsp)
         if rsp is None:
             raise timeout_exception
@@ -447,8 +442,8 @@ class AsyncPeripheral(AsyncBluepyHelper):
         # descriptors in one packet due to the limited size of MTU. So the
         # guest needs to check the response and make retries until all handles
         # are returned.
-        # In bluez 5.25 and later, gatt_discover_desc() in attrib/gatt.c does the retry
-        # so bluetooth_helper always returns a full list.
+        # In bluez 5.25 and later, gatt_discover_desc() in attrib/gatt.c does
+        # the retry so bluetooth_helper always returns a full list.
         # This was broken in earlier versions.
         resp = await self._getResp('desc')
         ndesc = len(resp['hnd'])
@@ -590,6 +585,7 @@ class BleakClientBluePy(BaseBleakClient):
             and kwargs["address_type"] in ("public", "random")
             else 'public'
         )
+        self._notification_callbacks = {}
 
         self.peripheral: Optional[AsyncPeripheral] = None
 
@@ -601,19 +597,24 @@ class BleakClientBluePy(BaseBleakClient):
         if not self.peripheral:
             raise BleakError('Not connected')
 
-        self.peripheral.setDelegate(ClientNotificationDelegate(self))
+        ach: Characteristic = (
+            await self.peripheral.getCharacteristics(uuid=char_specifier)
+        )[0]
+        self._notification_callbacks[ach.valHandle] = callback
 
-        ach = (await self.peripheral.getCharacteristics(uuid=char_specifier))[0]
-        desc = (await ach.getDescriptors(
+        desc: Descriptor = (await ach.getDescriptors(
             forUUID=AssignedNumbers.client_characteristic_configuration))[0]
+        self.peripheral.setDelegate(ClientNotificationDelegate(self))
         await self.peripheral.writeCharacteristic(
             desc.handle,
             0x01.to_bytes(2, byteorder="little"),
             withResponse=True,
         )
 
-    async def stop_notify(self, char_specifier: Union[
-        BleakGATTCharacteristic, int, str, uuid.UUID]) -> None:
+    async def stop_notify(
+        self,
+        char_specifier: Union[BleakGATTCharacteristic, int, str, uuid.UUID],
+    ) -> None:
         if not self.peripheral:
             raise BleakError('Not connected')
 
@@ -625,6 +626,7 @@ class BleakClientBluePy(BaseBleakClient):
             0x00.to_bytes(2, byteorder="little"),
             withResponse=True,
         )
+        self._notification_callbacks.pop(ach.valHandle, None)
 
     async def write_gatt_descriptor(self, handle: int, data: bytearray) -> None:
         pass
@@ -661,8 +663,10 @@ class BleakClientBluePy(BaseBleakClient):
         pass
 
     def push_notification(self, handle, data):
-        print('push_notification: ', handle, data)
-        # self._devices[device.addr] = device
+        logger.debug(f'notification from {handle}: {data}')
+        callback = self._notification_callbacks.get(handle)
+        if callback:
+            callback(handle, data)
 
     @property
     def is_connected(self) -> bool:
@@ -708,6 +712,6 @@ class BleakClientBluePy(BaseBleakClient):
             try:
                 await self.peripheral.disconnect()
             except BTLEException as e:
-                logger.exception("Error in disconnect")
+                logger.exception(f"Error in disconnect: {e}")
                 # raise BleakError() from e
         return True

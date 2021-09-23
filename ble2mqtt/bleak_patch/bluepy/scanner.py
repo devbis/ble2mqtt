@@ -6,12 +6,11 @@ import typing as ty
 import uuid
 from typing import List
 
+from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData, BaseBleakScanner
 from bluepy.btle import (BTLEDisconnectError, BTLEException, BTLEGattError,
                          BTLEInternalError, BTLEManagementError,
                          DefaultDelegate, ScanEntry, Scanner)
-
-from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import AdvertisementData, BaseBleakScanner
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +146,9 @@ class QueueScanner(Scanner):
                     raise BTLEManagementError(
                         "Management not available (permissions problem?)", resp)
                 elif errcode == 'atterr':
-                    self.queue.put_nowait(BTLEGattError("Bluetooth command failed", resp))
+                    self.queue.put_nowait(
+                        BTLEGattError("Bluetooth command failed", resp),
+                    )
                     raise BTLEGattError("Bluetooth command failed", resp)
                 else:
                     self.queue.put_nowait(BTLEException(
