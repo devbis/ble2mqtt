@@ -91,6 +91,7 @@ class AsyncBluepyHelper:
         self._lineq = None
         self._mtu = 0
         self.delegate = DefaultDelegate()
+        self.last_state = None
         self.reader_task = None
 
     async def helper_task(self):
@@ -122,7 +123,7 @@ class AsyncBluepyHelper:
     async def _readToQueue(self):
         """Thread to read lines from stdout and insert in queue."""
         output = bytearray()
-        while True:
+        while self._helper:  # and self._helper.stdout.at_eof():
             c = await self._helper.stdout.read(1)
             if c == b'\n' and output:
                 self._lineq.put_nowait(output.decode())
@@ -155,28 +156,38 @@ class AsyncBluepyHelper:
                     self.delegate.handleNotification(hnd, data)
             else:
                 if respType == 'stat':
-                    if 'state' in resp and len(resp['state']) > 0 and \
-                            resp['state'][0] == 'disc':
-                        await self._stopHelper()
+                    if 'state' in resp and len(resp['state']) > 0:
+                        self.last_state = resp['state'][0]
+                        if self.last_state == 'disc':
+                            await self._stopHelper()
                         # raise BTLEDisconnectError("Device disconnected", resp)
                 await self._responseq.put(resp)
 
     async def _stopHelper(self):
         if self._helper is not None:
             logger.debug(f"Stopping {helperExe}")
-            self._helper.stdin.write(b"quit\n")
-            await self._helper.stdin.drain()
-            await self._helper.wait()
-            self._helper = None
-            self.reader_task.cancel()
+            await asyncio.sleep(1)
             try:
+                self.reader_task.cancel()
                 await self.reader_task
             except asyncio.CancelledError:
                 pass
             self.reader_task = None
-            self.parser_task.cancel()
+
+            # logger.debug(f"Stopping {helperExe}")
+            # logger.debug("Sent: {}".format(b'quit\n'))
+            # self._helper.stdin.write(b"quit\n")
+            # await self._helper.stdin.drain()
+            # logger.debug(f"Wait for quit {helperExe}")
+            # await self._helper.communicate(input="quit\n".encode())
+            await self._helper.terminate()
+            await asyncio.wait_for(self._helper.wait(), timeout=5)
+            self._helper = None
+            self.last_state = 'disc'
+
             try:
-                await self.parser_task
+                self.parser_task.cancel()
+                self.parser_task.result()
             except asyncio.CancelledError:
                 pass
             self.parser_task = None
@@ -651,7 +662,9 @@ class BleakClientBluePy(BaseBleakClient):
             char_specifier: Union[BleakGATTCharacteristic, int, str, uuid.UUID],
             **kwargs) -> bytearray:
         ach = (await self.peripheral.getCharacteristics(uuid=char_specifier))[0]
-        return await self.peripheral.readCharacteristic(ach.valHandle)
+        res = await self.peripheral.readCharacteristic(ach.valHandle)
+        print('    ------>    read_gatt_char', char_specifier, res)
+        return res
 
     async def get_services(self, **kwargs) -> BleakGATTServiceCollection:
         pass
@@ -666,24 +679,13 @@ class BleakClientBluePy(BaseBleakClient):
         logger.debug(f'notification from {handle}: {data}')
         callback = self._notification_callbacks.get(handle)
         if callback:
-            callback(handle, data)
+            callback(int(handle) - 1, data)
 
     @property
     def is_connected(self) -> bool:
         if not self.peripheral:
             return False
-        return True
-        # state = None
-        # async def _is_connected():
-        #     global state
-        #     state = await self.peripheral.getState() == 'conn'
-        #
-        # try:
-        #     loop = asyncio.get_running_loop()
-        #     loop.en(_is_connected)
-        #     return state
-        # except BTLEInternalError:
-        #     return False
+        return self.peripheral.last_state == 'conn'
 
     async def connect(self, **kwargs) -> bool:
         logger.debug(
