@@ -2,12 +2,16 @@ import asyncio as aio
 import json
 import logging
 import os
+# import signal
+import faulthandler
+
+faulthandler.enable()
 
 from ble2mqtt.__version__ import VERSION
 
-from .bleak_patch import add_bluepy_backend
+from .bleak_gattlib import add_gattlib_backend
 
-add_bluepy_backend()
+add_gattlib_backend()
 
 from ble2mqtt.ble2mqtt import Ble2Mqtt
 
@@ -82,6 +86,7 @@ async def amain(config):
     service = Ble2Mqtt(
         reconnection_interval=10,
         loop=loop,
+        hci_device=config['hci_device'],
         host=config['mqtt_host'],
         port=config['mqtt_port'],
         user=config.get('mqtt_user'),
@@ -133,7 +138,7 @@ def main():
         'base_topic': 'ble2mqtt',
         'mqtt_config_prefix': 'b2m_',
         'log_level': 'INFO',
-        # 'hci_device': 'hci0',
+        'hci_device': 'hci0',
         **config,
     }
 

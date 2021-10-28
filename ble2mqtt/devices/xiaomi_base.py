@@ -12,6 +12,7 @@ class XiaomiHumidityTemperature(XiaomiPoller, abc.ABC):
     SENSOR_CLASS: ty.Any = None
     # send data only if temperature or humidity is set
     REQUIRED_VALUES = ('temperature', 'humidity')
+    DEVICE_DROPS_CONNECTION = True
 
     @property
     def entities(self):
@@ -43,4 +44,5 @@ class XiaomiHumidityTemperature(XiaomiPoller, abc.ABC):
         while not self._stack.empty():
             self._stack.get_nowait()
         self._state = self.SENSOR_CLASS.from_data(data_bytes, battery)
+        # self._state = self.SENSOR_CLASS.from_data(data_bytes, 0)
         await self._notify_state(publish_topic)

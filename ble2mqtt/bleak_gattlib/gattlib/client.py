@@ -2,6 +2,7 @@ import asyncio
 import enum
 import inspect
 import logging
+import os
 import uuid
 from typing import Callable, Optional, Union, List
 
@@ -20,6 +21,26 @@ from .service import BleakGATTServiceGattlib
 from .uuids import DescriptorUUID
 
 logger = logging.getLogger(__name__)
+
+
+class BleakGattlibResponseError(BleakError):
+    def __init__(self, text, err_code) -> None:
+        # allows to accept err_code as kwarg
+        super().__init__(text, err_code)
+
+    @property
+    def err_code(self) -> Optional[int]:
+        if len(self.args) > 1:
+            return self.args[1]
+        return None
+
+
+class BleakGattlibIOError(BleakError):
+    pass
+
+
+class BleakConnectionError(BleakError):
+    pass
 
 
 class GattlibErrors(enum.Enum):
@@ -63,9 +84,10 @@ class Response(GATTResponse):
     def on_response_failed(self, status):
         self.loop.call_soon_threadsafe(
             self.future.set_exception,
-            BleakError(
+            BleakGattlibResponseError(
                 f'Error on processing command: status '
                 f'{GattlibErrors(status).name}',
+                err_code=GattlibErrors(status),
             ),
         )
 
@@ -81,13 +103,19 @@ class Requester(GATTRequester):
         self.client = client
         self.loop = loop
         self._connection_state_changed = asyncio.Event()
+        self._error_code = None
 
     def on_connect(self, mtu):
         logger.debug(f'{self.client.address} connected')
         self.loop.call_soon_threadsafe(self._connection_state_changed.set)
 
+    def on_connect_failed(self, err_code):
+        logger.debug(f'{self.client.address} connect failed')
+        self._error_code = err_code
+        self.loop.call_soon_threadsafe(self._connection_state_changed.set)
+
     def on_disconnect(self):
-        logger.debug(f'{self.client.address} disconnected')
+        logger.info(f'{self.client.address} disconnected')
         self.loop.call_soon_threadsafe(self._connection_state_changed.set)
 
     def on_notification(self, handle, data):
@@ -98,16 +126,26 @@ class Requester(GATTRequester):
 
     async def connect_(self, address_type, timeout=10.0):
         self.loop.call_soon_threadsafe(self._connection_state_changed.clear)
+        self._error_code = None
         self.connect(
             False,  # wait
             address_type,  # channel_type
         )
-        await asyncio.wait_for(
-            self._connection_state_changed.wait(),
-            timeout=timeout,
-        )
+        try:
+            await asyncio.wait_for(
+                self._connection_state_changed.wait(),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise BleakConnectionError(
+                f'Timed out after {timeout} seconds',
+            ) from None
+        if self._error_code:
+            raise BleakConnectionError(
+                f"{os.strerror(self._error_code)} ({self._error_code})",
+            )
         if not self.is_connected():
-            raise BleakError("Connection failed")
+            raise BleakConnectionError("Connection failed")
         return True
 
     async def disconnect_(self):
@@ -154,24 +192,33 @@ class Requester(GATTRequester):
     async def enable_notifications(self, handle, enable):
         response = Response(self.loop)
         logger.debug(f'call enable_notifications({handle}, {enable})')
-        self.enable_notifications_async(
-            handle,  # handle
-            1 if enable else 0,  # notifications
-            0,  # indications
-            response,
-        )
+        try:
+            self.enable_notifications_async(
+                handle,  # handle
+                1 if enable else 0,  # notifications
+                0,  # indications
+                response,
+            )
+        except BTIOException as e:
+            raise BleakGattlibIOError(str(e)) from None
         return await response.wait_receive()
 
     async def write_by_handle_(self, handle, data):
         response = Response(self.loop)
         # logger.debug(f'call write_by_handle({handle}, {data})')
-        self.write_by_handle_async(handle, data, response)
+        try:
+            self.write_by_handle_async(handle, data, response)
+        except BTIOException as e:
+            raise BleakGattlibIOError(str(e)) from None
         return await response.wait_receive()
 
     async def read_by_handle_(self, handle):
         response = Response(self.loop)
         # logger.debug(f'call read_by_handle({handle})')
-        self.read_by_handle_async(handle, response)
+        try:
+            self.read_by_handle_async(handle, response)
+        except BTIOException as e:
+            raise BleakGattlibIOError(str(e)) from None
         return (await response.wait_receive())[0]
 
 
@@ -185,6 +232,7 @@ class BleakClientGattlib(BaseBleakClient):
             and kwargs["address_type"] in ("public", "random")
             else 'public'
         )
+        self._device = kwargs.get('adapter', 'hci0')
         self._notification_callbacks = {}
         self._subscriptions: List[int] = []
 
@@ -197,18 +245,28 @@ class BleakClientGattlib(BaseBleakClient):
             f"Connecting to device @ {self.address}")
 
         if self.is_connected:
-            raise BleakError("Client is already connected")
+            raise BleakConnectionError("Client is already connected")
 
         timeout = kwargs.get("timeout", self._timeout)
         loop = asyncio.get_running_loop()
-        self._requester = Requester(self, loop, self.address, False)
+
         try:
+            self._requester = Requester(
+                self,
+                loop,
+                self.address,
+                False,
+                self._device,
+            )
             await self._requester.connect_(self._address_type, timeout)
         except (BTIOException, asyncio.TimeoutError) as e:
+            if isinstance(e, BTIOException):
+                raise BleakGattlibIOError(str(e)) from e
+            raise BleakError(repr(e)) from e
+        finally:
+            logger.info(f'{self} disconnect!')
             if self._disconnected_callback:
                 self._disconnected_callback(self)
-
-            raise BleakError(str(e)) from e
 
         await asyncio.wait_for(self.get_services(asyncio.get_running_loop()),
                                10)
@@ -221,9 +279,10 @@ class BleakClientGattlib(BaseBleakClient):
                 await self._requester.disconnect_()
             except BTIOException as e:
                 # logger.exception(f"Error in disconnect: {e}")
-                raise BleakError() from e
-            if self._disconnected_callback:
-                self._disconnected_callback(self)
+                raise BleakGattlibIOError(str(e)) from e
+            finally:
+                if self._disconnected_callback:
+                    self._disconnected_callback(self)
 
         return True
 
@@ -239,7 +298,7 @@ class BleakClientGattlib(BaseBleakClient):
             callback: Callable[[int, bytearray], None],
             **kwargs) -> None:
         if not self._requester:
-            raise BleakError('Not connected')
+            raise BleakConnectionError('Not connected')
 
         """Activate notifications/indications on a characteristic.
 
@@ -291,7 +350,7 @@ class BleakClientGattlib(BaseBleakClient):
         char_specifier: Union[BleakGATTCharacteristic, int, str, uuid.UUID],
     ) -> None:
         if not self._requester:
-            raise BleakError('Not connected')
+            raise BleakConnectionError('Not connected')
 
         manager: Requester = self._requester
 
@@ -349,7 +408,7 @@ class BleakClientGattlib(BaseBleakClient):
         except BleakError as e:
             raise BleakError(
                 "Could not write value {0} to characteristic {1}: {2}".format(
-                    data, characteristic.uuid, e.args[1],
+                    data, characteristic.uuid, e.args[0],
                 ),
             )
 
@@ -384,7 +443,10 @@ class BleakClientGattlib(BaseBleakClient):
             raise BleakError(
                 "Characteristic {} was not found!".format(char_specifier))
 
-        output = await manager.read_by_handle_(characteristic.obj['value_handle'])
+        try:
+            output = await manager.read_by_handle_(characteristic.obj['value_handle'])
+        except BTIOException as e:
+            raise BleakGattlibIOError(str(e)) from e
         value = bytearray(output)
         logger.debug(
             "Read Characteristic {0} : {1}".format(characteristic.uuid, value))
@@ -412,10 +474,27 @@ class BleakClientGattlib(BaseBleakClient):
             )
 
         services = await manager.discover_services()
-        service_characteristics = await asyncio.gather(*[
-            _discover_characteristics(service)
-            for service in services
-        ])
+        service_characteristics = []
+
+        for service in services:
+            logger.info(f'Get characteristic for {service["uuid"]}')
+            try:
+                service_characteristics.append(
+                    await _discover_characteristics(service),
+                )
+            except BleakGattlibResponseError as e:
+                logger.info(f'{service["uuid"]} returns '
+                            f'{os.strerror(int(e.err_code))} ({e.err_code})')
+            except BleakError as e:
+                logger.exception(str(e))
+
+        # service_characteristics = await asyncio.gather(*[
+        #     _discover_characteristics(service)
+        #     for service in services
+        # ])
+
+
+
         # characteristic_descriptors = await asyncio.gather(*[
         #     _discover_descriptors(characteristic)
         #     for characteristic in (

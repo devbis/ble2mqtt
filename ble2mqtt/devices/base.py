@@ -335,7 +335,7 @@ class Device(BaseDevice, abc.ABC):
         if not self.config_sent:
             await send_config()
         if self.client:  # in passive mode, client is None
-            props = self.client._properties
+            props = getattr(self.client, '_properties', {})
             self.rssi = props.get('RSSI')
 
     def __str__(self):
@@ -358,12 +358,13 @@ class Device(BaseDevice, abc.ABC):
         assert self.MAC_TYPE in ('public', 'random')
         return BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
 
-    async def connect(self):
+    async def connect(self, _hci_device):  # FIXME
         if self.is_passive:
             return
 
         self.client = await self.get_client(
             disconnected_callback=self._on_disconnect,
+            adapter=_hci_device,
         )
         self.disconnected_event.clear()
         try:
@@ -380,7 +381,7 @@ class Device(BaseDevice, abc.ABC):
         _LOGGER.info(f'Connected to {self.client.address}')
 
     def _on_disconnect(self, client, *args):
-        _LOGGER.debug(f'Client {client.address} disconnected, device={self}')
+        _LOGGER.info(f'Client {client.address} disconnected, device={self}')
         self.disconnected_event.set()
 
     async def close(self):

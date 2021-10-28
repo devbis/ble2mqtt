@@ -4,6 +4,7 @@ import typing as ty
 import uuid
 from typing import List
 
+from bleak import BleakError
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData, BaseBleakScanner
 
@@ -35,8 +36,8 @@ class BleakScannerGattlib(BaseBleakScanner):
 
     async def process_scan(self):
         while True:
-            self.service.do_step()
-            await asyncio.sleep(0)
+            self.service.do_step(50)
+            await asyncio.sleep(0.05)
 
     def discover_callback(self, address, data):
         address = address.upper()
@@ -93,15 +94,22 @@ class BleakScannerGattlib(BaseBleakScanner):
         self._callback(device, advertisement_data)
 
     async def start(self):
-        self.service = DiscoveryService(self._adapter)
+        try:
+            self.service = DiscoveryService(self._adapter)
+        except RuntimeError as e:
+            raise BleakError(str(e)) from None
         self.service.set_callback(self.discover_callback)
 
         try:
             self.service.start()
         except RuntimeError:
-            self.service.stop()
-            await asyncio.sleep(0)
-            self.service.start()
+            try:
+                self.service.stop()
+                await asyncio.sleep(0)
+                self.service.start()
+            except RuntimeError as e:
+                raise BleakError(str(e))
+
         self.scanner_task = asyncio.ensure_future(self.process_scan())
 
     async def stop(self):
@@ -109,10 +117,10 @@ class BleakScannerGattlib(BaseBleakScanner):
             self.service.stop()
         if not self.scanner_task.done():
             self.scanner_task.cancel()
-            try:
-                await self.scanner_task
-            except asyncio.CancelledError:
-                pass
+        try:
+            await self.scanner_task
+        except asyncio.CancelledError:
+            pass
 
         self.service = None
 
