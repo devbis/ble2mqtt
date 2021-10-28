@@ -10,14 +10,19 @@ logger = logging.getLogger(__name__)
 class BLEQueueMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._ble_queue = aio.Queue()
+        self._ble_queue = None
+
+    def init_ble_queue(self, loop):
+        self._ble_queue = aio.Queue(loop=loop)
 
     def notification_callback(self, sender_handle: int, data: bytearray):
         """
         This method must be used as notification callback for BLE connection
         """
         logger.debug(f'Notification: {sender_handle}: {format_binary(data)}')
-        self._ble_queue.put_nowait((sender_handle, data))
+        self._loop.call_soon_threadsafe(
+            self._ble_queue.put_nowait, (sender_handle, data),
+        )
 
     def clear_ble_queue(self):
         if hasattr(self._ble_queue, '_queue'):
@@ -36,8 +41,11 @@ class BaseCommand:
 class SendAndWaitReplyMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cmd_queue: aio.Queue[BaseCommand] = aio.Queue()
+        self.cmd_queue: aio.Queue[BaseCommand] = None
         self._cmd_queue_task = ty.Optional[aio.Task]
+
+    def init_cmd_queue(self, loop):
+        self.cmd_queue = aio.Queue(loop=loop)
 
     def run_queue_handler(self):
         self._cmd_queue_task = aio.ensure_future(self._handle_cmd_queue())

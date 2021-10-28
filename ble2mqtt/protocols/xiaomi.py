@@ -19,7 +19,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor):
         self._stack = aio.LifoQueue(loop=loop)
 
     def process_data(self, data):
-        self._stack.put_nowait(data)
+        self._loop.call_soon_threadsafe(self._stack.put_nowait, data)
 
     async def read_and_send_data(self, publish_topic):
         raise NotImplementedError()
