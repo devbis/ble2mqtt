@@ -21,7 +21,7 @@ LIGHT_ENTITY = 'backlight'
 
 class RedmondKettle(RedmondKettle200Protocol, Device):
     MAC_TYPE = 'random'
-    NAME = 'redmond200'
+    NAME = 'redmond_rk_g200'
     TX_CHAR = UUID_NORDIC_TX
     RX_CHAR = UUID_NORDIC_RX
     ACTIVE_SLEEP_INTERVAL = 1

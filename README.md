@@ -30,7 +30,7 @@ The configuration file is a JSON with the following content:
         },
         {
             "address": "11:22:33:aa:bb:cc",
-            "type": "redmond200",
+            "type": "redmond_rk_g200",
             "key": "ffffffffffffffff"
         },
         {
