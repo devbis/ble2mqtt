@@ -34,6 +34,11 @@ The configuration file is a JSON with the following content:
             "key": "ffffffffffffffff"
         },
         {
+            "address": "11:22:33:aa:bb:c0",
+            "type": "redmond_rmc_m200",
+            "key": "ffffffffffffffff"
+        },
+        {
             "address": "11:22:33:aa:bb:cd",
             "type": "mikettle",
             "product_id": 275
@@ -84,7 +89,7 @@ Supported devices:
 - Any bluetooth device can work as a presence tracker
 
 **Kettles:**
-- Redmond G2xx series (redmond200)
+- Redmond RK-G2xxS series (redmond_rk_g200)
   The default key that is used is `"ffffffffffffffff"`
   and can be omitted in the config.
   In some cases kettles don't accept it. Just use another 
@@ -95,6 +100,14 @@ Supported devices:
   - yunmi.kettle.v1: `131`
   - yunmi.kettle.v2: `275` (default)
   - yunmi.kettle.v7: `1116`
+
+**Multi-Cookers**
+- Redmond RMC-M225S, RMC-M227S (redmond_rmc_m200)
+  Notes about the key parameter you can read above for the 
+  Redmond kettles. 
+  *Other RMC multi-cookers may need 
+  adjustments for the list of available programs, it depends
+  on the device panel.*
 
 **Humidity sensors:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
