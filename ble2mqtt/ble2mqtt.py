@@ -10,9 +10,9 @@ from bleak import BleakError, BleakScanner
 from bleak.backends.device import BLEDevice
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, COVER_DOMAIN,
-                           DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SENSOR_DOMAIN,
-                           SWITCH_DOMAIN, ConnectionTimeoutError, Device,
-                           done_callback)
+                           DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
+                           SENSOR_DOMAIN, SWITCH_DOMAIN,
+                           ConnectionTimeoutError, Device, done_callback)
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +410,38 @@ class DeviceManager:
                         'position_template': '{{ value_json.position }}',
                         'command_topic': set_topic,
                         'set_position_topic': set_position_topic,
+                    }
+                    payload = json.dumps(config_params)
+                    logger.debug(
+                        f'Publish config topic={config_topic}: {payload}',
+                    )
+                    messages_to_send.append(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+            if cls == SELECT_DOMAIN:
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(
+                        device.unique_id,
+                        entity.get('topic', device.STATE_TOPIC),
+                    )
+                    set_topic = '/'.join((state_topic, device.SET_POSTFIX))
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        device.dev_id,
+                        entity_name,
+                        'config',
+                    ))
+                    config_params = {
+                        **get_generic_vals(entity),
+                        'state_topic': state_topic,
+                        'command_topic': set_topic,
                     }
                     payload = json.dumps(config_params)
                     logger.debug(

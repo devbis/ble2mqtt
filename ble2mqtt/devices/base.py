@@ -20,6 +20,7 @@ LIGHT_DOMAIN = 'light'
 SWITCH_DOMAIN = 'switch'
 COVER_DOMAIN = 'cover'
 DEVICE_TRACKER_DOMAIN = 'device_tracker'
+SELECT_DOMAIN = 'select'
 
 DEFAULT_STATE_TOPIC = ''  # send to the parent topic
 
@@ -161,6 +162,7 @@ class Device(BaseDevice, abc.ABC):
             LIGHT_DOMAIN,
             SWITCH_DOMAIN,
             COVER_DOMAIN,
+            SELECT_DOMAIN,
             DEVICE_TRACKER_DOMAIN,
         }
 
@@ -196,7 +198,7 @@ class Device(BaseDevice, abc.ABC):
             f'{self.unique_id}/{entity["name"]}/{self.SET_POSTFIX}'
             for cls, items in self.entities.items()
             for entity in items
-            if cls in [SWITCH_DOMAIN, LIGHT_DOMAIN, COVER_DOMAIN]
+            if cls in [SWITCH_DOMAIN, LIGHT_DOMAIN, COVER_DOMAIN, SELECT_DOMAIN]
         ] + [
             f'{self.unique_id}/{entity["name"]}/{self.SET_POSITION_POSTFIX}'
             for cls, items in self.entities.items()

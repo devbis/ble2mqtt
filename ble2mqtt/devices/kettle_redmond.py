@@ -3,8 +3,8 @@ import json
 import logging
 import uuid
 
-from ..protocols.redmond import (ColorTarget, Kettle200State, Mode,
-                                 RedmondKettle200Protocol, RunState)
+from ..protocols.redmond import (ColorTarget, KettleG200Mode, KettleG200State,
+                                 KettleRunState, RedmondKettle200Protocol)
 from .base import LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device
 from .uuids import DEVICE_NAME
 
@@ -100,13 +100,15 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         await self.set_time()
         await self._update_statistics()
 
-    def update_multiplier(self, state: Kettle200State = None):
+    def update_multiplier(self, state: KettleG200State = None):
         if state is None:
             state = self._state
         self._send_data_period_multiplier = (
             1
-            if state.state == RunState.ON and
-            state.mode in [Mode.BOIL, Mode.HEAT]
+            if state.state == KettleRunState.ON and state.mode in [
+                KettleG200Mode.BOIL,
+                KettleG200Mode.HEAT,
+            ]
             else self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         )
 
@@ -147,10 +149,10 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             if light['name'] == LIGHT_ENTITY:
                 light_state = {
                     'state': (
-                        RunState.ON.name
-                        if self._state.state == RunState.ON and
-                        self._state.mode == Mode.LIGHT
-                        else RunState.OFF.name
+                        KettleRunState.ON.name
+                        if self._state.state == KettleRunState.ON and
+                        self._state.mode == KettleG200Mode.LIGHT
+                        else KettleRunState.OFF.name
                     ),
                     'brightness': 255,
                     'color': {
@@ -166,22 +168,22 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         if coros:
             await aio.gather(*coros)
 
-    async def notify_run_state(self, new_state: Kettle200State, publish_topic):
+    async def notify_run_state(self, new_state: KettleG200State, publish_topic):
         if not self.initial_status_sent or \
                 new_state.state != self._state.state or \
                 new_state.mode != self._state.mode:
             state_to_str = {
-                True: RunState.ON.name,
-                False: RunState.OFF.name,
+                True: KettleRunState.ON.name,
+                False: KettleRunState.OFF.name,
             }
             boil_mode = state_to_str[
-                new_state.mode == Mode.BOIL and
-                new_state.state == RunState.ON
-            ]
+                new_state.mode == KettleG200Mode.BOIL and
+                new_state.state == KettleRunState.ON
+                ]
             heat_mode = state_to_str[
-                new_state.mode == Mode.HEAT and
-                new_state.state == RunState.ON
-            ]
+                new_state.mode == KettleG200Mode.HEAT and
+                new_state.state == KettleRunState.ON
+                ]
             topics = {
                 BOIL_ENTITY: boil_mode,
                 HEAT_ENTITY: heat_mode,
@@ -229,27 +231,27 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
 
     async def _switch_mode(self, mode, value):
-        if value == RunState.ON.name:
+        if value == KettleRunState.ON.name:
             try:
                 if self._state.mode != mode:
                     await self.stop()
-                await self.set_mode(Kettle200State(mode=mode))
+                await self.set_mode(KettleG200State(mode=mode))
             except ValueError:
                 # if the MODE is the same then it returns
                 # en error. Treat it as normal
                 pass
             await self.run()
-            next_state = RunState.ON
+            next_state = KettleRunState.ON
         else:
             await self.stop()
-            next_state = RunState.OFF
-        self.update_multiplier(Kettle200State(state=next_state))
+            next_state = KettleRunState.OFF
+        self.update_multiplier(KettleG200State(state=next_state))
 
     async def _switch_boil(self, value):
-        await self._switch_mode(Mode.BOIL, value)
+        await self._switch_mode(KettleG200Mode.BOIL, value)
 
     async def _switch_backlight(self, value):
-        await self._switch_mode(Mode.LIGHT, value)
+        await self._switch_mode(KettleG200Mode.LIGHT, value)
 
     async def handle_messages(self, publish_topic, *args, **kwargs):
         while True:

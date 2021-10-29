@@ -1,6 +1,7 @@
 from .atom_fast import AtomFast  # noqa
 from .base import registered_device_types  # noqa
 from .blinds_am43 import AM43Cover  # noqa
+from .cooker_redmond import RedmondCooker  # noqa
 from .kettle_redmond import RedmondKettle  # noqa
 from .kettle_xiaomi import XiaomiKettle  # noqa
 from .presence import Presence  # noqa

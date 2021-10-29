@@ -4,7 +4,7 @@ import logging
 import struct
 import time
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 
 from ..devices.base import BaseDevice
 from ..utils import format_binary
@@ -20,22 +20,27 @@ class RedmondError(ValueError):
     pass
 
 
-class Command(Enum):
+class Command(IntEnum):
     VERSION = 0x01
     RUN_CURRENT_MODE = 0x03
     STOP_CURRENT_MODE = 0x04
     WRITE_MODE = 0x05
     READ_MODE = 0x06
-    SET_TIME = 0x6e
+    WRITE_TEMPERATURE = 0x0b
+    WRITE_DELAY = 0x0c
+    WRITE_IONIZATION = 0x1b
     WRITE_COLOR = 0x32
     READ_COLOR = 0x33
     SET_BACKLIGHT_MODE = 0x37
+    SET_SOUND = 0x3c
+    SET_LOCK = 0x3e
     GET_STATISTICS = 0x47
     GET_STARTS_COUNT = 0x50
+    SET_TIME = 0x6e
     AUTH = 0xFF
 
 
-class Mode(Enum):
+class KettleG200Mode(IntEnum):
     BOIL = 0x00
     HEAT = 0x01
     LIGHT = 0x03
@@ -44,12 +49,27 @@ class Mode(Enum):
     UNKNOWN3 = 0x06
 
 
-class RunState(Enum):
+class CookerAfterCookMode(IntEnum):
+    HEAT_AFTER_COOK = 0x00
+    OFF_AFTER_COOK = 0x01
+
+
+class KettleRunState(IntEnum):
     OFF = 0x00
     SETUP_PROGRAM = 0x01  # for cooker
-    ON = 0x02
-    HEAT = 0x04  # for cooker
-    DELAYED_START = 0x05  # for cooker
+    ON = 0x02  # cooker - delayed start
+    HEAT = 0x03  # for cooker
+    COOKING = 0x05  # for cooker
+    WARM_UP = 0x06  # for cooker
+
+
+class CookerRunState(IntEnum):
+    OFF = 0x00
+    SETUP_PROGRAM = 0x01  # for cooker
+    DELAYED_START = 0x02  # cooker - delayed start
+    HEAT = 0x03  # for cooker
+    COOKING = 0x05  # for cooker
+    WARM_UP = 0x06  # for cooker
 
 
 class ColorTarget(Enum):
@@ -57,14 +77,35 @@ class ColorTarget(Enum):
     LIGHT = 0x01
 
 
+class CookerM200Program(Enum):
+    FRYING = 0x0
+    RICE = 0x1
+    MANUAL = 0x2
+    PILAF = 0x3
+    STEAM = 0x4
+    BAKING = 0x5
+    STEWING = 0x6
+    SOUP = 0x7
+    PORRIDGE = 0x8
+    YOGHURT = 0x9
+    EXPRESS = 0xa
+
+
+class CookerSubProgram(Enum):
+    NONE = 0
+    VEGETABLES = 1
+    FISH = 2
+    MEAT = 3
+
+
 @dataclass
-class Kettle200State:
+class KettleG200State:
     temperature: int = 0
     color_change_period: int = 0xf
-    mode: Mode = Mode.BOIL
+    mode: KettleG200Mode = KettleG200Mode.BOIL
     target_temperature: int = 0
     sound: bool = True
-    state: RunState = RunState.OFF
+    state: KettleRunState = KettleRunState.OFF
     boil_time: int = 0
     error: int = 0
 
@@ -88,11 +129,11 @@ class Kettle200State:
             error,  # 14,15
         ) = struct.unpack(cls.FORMAT, response)
         return cls(
-            mode=Mode(mode),
+            mode=KettleG200Mode(mode),
             target_temperature=target_temp,
             sound=sound,
             temperature=current_temp,
-            state=RunState(state),
+            state=KettleRunState(state),
             boil_time=boil_time_relative - BOIL_TIME_RELATIVE_DEFAULT,
             color_change_period=color_change_period,
             error=error,
@@ -114,7 +155,101 @@ class Kettle200State:
         )
 
 
-class KettleCommand(BaseCommand):
+@dataclass
+class CookerState:
+    program: CookerM200Program = CookerM200Program.RICE
+    subprogram: CookerSubProgram = CookerSubProgram.NONE
+    target_temperature: int = 0
+    program_minutes: int = 0
+    timer_minutes: int = 0
+    after_cooking_mode: CookerAfterCookMode = \
+        CookerAfterCookMode.HEAT_AFTER_COOK
+    state: CookerRunState = CookerRunState.OFF
+    sound: bool = True
+    locked: bool = False
+
+    SET_FORMAT = '<8B'
+    FORMAT = f'{SET_FORMAT}6BH'
+
+    @classmethod
+    def from_bytes(cls, response):
+        # 00 00 00 00 00 00 00 00 00 00 01 00 00 00 00 00 - wait with sound
+        # 00 00 64 00 00 00 00 00 00 01 01 00 00 00 00 00 - locked
+        # 00 00 96 00 0f 00 0f 01 00 00 00 00 00 00 00 00 - 150º 15 minutes
+
+        (
+            program,  # 0
+            subprogram,  # 1
+            target_temp,  # 2
+            program_hours,  # 3
+            program_minutes,  # 4
+            timer_hours,  # 5
+            timer_minutes,  # 6
+            after_cooking_mode,  # 7
+            state,  # 8
+            locked,  # 9
+            sound,  # 10
+            _,  # 11
+            _,   # 12,
+            _,  # 13
+            error,  # 14,15
+        ) = struct.unpack(cls.FORMAT, response)
+        return cls(
+            program=CookerM200Program(program),
+            subprogram=CookerSubProgram(subprogram),
+            target_temperature=target_temp,
+            after_cooking_mode=CookerAfterCookMode(after_cooking_mode),
+            state=CookerRunState(state),
+            program_minutes=(program_minutes + program_hours * 60),
+            timer_minutes=(timer_minutes + timer_hours * 60),
+            sound=bool(sound),
+            locked=bool(locked),
+        )
+
+    def to_bytes(self):
+        return struct.pack(
+            self.SET_FORMAT,
+            self.program.value,
+            self.subprogram.value,
+            self.target_temperature,
+            self.program_minutes // 60,
+            self.program_minutes % 60,
+            self.timer_minutes // 60,
+            self.timer_minutes % 60,
+            self.after_cooking_mode.value,
+        )
+
+
+_COOKER_M200_PREDEFINED_PROGRAMS_VALUES = [
+    # program, subprogram, temperature, hours, minutes, dhours, dminutes, heat
+    [0x00, 0x00, 0x96, 0x00, 0x0f, 0x00, 0x00, 0x01],
+    [0x01, 0x00, 0x64, 0x00, 0x19, 0x00, 0x00, 0x01],
+    [0x02, 0x00, 0x64, 0x00, 0x1e, 0x00, 0x00, 0x01],
+    [0x03, 0x00, 0x6e, 0x01, 0x00, 0x00, 0x00, 0x01],
+    [0x04, 0x00, 0x64, 0x00, 0x19, 0x00, 0x00, 0x01],
+    [0x05, 0x00, 0x8c, 0x01, 0x00, 0x00, 0x00, 0x01],
+    [0x06, 0x00, 0x64, 0x01, 0x00, 0x00, 0x00, 0x01],
+    [0x07, 0x00, 0x64, 0x01, 0x00, 0x00, 0x00, 0x01],
+    [0x08, 0x00, 0x64, 0x00, 0x1e, 0x00, 0x00, 0x01],
+    [0x09, 0x00, 0x28, 0x08, 0x00, 0x00, 0x00, 0x00],
+    [0x0a, 0x00, 0x64, 0x00, 0x1e, 0x00, 0x00, 0x00],
+]
+
+
+COOKER_PREDEFINED_PROGRAMS = {
+    CookerM200Program(v[0]).name.lower(): CookerState(
+        program=CookerM200Program(v[0]),
+        subprogram=CookerSubProgram(v[1]),
+        target_temperature=v[2],
+        program_minutes=v[3] * 60 + v[4],
+        timer_minutes=v[5] * 60 + v[6],
+        after_cooking_mode=CookerAfterCookMode(v[7]),
+    )
+    for v in _COOKER_M200_PREDEFINED_PROGRAMS_VALUES
+}
+
+
+class RedmondCommand(BaseCommand):
     def __init__(self, cmd, payload, wait_reply, timeout, *args, **kwargs):
         super().__init__(cmd, *args, **kwargs)
         self.payload = payload
@@ -122,8 +257,8 @@ class KettleCommand(BaseCommand):
         self.timeout = timeout
 
 
-class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
-                               BaseDevice, abc.ABC):
+class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
+                          abc.ABC):
     MAGIC_START = 0x55
     MAGIC_END = 0xaa
 
@@ -133,7 +268,6 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
-        self.notification_queue = aio.Queue()
         self.run_queue_handler()
         self._cmd_queue_task.add_done_callback(
             self._queue_handler_done_callback,
@@ -153,7 +287,26 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
                 exc_info=exc_info,
             )
 
-    async def process_command(self, command: KettleCommand):
+    def _get_command(self, cmd: int, payload: bytes):
+        container = struct.pack(
+            '<4B',
+            self.MAGIC_START,
+            self._cmd_counter,
+            cmd,
+            self.MAGIC_END,
+        )
+        self._cmd_counter += 1
+        if self._cmd_counter > 100:
+            self._cmd_counter = 0
+        return bytearray(b'%b%b%b' % (container[:3], payload, container[3:]))
+
+    async def send_command(self, cmd: Command, payload: bytes = b'',
+                           wait_reply=True, timeout=25):
+        cmd = RedmondCommand(cmd, payload, wait_reply, timeout)
+        await self.cmd_queue.put(cmd)
+        return await aio.wait_for(cmd.answer, timeout)
+
+    async def process_command(self, command: RedmondCommand):
         cmd = self._get_command(command.cmd.value, command.payload)
         logger.debug(
             f'... send cmd {command.cmd.value:04x} ['
@@ -207,6 +360,10 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         # NB: not used for now as we don't disconnect from our side
         await self.client.stop_notify(self.RX_CHAR)
 
+    async def close(self):
+        self.clear_cmd_queue()
+        await super().close()
+
     @staticmethod
     def _check_success(response,
                        error_msg="Command was not completed successfully"):
@@ -222,25 +379,9 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         if response != 0:
             raise RedmondError(error_msg)
 
-    def _get_command(self, cmd: int, payload: bytes):
-        container = struct.pack(
-            '<4B',
-            self.MAGIC_START,
-            self._cmd_counter,
-            cmd,
-            self.MAGIC_END,
-        )
-        self._cmd_counter += 1
-        if self._cmd_counter > 100:
-            self._cmd_counter = 0
-        return bytearray(b'%b%b%b' % (container[:3], payload, container[3:]))
 
-    async def send_command(self, cmd: Command, payload: bytes = b'',
-                           wait_reply=True, timeout=25):
-        cmd = KettleCommand(cmd, payload, wait_reply, timeout)
-        await self.cmd_queue.put(cmd)
-        return await aio.wait_for(cmd.answer, timeout)
-
+class RedmondCommonProtocol(RedmondBaseProtocol, abc.ABC):
+    """ Shared methods between different devices """
     async def login(self, key):
         logger.debug('logging in...')
         resp = await self.send_command(Command.AUTH, key, True)
@@ -253,6 +394,18 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         logger.debug(f'version: {version}')
         return version
 
+    async def run(self):
+        logger.debug('Run mode')
+        resp = await self.send_command(Command.RUN_CURRENT_MODE)
+        self._check_success(resp)
+
+    async def stop(self):
+        logger.debug('Stop mode')
+        resp = await self.send_command(Command.STOP_CURRENT_MODE)
+        self._check_success(resp)
+
+
+class RedmondKettle200Protocol(RedmondCommonProtocol, abc.ABC):
     async def set_time(self, ts=None):
         if ts is None:
             ts = time.time()
@@ -269,9 +422,9 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
     async def get_mode(self):
         logger.debug('Get mode...')
         response = await self.send_command(Command.READ_MODE)
-        return Kettle200State.from_bytes(response)
+        return KettleG200State.from_bytes(response)
 
-    async def set_mode(self, state: Kettle200State):
+    async def set_mode(self, state: KettleG200State):
         logger.debug('Set mode...')
         resp = await self.send_command(
             Command.WRITE_MODE,
@@ -280,16 +433,6 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         success = resp[0]
         if not success:
             raise RedmondError('Cannot set mode')
-
-    async def run(self):
-        logger.debug('Run mode')
-        resp = await self.send_command(Command.RUN_CURRENT_MODE)
-        self._check_success(resp)
-
-    async def stop(self):
-        logger.debug('Stop mode')
-        resp = await self.send_command(Command.STOP_CURRENT_MODE)
-        self._check_success(resp)
 
     async def set_color(self, mode: ColorTarget, r, g, b, brightness):
         # scale_light = [0x00, 0x32, 0x64]
@@ -333,6 +476,66 @@ class RedmondKettle200Protocol(SendAndWaitReplyMixin, BLEQueueMixin,
         _, _, starts, *_ = struct.unpack('<BHHHHHHHB', resp)
         return starts
 
-    async def close(self):
-        self.clear_cmd_queue()
-        await super().close()
+
+class RedmondCookerProtocol(RedmondCommonProtocol, abc.ABC):
+    async def get_mode(self):
+        logger.debug('Get mode...')
+        response = await self.send_command(Command.READ_MODE)
+        return CookerState.from_bytes(response)
+
+    async def set_mode(self, state: CookerState, ignore_result=True):
+        logger.debug(f'Set mode {state}...')
+        resp = await self.send_command(
+            Command.WRITE_MODE,
+            state.to_bytes(),
+        )
+        success = resp[0]
+        if not ignore_result and not success:
+            raise RedmondError('Cannot set mode')
+
+    async def set_predefined_program(self, mode_name: str):
+        logger.debug(f'Set predefined mode {mode_name}...')
+        await self.set_mode(COOKER_PREDEFINED_PROGRAMS[mode_name])
+
+    async def set_delay(self, minutes: int):
+        logger.debug('Set delay...')
+        resp = await self.send_command(
+            Command.WRITE_DELAY,
+            bytes([
+                minutes // 60,
+                minutes % 60,
+            ]),
+        )
+        success = resp[0]
+        if not success:
+            raise RedmondError('Cannot set delay')
+
+    async def set_temperature(self, temperature: int):
+        logger.debug('Set temperature...')
+        resp = await self.send_command(
+            Command.WRITE_TEMPERATURE,
+            bytes([temperature]),
+        )
+        success = resp[0]
+        if not success:
+            raise RedmondError('Cannot set temperature')
+
+    async def set_lock(self, value: bool):
+        logger.debug(f'Set lock {value}...')
+        resp = await self.send_command(
+            Command.SET_LOCK,
+            bytes([1 if value else 0]),
+        )
+        success = resp[0]
+        if not success:
+            raise RedmondError('Cannot set lock')
+
+    async def set_sound(self, value: bool):
+        logger.debug(f'Set sound {value}...')
+        resp = await self.send_command(
+            Command.SET_SOUND,
+            bytes([1 if value else 0]),
+        )
+        success = resp[0]
+        if not success:
+            raise RedmondError('Cannot set sound')
