@@ -1,2 +1,2 @@
 aio-mqtt==0.2.0
-bleak==0.11.0
+bleak>=0.12.0

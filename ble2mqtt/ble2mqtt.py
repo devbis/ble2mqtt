@@ -756,7 +756,7 @@ class Ble2Mqtt:
                     except aio.TimeoutError:
                         logger.error('Scanner start failed with timeout')
                     await aio.sleep(3)
-                    devices = await scanner.get_discovered_devices()
+                    devices = scanner.discovered_devices
                     await scanner.stop()
                     if not devices:
                         empty_scans += 1
