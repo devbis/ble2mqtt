@@ -314,8 +314,12 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                             return
                     if value.get('brightness'):
                         self._brightness = value['brightness']
-                    await self.set_color(
-                        ColorTarget.LIGHT,
-                        *self._color,
-                        self._brightness,
+                    await aio.gather(
+                        self.set_color(
+                            ColorTarget.LIGHT,
+                            *self._color,
+                            self._brightness,
+                        ),
+                        self._notify_state(publish_topic),
+                        loop=self._loop,
                     )
