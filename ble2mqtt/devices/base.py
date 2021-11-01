@@ -144,12 +144,11 @@ class Device(BaseDevice, abc.ABC):
     # secs to sleep if not connected or no data in passive mode
     NOT_READY_SLEEP_INTERVAL = 5
 
-    def __init__(self, mac, *args, prefix, **kwargs) -> None:
+    def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.disconnected_event = aio.Event()
         self.message_queue = aio.Queue()
         self.mac = mac
-        self.prefix = prefix
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
         self._version = None
@@ -232,7 +231,7 @@ class Device(BaseDevice, abc.ABC):
         # name and manufacturer can change while working, e.g. when
         # a device sends his name. To avoid changing topics use
         # the ID based on mac address only
-        return f'{self.prefix}{self.dev_id}'
+        return f'0x{self.dev_id}'
 
     @property
     def unique_name(self):

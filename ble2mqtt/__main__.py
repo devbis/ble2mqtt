@@ -86,7 +86,7 @@ def main():
         'mqtt_host': 'localhost',
         'mqtt_port': 1883,
         'base_topic': 'ble2mqtt',
-        'mqtt_prefix': 'b2m_',
+        'mqtt_config_prefix': 'b2m_',
         'log_level': 'INFO',
         **config,
     }
@@ -104,7 +104,7 @@ def main():
         user=config.get('mqtt_user'),
         password=config.get('mqtt_password'),
         base_topic=config['base_topic'],
-        mqtt_prefix=config['mqtt_prefix'],
+        mqtt_config_prefix=config['mqtt_config_prefix'],
     )
 
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)

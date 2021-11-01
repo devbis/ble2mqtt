@@ -169,10 +169,11 @@ async def handle_ble_exceptions():
 
 
 class DeviceManager:
-    def __init__(self, device, mqtt_client, base_topic):
+    def __init__(self, device, *, mqtt_client, base_topic, config_prefix):
         self.device: Device = device
         self._mqtt_client = mqtt_client
         self._base_topic = base_topic
+        self._config_prefix = config_prefix
         self.manage_task = None
 
     async def close(self):
@@ -210,6 +211,12 @@ class DeviceManager:
         return '/'.join(
             filter(None, (self._base_topic, dev_id, subtopic, *args)),
         )
+
+    @property
+    def _config_device_topic(self):
+        """Add a prefix to avoid interfering with other ble software"""
+
+        return f'{self._config_prefix}{self.device.dev_id}'
 
     async def send_device_config(self):
         device = self.device
@@ -273,7 +280,7 @@ class DeviceManager:
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
-                        device.dev_id,
+                        self._config_device_topic,
                         entity_name,
                         'config',
                     ))
@@ -320,7 +327,7 @@ class DeviceManager:
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
-                        device.dev_id,
+                        self._config_device_topic,
                         entity_name,
                         'config',
                     ))
@@ -360,7 +367,7 @@ class DeviceManager:
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
-                        device.dev_id,
+                        self._config_device_topic,
                         entity_name,
                         'config',
                     ))
@@ -397,7 +404,7 @@ class DeviceManager:
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
-                        device.dev_id,
+                        self._config_device_topic,
                         entity_name,
                         'config',
                     ))
@@ -434,7 +441,7 @@ class DeviceManager:
                     config_topic = '/'.join((
                         CONFIG_MQTT_NAMESPACE,
                         cls,
-                        device.dev_id,
+                        self._config_device_topic,
                         entity_name,
                         'config',
                     ))
@@ -610,14 +617,14 @@ class Ble2Mqtt:
             loop: ty.Optional[aio.AbstractEventLoop] = None,
             *,
             base_topic,
-            mqtt_prefix,
+            mqtt_config_prefix,
     ) -> None:
         self._mqtt_host = host
         self._mqtt_port = port
         self._mqtt_user = user
         self._mqtt_password = password
         self._base_topic = base_topic
-        self._mqtt_prefix = mqtt_prefix
+        self._mqtt_config_prefix = mqtt_config_prefix
 
         self._reconnection_interval = reconnection_interval
         self._loop = loop or aio.get_event_loop()
@@ -657,7 +664,6 @@ class Ble2Mqtt:
                 logger.warning(f'Error on MQTT  disconnecting: {repr(e)}')
 
     def register(self, device_class: ty.Type[Device], *args, **kwargs):
-        kwargs.setdefault('prefix', self._mqtt_prefix)
         device = device_class(*args, **kwargs)
         if not device:
             return
@@ -776,7 +782,12 @@ class Ble2Mqtt:
         has_passive_devices = False
         for dev in self.device_registry:
             self._device_managers[dev] = \
-                DeviceManager(dev, self._mqtt_client, self._base_topic)
+                DeviceManager(
+                    dev,
+                    mqtt_client=self._mqtt_client,
+                    base_topic=self._base_topic,
+                    config_prefix=self._mqtt_config_prefix,
+                )
             if dev.is_passive:
                 has_passive_devices = True
         logger.debug("Wait for network interruptions...")
