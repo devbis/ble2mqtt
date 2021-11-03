@@ -105,11 +105,12 @@ class KettleG200State:
     mode: KettleG200Mode = KettleG200Mode.BOIL
     target_temperature: int = 0
     sound: bool = True
+    is_blocked: bool = False
     state: KettleRunState = KettleRunState.OFF
     boil_time: int = 0
     error: int = 0
 
-    FORMAT = '<HH2B3H2BH'
+    FORMAT = '<6BH2BH4B'
 
     @classmethod
     def from_bytes(cls, response):
@@ -117,16 +118,20 @@ class KettleG200State:
         # 00 00 00 00 01 14 0f 00 02 00 00 00 00 80 00 00 - boil
         # 01 00 28 00 01 19 0f 00 00 00 00 00 00 80 00 00 - 40º keep
         (
-            mode,  # 0,1
-            target_temp,  # 2,3
+            mode,  # 0
+            submode,  # 1
+            target_temp,  # 2
+            is_blocked,  # 3
             sound,  # 4
             current_temp,  # 5
             color_change_period,  # 6-7
-            state,  # 8,9
+            state,  # 8
+            _,  # 9
             ionization,  # 10,11  # for air purifier
             _,   # 12,
             boil_time_relative,  # 13
-            error,  # 14,15
+            _,  # 14
+            error,  # 15
         ) = struct.unpack(cls.FORMAT, response)
         return cls(
             mode=KettleG200Mode(mode),
@@ -143,15 +148,19 @@ class KettleG200State:
         return struct.pack(
             self.FORMAT,
             self.mode.value,
+            0,
             self.target_temperature,
+            1 if self.is_blocked else 0,
             self.sound,
             self.temperature,
             self.color_change_period,
             self.state.value,
             0,
             0,
+            0,
             self.boil_time + BOIL_TIME_RELATIVE_DEFAULT,
-            self.error,
+            0,
+            0,  # don't send error
         )
 
 
