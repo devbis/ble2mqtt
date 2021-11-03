@@ -1,9 +1,66 @@
 # Service to export BLE devices to MQTT with Home Assistant discovery
 
-## Known issues:
-- High cpu usage due to underlying library to work with bluetooth
+## Supported devices:
+
+### Any device
+- Any bluetooth device can work as a presence tracker
+
+### Kettles
+- **Redmond RK-G2xxS series (redmond_rk_g200)**
+
+  The default key that is used is `"ffffffffffffffff"`
+  and can be omitted in the config.
+  In some cases kettles don't accept it. Just use another 
+  key in the config file for the device: 
+  `"key": "16 random hex numbers"`
+
+- **Mi Kettle (mikettle)**
+
+  Use correct `product_id` for your kettle:
+  - yunmi.kettle.v1: `131`
+  - yunmi.kettle.v2: `275` (default)
+  - yunmi.kettle.v7: `1116`
+
+### Multi-Cookers
+- **Redmond RMC-M225S, RMC-M227S (redmond_rmc_m200)**
+
+  Notes about the key parameter you can read above for the 
+  Redmond kettles. 
+  *Other RMC multi-cookers may need 
+  adjustments for the list of available programs, it depends
+  on the device panel.*
+
+### Humidity sensors
+- **Xiaomi MJ_HT_V1 (xiaomihtv1)**
+- **Xiaomi LYWSD03MMC (xiaomilywsd)** (due to the connection to the device on 
+  every data fetch, it consumes more battery power. Flashing to the custom
+  firmware is recommended)
+- **Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)**
+  - supported both atc1441 and pvvx formats
+
+### Blinds
+- **Generic AM43 (am43)**
+
+  Manufacturer can be A-OK, Zemismart, etc.
+
+### Dosimeters
+- **Atom Fast (atomfast)**
+
+By default, a device works in the passive mode without connection by 
+listening to advertisement packets from a device.
+To use connection to the device provide `"passive": false` parameter.
+
+**Supported devices in passive mode:**
+- Xiaomi MJ_HT_V1 (xiaomihtv1)
+- Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
+
+
+### Known issues:
+- *High cpu usage due to underlying library to work with bluetooth*
 
 **Use this software at your own risk.**
+
+## Configuration
 
 Default config should be located in `/etc/ble2mqtt.json` or 
 can be overridden with `BLE2MQTT_CONFIG` environment variable.
@@ -81,55 +138,6 @@ Extra configuration parameters:
 
 Devices accept `friendly_name` parameter to replace mac address in device
 names for Home Assistant.
-
-
-Supported devices:
-
-**Any device**
-- Any bluetooth device can work as a presence tracker
-
-**Kettles:**
-- Redmond RK-G2xxS series (redmond_rk_g200)
-  The default key that is used is `"ffffffffffffffff"`
-  and can be omitted in the config.
-  In some cases kettles don't accept it. Just use another 
-  key in the config file for the device: 
-  `"key": "16 random hex numbers"`
-- Mi Kettle (mikettle)
-  Use correct `product_id` for your kettle:
-  - yunmi.kettle.v1: `131`
-  - yunmi.kettle.v2: `275` (default)
-  - yunmi.kettle.v7: `1116`
-
-**Multi-Cookers**
-- Redmond RMC-M225S, RMC-M227S (redmond_rmc_m200)
-  Notes about the key parameter you can read above for the 
-  Redmond kettles. 
-  *Other RMC multi-cookers may need 
-  adjustments for the list of available programs, it depends
-  on the device panel.*
-
-**Humidity sensors:**
-- Xiaomi MJ_HT_V1 (xiaomihtv1)
-- Xiaomi LYWSD03MMC (xiaomilywsd) (due to the connection to the device on 
-  every data fetch, it consumes more battery power. Flashing to the custom
-  firmware is recommended)
-- Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
-  - supported both atc1441 and pvvx formats
-
-**Blinds:**
-- Generic AM43 (am43) Manufacturer can be A-OK, Zemismart, etc.
-
-**Dosimeters**
-- Atom Fast (atomfast)
-
-By default, a device works in the passive mode without connection by 
-listening to advertisement packets from a device.
-To use connection to the device provide `"passive": false` parameter.
-
-**Supported devices in passive mode:**
-- Xiaomi MJ_HT_V1 (xiaomihtv1)
-- Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
 
 
 ## Installation on OpenWRT
