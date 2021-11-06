@@ -9,12 +9,18 @@
         },
         {
             "address": "11:22:33:aa:bb:cc",
-            "type": "redmond200"
+            "type": "redmond_rk_g200",
+            "key": "ffffffffffffffff"
         },
         {
             "address": "11:22:33:aa:bb:cd",
             "type": "mikettle",
             "product_id": 275
+        },
+        {
+            "address": "11:22:33:aa:bb:ce",
+            "type": "redmond_rmc_m200",
+            "key": "ffffffffffffffee"
         },
         {
             "address": "11:22:33:aa:bb:de",
