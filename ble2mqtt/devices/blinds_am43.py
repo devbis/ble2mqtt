@@ -48,6 +48,7 @@ class AM43Cover(AM43Protocol, Device):
             COVER_DOMAIN: [
                 {
                     'name': COVER_ENTITY,
+                    'topic': COVER_ENTITY,
                     'device_class': 'shade',
                 },
             ],
