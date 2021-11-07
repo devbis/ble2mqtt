@@ -277,7 +277,7 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
-        self.run_queue_handler()
+        self.run_queue_handler(self._loop)
         self._cmd_queue_task.add_done_callback(
             self._queue_handler_done_callback,
         )
@@ -292,7 +292,7 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         if exc_info is not None:
             exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
             logger.exception(
-                f'{self} handle_queue() stopped unexpectedly',
+                f'{self} _handle_cmd_queue() stopped unexpectedly',
                 exc_info=exc_info,
             )
 
@@ -331,6 +331,7 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             if command.answer.cancelled():
                 return
             command.answer.set_result(cmd_resp)
+            return
 
         ble_notification = await aio.wait_for(
             self.ble_get_notification(),
