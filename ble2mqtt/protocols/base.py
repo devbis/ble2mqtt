@@ -47,8 +47,11 @@ class SendAndWaitReplyMixin:
     def init_cmd_queue(self, loop):
         self.cmd_queue = aio.Queue(loop=loop)
 
-    def run_queue_handler(self):
-        self._cmd_queue_task = aio.ensure_future(self._handle_cmd_queue())
+    def run_queue_handler(self, loop):
+        self._cmd_queue_task = aio.ensure_future(
+            self._handle_cmd_queue(),
+            loop=loop,
+        )
 
     def clear_cmd_queue(self):
         if hasattr(self.cmd_queue, '_queue'):

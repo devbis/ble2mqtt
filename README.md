@@ -43,6 +43,9 @@
 
   Manufacturer can be A-OK, Zemismart, etc.
 
+### Bulbs
+- **Avea RGBW bulbs (avea_rgbw)**
+
 ### Dosimeters
 - **Atom Fast (atomfast)**
 

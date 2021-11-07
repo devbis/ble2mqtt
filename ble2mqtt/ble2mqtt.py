@@ -374,7 +374,11 @@ class DeviceManager:
                     payload = json.dumps({
                         **get_generic_vals(entity),
                         'schema': 'json',
-                        'rgb': entity.get('rgb', True),
+                        'color_mode': bool(entity.get('color_mode', True)),
+                        'supported_color_modes': entity.get(
+                            'color_mode',
+                            ['rgb'],
+                        ),
                         'brightness': entity.get('brightness', True),
                         'state_topic': state_topic,
                         'command_topic': set_topic,
