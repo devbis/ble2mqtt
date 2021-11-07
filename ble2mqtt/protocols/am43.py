@@ -27,7 +27,7 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
 
     def notification_callback(self, sender_handle: int, data: bytearray):
         self.process_data(data)
-        self._ble_queue.put_nowait((sender_handle, data))
+        super().notification_callback(sender_handle, data)
 
     @staticmethod
     def _convert_position(value):
