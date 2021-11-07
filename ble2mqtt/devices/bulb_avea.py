@@ -130,10 +130,11 @@ class AveaBulb(AveaProtocol, Device):
         )
         coros = []
 
+        state = {'linkquality': self.linkquality}
         lights = self.entities.get(LIGHT_DOMAIN, [])
         for light in lights:
             if light['name'] == LIGHT_ENTITY:
-                light_state = {
+                state.update({
                     'state': (
                         'ON'
                         if (
@@ -149,10 +150,10 @@ class AveaBulb(AveaProtocol, Device):
                         'b': self._color[2],
                     },
                     'color_mode': 'rgb',
-                }
+                })
                 coros.append(publish_topic(
                     topic=self._get_topic_for_entity(light),
-                    value=json.dumps(light_state),
+                    value=json.dumps(state),
                 ))
         if coros:
             await aio.gather(*coros)
