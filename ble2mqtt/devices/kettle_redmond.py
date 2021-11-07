@@ -160,6 +160,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                         'g': self._color[1],
                         'b': self._color[2],
                     },
+                    'color_mode': 'rgb',
                 }
                 coros.append(publish_topic(
                     topic=self._get_topic_for_entity(light),
