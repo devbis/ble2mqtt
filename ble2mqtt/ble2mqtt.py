@@ -169,11 +169,13 @@ async def handle_ble_exceptions():
 
 
 class DeviceManager:
-    def __init__(self, device, *, mqtt_client, base_topic, config_prefix):
+    def __init__(self, device, *, mqtt_client, base_topic, config_prefix,
+                 global_availability_topic):
         self.device: Device = device
         self._mqtt_client = mqtt_client
         self._base_topic = base_topic
         self._config_prefix = config_prefix
+        self._global_availability_topic = global_availability_topic
         self.manage_task = None
 
     async def close(self):
@@ -238,6 +240,10 @@ class DeviceManager:
                 'name': f'{name}_{device.friendly_id}',
                 'unique_id': f'{name}_{device.dev_id}',
                 'device': device_info,
+                'availability_mode': 'all',
+                'availability': [
+                    {'topic': self._global_availability_topic},
+                ],
             }
             icon = entity.pop('icon', None)
             if icon:
@@ -796,6 +802,7 @@ class Ble2Mqtt:
                     mqtt_client=self._mqtt_client,
                     base_topic=self._base_topic,
                     config_prefix=self._mqtt_config_prefix,
+                    global_availability_topic=self.availability_topic,
                 )
             if dev.is_passive:
                 has_passive_devices = True
@@ -862,9 +869,15 @@ class Ble2Mqtt:
                     ),
                 )
                 await self._run_device_tasks(mqtt_connection.disconnect_reason)
-            except aio.CancelledError:
-                raise
-            except KeyboardInterrupt:
+            except (aio.CancelledError, KeyboardInterrupt):
+                await self._mqtt_client.publish(
+                    aio_mqtt.PublishableMessage(
+                        topic_name=self.availability_topic,
+                        payload='offline',
+                        qos=aio_mqtt.QOSLevel.QOS_0,
+                        retain=True,
+                    ),
+                )
                 raise
             except Exception:
                 logger.exception(
