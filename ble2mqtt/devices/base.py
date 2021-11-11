@@ -170,6 +170,7 @@ class Device(BaseDevice, abc.ABC):
         self._version = None
         self._manufacturer = self.MANUFACTURER
         self._rssi = None
+        self._advertisement_seen = aio.Event()
 
         assert set(self.entities.keys()) <= {
             BINARY_SENSOR_DOMAIN,
@@ -180,6 +181,9 @@ class Device(BaseDevice, abc.ABC):
             SELECT_DOMAIN,
             DEVICE_TRACKER_DOMAIN,
         }
+
+    def set_advertisement_seen(self):
+        self._advertisement_seen.set()
 
     def _get_topic(self, topic):
         return '/'.join(filter(None, (self.unique_id, topic)))
@@ -333,6 +337,7 @@ class Device(BaseDevice, abc.ABC):
         except (Exception, aio.CancelledError):
             self.disconnected_event.set()
             raise
+        self._advertisement_seen.clear()
         logger.info(f'Connected to {self.client.address}')
 
     def _on_disconnect(self, client, *args):

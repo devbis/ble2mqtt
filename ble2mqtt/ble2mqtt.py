@@ -757,6 +757,12 @@ class Ble2Mqtt:
                     if device.name:
                         reg_device._model = device.name
                     reg_device.handle_advert(device, advertisement_data)
+                else:
+                    logger.debug(
+                        f'active device seen: {reg_device} '
+                        f'{advertisement_data}',
+                    )
+                    reg_device.set_advertisement_seen()
 
     async def scan_devices_task(self):
         empty_scans = 0
