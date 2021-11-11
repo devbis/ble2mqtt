@@ -33,6 +33,13 @@ class CoverRunState(Enum):
     STOPPED = 'stopped'
 
 
+class ConnectionMode(Enum):
+    PASSIVE = 0
+    ACTIVE_POLL_WITH_DISCONNECT = 1
+    ACTIVE_KEEP_CONNECTION = 2
+    ON_DEMAND_CONNECTION = 3  # not implemented yet
+
+
 class ConnectionTimeoutError(ConnectionError):
     pass
 
@@ -56,16 +63,21 @@ class RegisteredType(abc.ABCMeta):
     def __new__(mcs, clsname, superclasses, attributedict):
         newclass = type.__new__(mcs, clsname, superclasses, attributedict)
         # condition to prevent base class registration
-        if superclasses:
+        if superclasses and abc.ABC not in superclasses:
             if newclass.NAME is not None:
                 registered_device_types[newclass.NAME] = newclass
+            assert (
+                not newclass.SUPPORT_ACTIVE or
+                newclass.ACTIVE_CONNECTION_MODE is not None
+            ), f'{clsname} requires ACTIVE_CONNECTION_MODE to be set'
         return newclass
 
 
-class BaseDevice(metaclass=RegisteredType):
+class BaseDevice(abc.ABC, metaclass=RegisteredType):
     NAME = None
     SUPPORT_PASSIVE = False
     SUPPORT_ACTIVE = True
+    ACTIVE_CONNECTION_MODE = None
 
     # Whether we should stop handle task on disconnect or not
     # if true wait more to publish data to topics
@@ -79,6 +91,10 @@ class BaseDevice(metaclass=RegisteredType):
                 'This device doesn\'t support passive mode',
             )
         self._is_passive = kwargs.get('passive', self.SUPPORT_PASSIVE)
+        if self._is_passive:
+            self._connection_mode = ConnectionMode.PASSIVE
+        else:
+            self._connection_mode = self.ACTIVE_CONNECTION_MODE
         self.config_sent = False
 
     @property
@@ -334,7 +350,7 @@ class Device(BaseDevice, abc.ABC):
         await super().close()
 
 
-class Sensor(Device):
+class Sensor(Device, abc.ABC):
     # a list of state properties that must be not None at least one of them
     # to send data.
     # E.g. only battery updated, but wait for temperature and humidity

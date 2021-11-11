@@ -3,7 +3,8 @@ import struct
 import uuid
 from dataclasses import dataclass
 
-from .base import SENSOR_DOMAIN, Sensor, SubscribeAndSetDataMixin
+from .base import (SENSOR_DOMAIN, ConnectionMode, Sensor,
+                   SubscribeAndSetDataMixin)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class AtomFast(SubscribeAndSetDataMixin, Sensor):
     SENSOR_CLASS = SensorState
     CONNECTION_FAILURES_LIMIT = 10
     MANUFACTURER = 'Atom'
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_KEEP_CONNECTION
 
     @property
     def entities(self):

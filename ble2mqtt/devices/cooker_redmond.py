@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager
 from ..protocols.redmond import (COOKER_PREDEFINED_PROGRAMS, CookerRunState,
                                  CookerState, RedmondCookerProtocol,
                                  RedmondError)
-from .base import SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, Device
+from .base import (SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
+                   Device)
 from .uuids import DEVICE_NAME
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
     ACTIVE_SLEEP_INTERVAL = 1
     RECONNECTION_SLEEP_INTERVAL = 30
     MANUFACTURER = 'Redmond'
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_KEEP_CONNECTION
 
     SEND_DATA_PERIOD = 5  # seconds when boiling
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode

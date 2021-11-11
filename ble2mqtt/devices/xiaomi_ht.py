@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from bleak.backends.device import BLEDevice
 
 from ..utils import format_binary
+from .base import ConnectionMode
 from .uuids import BATTERY
 from .xiaomi_base import XiaomiHumidityTemperature
 
@@ -41,6 +42,7 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature):
     BATTERY_CHAR = BATTERY
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT
 
     def filter_notifications(self, sender):
         # sender is 0xd or several requests it becomes

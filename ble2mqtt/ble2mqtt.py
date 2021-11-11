@@ -11,7 +11,7 @@ from bleak.backends.device import BLEDevice
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, COVER_DOMAIN,
                            DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
-                           SENSOR_DOMAIN, SWITCH_DOMAIN,
+                           SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
                            ConnectionTimeoutError, Device, done_callback)
 
 logger = logging.getLogger(__name__)
@@ -675,6 +675,11 @@ class Ble2Mqtt:
             raise NotImplementedError(
                 f'Device {device.dev_id} doesn\'t support active mode',
             )
+        assert device.is_passive or device.ACTIVE_CONNECTION_MODE in (
+            ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT,
+            ConnectionMode.ACTIVE_KEEP_CONNECTION,
+            ConnectionMode.ON_DEMAND_CONNECTION,
+        )
         self.device_registry.append(device)
 
     @property

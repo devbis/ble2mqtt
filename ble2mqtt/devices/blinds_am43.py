@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..protocols.am43 import AM43Protocol
-from .base import COVER_DOMAIN, SENSOR_DOMAIN, CoverRunState, Device
+from .base import (COVER_DOMAIN, SENSOR_DOMAIN, ConnectionMode, CoverRunState,
+                   Device)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class AM43Cover(AM43Protocol, Device):
     SEND_DATA_PERIOD = 5
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12 * 5  # 5 minutes
     LINKQUALITY_TOPIC = COVER_ENTITY
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_KEEP_CONNECTION
 
     # HA notation. We convert value on setting and receiving data
     CLOSED_POSITION = 0

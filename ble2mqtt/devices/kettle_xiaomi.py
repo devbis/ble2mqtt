@@ -10,7 +10,7 @@ from enum import Enum
 
 from ..protocols.xiaomi import XiaomiCipherMixin
 from ..utils import format_binary
-from .base import BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, Device
+from .base import BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, ConnectionMode, Device
 from .uuids import SOFTWARE_VERSION
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
     ACTIVE_SLEEP_INTERVAL = 1
     SEND_INTERVAL = 30
     MANUFACTURER = 'Xiaomi'
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_KEEP_CONNECTION
 
     def __init__(self, mac, product_id=275, token=None,
                  *args, loop, **kwargs):

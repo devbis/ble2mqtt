@@ -1,3 +1,4 @@
+import abc
 import asyncio as aio
 import logging
 import uuid
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Xiaomi Humidity/Temperature sensors
 
-class XiaomiPoller(SubscribeAndSetDataMixin, Sensor):
+class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
     DATA_CHAR: uuid.UUID = None
     BATTERY_CHAR: uuid.UUID = None
     MANUFACTURER = 'Xiaomi'

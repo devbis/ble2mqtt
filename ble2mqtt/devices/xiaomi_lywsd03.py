@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 
 from ..utils import cr2032_voltage_to_percent
+from .base import ConnectionMode
 from .xiaomi_base import XiaomiHumidityTemperature
 
 logger = logging.getLogger(__name__)
@@ -35,3 +36,4 @@ class XiaomiHumidityTemperatureLYWSD(XiaomiHumidityTemperature):
     SENSOR_CLASS = SensorState
     CONNECTION_FAILURES_LIMIT = 10
     DEVICE_DROPS_CONNECTION = True
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT

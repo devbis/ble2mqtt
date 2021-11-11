@@ -3,7 +3,7 @@ import json
 import logging
 import uuid
 
-from ble2mqtt.devices.base import LIGHT_DOMAIN, Device
+from ble2mqtt.devices.base import LIGHT_DOMAIN, ConnectionMode, Device
 from ble2mqtt.devices.uuids import FIRMWARE_VERSION
 from ble2mqtt.protocols.avea import AveaProtocol
 
@@ -20,6 +20,7 @@ class AveaBulb(AveaProtocol, Device):
     ACTIVE_SLEEP_INTERVAL = 1
     RECONNECTION_SLEEP_INTERVAL = 30
     MANUFACTURER = 'Avea'
+    ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_KEEP_CONNECTION
 
     SEND_DATA_PERIOD = 60
 

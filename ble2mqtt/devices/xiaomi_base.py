@@ -1,3 +1,4 @@
+import abc
 import logging
 
 from ..protocols.xiaomi import XiaomiPoller
@@ -6,7 +7,7 @@ from .base import SENSOR_DOMAIN
 logger = logging.getLogger(__name__)
 
 
-class XiaomiHumidityTemperature(XiaomiPoller):
+class XiaomiHumidityTemperature(XiaomiPoller, abc.ABC):
     SENSOR_CLASS = None
     # send data only if temperature or humidity is set
     REQUIRED_VALUES = ('temperature', 'humidity')
