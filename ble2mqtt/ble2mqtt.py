@@ -34,7 +34,8 @@ ListOfConnectionErrors = (
 )
 
 
-BLUETOOTH_RESTARTING = aio.Lock()
+# initialize in a loop
+BLUETOOTH_RESTARTING: aio.Lock = None  # type: ignore
 
 
 async def run_tasks_and_cancel_on_first_return(*tasks: aio.Future,
@@ -642,6 +643,8 @@ class Ble2Mqtt:
             base_topic,
             mqtt_config_prefix,
     ) -> None:
+        global BLUETOOTH_RESTARTING
+
         self._mqtt_host = host
         self._mqtt_port = port
         self._mqtt_user = user
@@ -651,6 +654,8 @@ class Ble2Mqtt:
 
         self._reconnection_interval = reconnection_interval
         self._loop = loop or aio.get_event_loop()
+        BLUETOOTH_RESTARTING = aio.Lock(loop=self._loop)
+
         self._mqtt_client = aio_mqtt.Client(
             client_id_prefix=f'{base_topic}_',
             loop=self._loop,
