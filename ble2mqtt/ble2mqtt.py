@@ -478,6 +478,23 @@ class DeviceManager:
         ])
         device.config_sent = True
 
+    async def _sleep_until_next_connection(self):
+        device = self.device
+        logger.debug(
+            f'Sleep for {device.RECONNECTION_SLEEP_INTERVAL} secs to '
+            f'reconnect to device={device}',
+        )
+        if device._connection_mode == ConnectionMode.ACTIVE_KEEP_CONNECTION:
+            try:
+                await aio.wait_for(
+                    device._advertisement_seen.wait(),
+                    timeout=device.RECONNECTION_SLEEP_INTERVAL,
+                )
+            except aio.TimeoutError:
+                pass
+        else:
+            await aio.sleep(self.device.RECONNECTION_SLEEP_INTERVAL)
+
     async def manage_device(self):
         device = self.device
         logger.debug(f'Start managing device={device}')
@@ -606,11 +623,7 @@ class DeviceManager:
                     )
             except aio.TimeoutError:
                 logger.exception(f'{device} not disconnected in 10 secs')
-            logger.debug(
-                f'Sleep for {device.RECONNECTION_SLEEP_INTERVAL} secs to '
-                f'reconnect to device={device}',
-            )
-            await aio.sleep(device.RECONNECTION_SLEEP_INTERVAL)
+            await self._sleep_until_next_connection()
 
 
 class Ble2Mqtt:
