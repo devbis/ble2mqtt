@@ -3,6 +3,7 @@ import asyncio as aio
 import logging
 import struct
 import time
+import uuid
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
@@ -271,8 +272,8 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
     MAGIC_START = 0x55
     MAGIC_END = 0xaa
 
-    RX_CHAR = None
-    TX_CHAR = None
+    RX_CHAR: uuid.UUID = None  # type: ignore
+    TX_CHAR: uuid.UUID = None  # type: ignore
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -290,7 +291,11 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             pass
 
         if exc_info is not None:
-            exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+            exc_info = (  # type: ignore
+                type(exc_info),
+                exc_info,
+                exc_info.__traceback__,
+            )
             logger.exception(
                 f'{self} _handle_cmd_queue() stopped unexpectedly',
                 exc_info=exc_info,
@@ -311,9 +316,9 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
 
     async def send_command(self, cmd: Command, payload: bytes = b'',
                            wait_reply=True, timeout=25):
-        cmd = RedmondCommand(cmd, payload, wait_reply, timeout)
-        await self.cmd_queue.put(cmd)
-        return await aio.wait_for(cmd.answer, timeout)
+        command = RedmondCommand(cmd, payload, wait_reply, timeout)
+        await self.cmd_queue.put(command)
+        return await aio.wait_for(command.answer, timeout)
 
     async def process_command(self, command: RedmondCommand):
         cmd = self._get_command(command.cmd.value, command.payload)

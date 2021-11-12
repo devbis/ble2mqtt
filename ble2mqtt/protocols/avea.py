@@ -2,6 +2,7 @@ import abc
 import asyncio as aio
 import logging
 import struct
+import uuid
 
 from ..devices.base import BaseDevice
 from ..utils import color_rgb_to_rgbw, color_rgbw_to_rgb, format_binary
@@ -22,7 +23,7 @@ class AveaCommand(BaseCommand):
 
 
 class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
-    DATA_CHAR = None
+    DATA_CHAR: uuid.UUID = None  # type: ignore
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,9 +45,9 @@ class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
 
     async def send_command(self, cmd: bytes = b'',
                            wait_reply=False, timeout=10):
-        cmd = AveaCommand(cmd, wait_reply, timeout)
-        await self.cmd_queue.put(cmd)
-        return await aio.wait_for(cmd.answer, timeout)
+        command = AveaCommand(cmd, wait_reply, timeout)
+        await self.cmd_queue.put(command)
+        return await aio.wait_for(command.answer, timeout)
 
     def _queue_handler_done_callback(self, future: aio.Future):
         exc_info = None
@@ -56,7 +57,11 @@ class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
             pass
 
         if exc_info is not None:
-            exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+            exc_info = (  # type: ignore
+                type(exc_info),
+                exc_info,
+                exc_info.__traceback__,
+            )
             logger.exception(
                 f'{self} _handle_cmd_queue() stopped unexpectedly',
                 exc_info=exc_info,

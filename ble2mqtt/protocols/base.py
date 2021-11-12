@@ -1,13 +1,15 @@
+import abc
 import asyncio as aio
 import logging
 import typing as ty
 
+from ..devices.base import BaseDevice
 from ..utils import format_binary
 
 logger = logging.getLogger(__name__)
 
 
-class BLEQueueMixin:
+class BLEQueueMixin(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ble_queue = None
@@ -72,5 +74,5 @@ class SendAndWaitReplyMixin:
                     f'{self} raise an error in handle_queue, ignore it',
                 )
 
-    async def process_command(self, command: BaseCommand):
+    async def process_command(self, command):
         raise NotImplementedError()

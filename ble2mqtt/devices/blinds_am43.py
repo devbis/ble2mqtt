@@ -1,6 +1,7 @@
 import asyncio as aio
 import json
 import logging
+import typing as ty
 import uuid
 from dataclasses import dataclass
 from enum import Enum
@@ -23,11 +24,11 @@ class MovementType(Enum):
 
 @dataclass
 class AM43State:
-    battery: int = None
+    battery: ty.Optional[int] = None
     position: int = 0
     illuminance: int = 0
     run_state: CoverRunState = CoverRunState.CLOSED
-    target_position: int = None
+    target_position: ty.Optional[int] = None
 
 
 class AM43Cover(AM43Protocol, Device):

@@ -1,4 +1,5 @@
 import logging
+import typing as ty
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SensorState:
     presence: bool = False
-    last_check: datetime = None
+    last_check: ty.Optional[datetime] = None
 
     @property
     def device_tracker(self):
@@ -31,7 +32,8 @@ class Presence(Sensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._state = None
+        cls = self.SENSOR_CLASS
+        self._state: cls = None
 
     @property
     def entities(self):
@@ -49,7 +51,7 @@ class Presence(Sensor):
             ],
         }
 
-    def handle_advert(self, scanned_device: BLEDevice, *args, **kwargs):
+    def handle_advert(self, scanned_device: BLEDevice, adv_data):
         self._state = self.SENSOR_CLASS(
             presence=True,
             last_check=datetime.now(),

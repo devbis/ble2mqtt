@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 # Xiaomi Humidity/Temperature sensors
 
 class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
-    DATA_CHAR: uuid.UUID = None
-    BATTERY_CHAR: uuid.UUID = None
+    DATA_CHAR: uuid.UUID = None  # type: ignore
+    BATTERY_CHAR: uuid.UUID = None  # type: ignore
     MANUFACTURER = 'Xiaomi'
 
     def __init__(self, *args, loop, **kwargs):

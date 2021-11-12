@@ -112,7 +112,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
             self._token = bytes.fromhex(token)
         else:
             self._token = self.generate_random_token()
-        self.queue: ty.Optional[aio.Queue] = None
+        self.queue: aio.Queue = None
         self._state: ty.Optional[MiKettleState] = None
 
     @property

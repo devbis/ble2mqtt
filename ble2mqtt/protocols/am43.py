@@ -1,6 +1,7 @@
 import abc
 import asyncio as aio
 import logging
+import uuid
 
 from ..devices.base import BaseDevice
 from ..utils import format_binary
@@ -23,7 +24,7 @@ AM43_REPLY_UNKNOWN2 = 0xa9
 
 
 class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
-    DATA_CHAR = None
+    DATA_CHAR: uuid.UUID = None  # type: ignore
 
     def notification_callback(self, sender_handle: int, data: bytearray):
         self.process_data(data)
@@ -33,8 +34,13 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
     def _convert_position(value):
         return 100 - value
 
-    convert_to_device = _convert_position
-    convert_from_device = _convert_position
+    @classmethod
+    def convert_to_device(cls, value):
+        return cls._convert_position(value)
+
+    @classmethod
+    def convert_from_device(cls, value):
+        return cls._convert_position(value)
 
     async def send_command(self, cmd_id, data: list,
                            wait_reply=True, timeout=25):
@@ -54,7 +60,7 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
                 self.ble_get_notification(),
                 timeout=timeout,
             )
-            logger.debug(f'[{self}] reply: {ble_notification[1]}')
+            logger.debug(f'[{self}] reply: {repr(ble_notification[1])}')
             ret = bytes(ble_notification[1])
         return ret
 

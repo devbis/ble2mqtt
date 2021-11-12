@@ -2,10 +2,12 @@ import abc
 import asyncio as aio
 import json
 import logging
+import typing as ty
 import uuid
 from enum import Enum
 
 from bleak import BleakClient, BleakError
+from bleak.backends.device import BLEDevice
 
 from ..devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
 from ..utils import format_binary, rssi_to_linkquality
@@ -52,7 +54,11 @@ def done_callback(future: aio.Future):
         pass
 
     if exc_info is not None:
-        exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+        exc_info = (  # type: ignore
+            type(exc_info),
+            exc_info,
+            exc_info.__traceback__,
+        )
         logger.exception(
             f'{future} stopped unexpectedly',
             exc_info=exc_info,
@@ -74,14 +80,14 @@ class RegisteredType(abc.ABCMeta):
 
 
 class BaseDevice(abc.ABC, metaclass=RegisteredType):
-    NAME = None
-    SUPPORT_PASSIVE = False
-    SUPPORT_ACTIVE = True
-    ACTIVE_CONNECTION_MODE = None
+    NAME: str = None  # type: ignore
+    SUPPORT_PASSIVE: bool = False
+    SUPPORT_ACTIVE: bool = True
+    ACTIVE_CONNECTION_MODE: ConnectionMode = None  # type: ignore
 
     # Whether we should stop handle task on disconnect or not
     # if true wait more to publish data to topics
-    DEVICE_DROPS_CONNECTION = False
+    DEVICE_DROPS_CONNECTION: bool = False
 
     def __init__(self, *args, loop, **kwargs):
         self._loop = loop
@@ -92,7 +98,7 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
             )
         self._is_passive = kwargs.get('passive', self.SUPPORT_PASSIVE)
         if self._is_passive:
-            self._connection_mode = ConnectionMode.PASSIVE
+            self._connection_mode: ConnectionMode = ConnectionMode.PASSIVE
         else:
             self._connection_mode = self.ACTIVE_CONNECTION_MODE
         self.config_sent = False
@@ -140,22 +146,22 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         raise NotImplementedError()
 
-    def handle_advert(self, *args, **kwargs):
+    def handle_advert(self, scanned_device: BLEDevice, adv_data):
         raise NotImplementedError()
 
 
 class Device(BaseDevice, abc.ABC):
     MQTT_VALUES = None
-    SET_POSTFIX = 'set'
-    SET_POSITION_POSTFIX = 'set_position'  # for covers. Consider rework
-    MAC_TYPE = 'public'
-    MANUFACTURER = None
+    SET_POSTFIX: str = 'set'
+    SET_POSITION_POSTFIX: str = 'set_position'  # for covers. Consider rework
+    MAC_TYPE: str = 'public'
+    MANUFACTURER: str = None  # type: ignore
     CONNECTION_FAILURES_LIMIT = 100
     RECONNECTION_SLEEP_INTERVAL = 60
     ACTIVE_SLEEP_INTERVAL = 60
     PASSIVE_SLEEP_INTERVAL = 60
-    LINKQUALITY_TOPIC = None
-    STATE_TOPIC = DEFAULT_STATE_TOPIC
+    LINKQUALITY_TOPIC: ty.Optional[str] = None
+    STATE_TOPIC: str = DEFAULT_STATE_TOPIC
 
     # secs to sleep if not connected or no data in passive mode
     NOT_READY_SLEEP_INTERVAL = 5
@@ -163,7 +169,7 @@ class Device(BaseDevice, abc.ABC):
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.disconnected_event = aio.Event()
-        self.message_queue = aio.Queue()
+        self.message_queue: aio.Queue = aio.Queue()
         self.mac = mac
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
@@ -359,7 +365,7 @@ class Sensor(Device, abc.ABC):
     # a list of state properties that must be not None at least one of them
     # to send data.
     # E.g. only battery updated, but wait for temperature and humidity
-    REQUIRED_VALUES = ()
+    REQUIRED_VALUES: ty.Sequence[str] = ()
 
     def __init__(self, mac, *args, loop, **kwargs) -> None:
         super().__init__(mac, *args, loop=loop, **kwargs)
@@ -434,7 +440,8 @@ class Sensor(Device, abc.ABC):
 
 
 class SubscribeAndSetDataMixin:
-    DATA_CHAR: uuid.UUID = None
+    DATA_CHAR: uuid.UUID = None  # type: ignore
+    SENSOR_CLASS: ty.Any = None  # type: ignore
 
     def filter_notifications(self, sender):
         return True
