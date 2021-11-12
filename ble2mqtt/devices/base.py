@@ -288,9 +288,19 @@ class Device(BaseDevice, abc.ABC):
         return rssi_to_linkquality(self.rssi)
 
     @property
+    def availability_topic(self):
+        return self._get_topic('availability')
+
+    @property
     @abc.abstractmethod
     def entities(self):
         return {}
+
+    async def send_availability(self, publish_topic, value: bool):
+        await publish_topic(
+            topic=self.availability_topic,
+            value='online' if value else 'offline',
+        )
 
     async def handle_messages(self, *args, **kwargs):
         while True:

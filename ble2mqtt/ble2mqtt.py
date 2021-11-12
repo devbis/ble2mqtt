@@ -244,6 +244,9 @@ class DeviceManager:
                 'availability_mode': 'all',
                 'availability': [
                     {'topic': self._global_availability_topic},
+                    {'topic': '/'.join(
+                        (self._base_topic, self.device.availability_topic),
+                    )},
                 ],
             }
             icon = entity.pop('icon', None)
@@ -479,6 +482,12 @@ class DeviceManager:
         ])
         device.config_sent = True
 
+    async def send_availability(self, value: bool):
+        return await self.device.send_availability(
+            self.publish_topic_callback,
+            value,
+        )
+
     async def _sleep_until_next_connection(self):
         device = self.device
         logger.debug(
@@ -495,6 +504,11 @@ class DeviceManager:
                 pass
         else:
             await aio.sleep(self.device.RECONNECTION_SLEEP_INTERVAL)
+
+    async def publish_topic_with_availability(self, topic, value):
+        # call sequentially to allow HA receive a new value
+        await self.publish_topic_callback(topic, value)
+        await self.send_availability(True)
 
     async def manage_device(self):
         device = self.device
@@ -527,14 +541,16 @@ class DeviceManager:
                     coros = [
                         *[coro() for coro in initial_coros],
                         device.handle(
-                            self.publish_topic_callback,
+                            self.publish_topic_with_availability,
                             send_config=self.send_device_config,
                         ),
                     ]
                     will_handle_messages = bool(device.subscribed_topics)
                     if will_handle_messages:
                         coros.append(
-                            device.handle_messages(self.publish_topic_callback),
+                            device.handle_messages(
+                                self.publish_topic_with_availability,
+                            ),
                         )
 
                     tasks = [aio.create_task(t) for t in coros]
@@ -591,6 +607,7 @@ class DeviceManager:
                     missing_device_count = 0
                     await restart_bluetooth()
             finally:
+                await self.send_availability(False)
                 try:
                     await aio.wait_for(device.close(), timeout=10)
                 except aio.CancelledError:
