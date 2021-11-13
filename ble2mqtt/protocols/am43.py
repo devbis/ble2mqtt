@@ -1,5 +1,4 @@
 import abc
-import asyncio as aio
 import logging
 import uuid
 
@@ -56,10 +55,7 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
         ret = None
         if wait_reply:
             logger.debug(f'[{self}] waiting for reply')
-            ble_notification = await aio.wait_for(
-                self.ble_get_notification(),
-                timeout=timeout,
-            )
+            ble_notification = await self.ble_get_notification(timeout)
             logger.debug(f'[{self}] reply: {repr(ble_notification[1])}')
             ret = bytes(ble_notification[1])
         return ret

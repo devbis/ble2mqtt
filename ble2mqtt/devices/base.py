@@ -92,6 +92,7 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
     def __init__(self, *args, loop, **kwargs):
         self._loop = loop
         self.client: BleakClient = None
+        self.disconnected_event = aio.Event()
         if kwargs.get('passive') and not self.SUPPORT_PASSIVE:
             raise NotImplementedError(
                 'This device doesn\'t support passive mode',
@@ -168,7 +169,6 @@ class Device(BaseDevice, abc.ABC):
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.disconnected_event = aio.Event()
         self.message_queue: aio.Queue = aio.Queue()
         self.mac = mac
         self.friendly_name = kwargs.pop('friendly_name', None)

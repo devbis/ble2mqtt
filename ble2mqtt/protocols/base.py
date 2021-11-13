@@ -30,8 +30,30 @@ class BLEQueueMixin(BaseDevice, abc.ABC):
         if hasattr(self._ble_queue, '_queue'):
             self._ble_queue._queue.clear()
 
-    async def ble_get_notification(self) -> ty.Tuple[int, bytes]:
-        return await self._ble_queue.get()
+    async def ble_get_notification(self, timeout) -> ty.Tuple[int, bytes]:
+        ble_response_task = aio.create_task(self._ble_queue.get())
+        disconnect_wait_task = aio.create_task(self.disconnected_event.wait())
+        await aio.wait(
+            [ble_response_task, disconnect_wait_task],
+            timeout=timeout,
+            return_when=aio.FIRST_COMPLETED,
+        )
+        if ble_response_task.done():
+            disconnect_wait_task.cancel()
+            try:
+                await disconnect_wait_task
+            except aio.CancelledError:
+                pass
+            return await ble_response_task
+        else:
+            ble_response_task.cancel()
+            try:
+                await ble_response_task
+            except aio.CancelledError:
+                pass
+            raise ConnectionError(
+                f'{self} cannot fetch response, device is offline',
+            )
 
 
 class BaseCommand:

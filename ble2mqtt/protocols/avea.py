@@ -80,10 +80,7 @@ class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
             command.answer.set_result(cmd_resp)
             return
 
-        ble_notification = await aio.wait_for(
-            self.ble_get_notification(),
-            timeout=command.timeout,
-        )
+        ble_notification = await self.ble_get_notification(command.timeout)
 
         # extract payload from container
         cmd_resp = bytes(ble_notification[1])
