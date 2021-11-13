@@ -200,14 +200,18 @@ class DeviceManager:
         self.manage_task = aio.create_task(self.manage_device())
         return self.manage_task
 
-    async def publish_topic_callback(self, topic, value):
+    async def publish_topic_callback(self, topic, value, nowait=False):
         logger.debug(f'call publish callback topic={topic} value={value}')
+        if not self._mqtt_client.is_connected():
+            logger.warning(f'{self.device} mqtt is disconnected')
+            return
         await self._mqtt_client.publish(
             aio_mqtt.PublishableMessage(
                 topic_name='/'.join((self._base_topic, topic)),
                 payload=value,
                 qos=aio_mqtt.QOSLevel.QOS_1,
             ),
+            nowait=nowait,
         )
 
     def _get_topic(self, dev_id, subtopic, *args):
@@ -607,9 +611,12 @@ class DeviceManager:
                     missing_device_count = 0
                     await restart_bluetooth()
             finally:
-                await self.send_availability(False)
                 try:
-                    await aio.wait_for(device.close(), timeout=10)
+                    await aio.wait_for(self.send_availability(False), timeout=1)
+                except aio.TimeoutError:
+                    pass
+                try:
+                    await aio.wait_for(device.close(), timeout=5)
                 except aio.CancelledError:
                     raise
                 except Exception:

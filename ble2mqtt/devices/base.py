@@ -300,6 +300,7 @@ class Device(BaseDevice, abc.ABC):
         await publish_topic(
             topic=self.availability_topic,
             value='online' if value else 'offline',
+            nowait=True,
         )
 
     async def handle_messages(self, *args, **kwargs):
