@@ -7,7 +7,7 @@ from bleak.backends.device import BLEDevice
 
 from .base import BINARY_SENSOR_DOMAIN, DEVICE_TRACKER_DOMAIN, Sensor
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -56,7 +56,7 @@ class Presence(Sensor):
             presence=True,
             last_check=datetime.now(),
         )
-        logger.debug(
+        _LOGGER.debug(
             f'Advert received for {self}, current state: {self._state}',
         )
 
@@ -76,7 +76,7 @@ class Presence(Sensor):
                 (datetime.now() - self.last_sent_time).seconds > \
                 self.SEND_DATA_PERIOD:
 
-            logger.debug(f'Try publish {self._state}')
+            _LOGGER.debug(f'Try publish {self._state}')
             await self._notify_state(publish_topic)
             self.last_sent_value = self._state.presence
             self.last_sent_time = datetime.now()

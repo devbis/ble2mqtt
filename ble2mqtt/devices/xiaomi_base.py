@@ -5,7 +5,7 @@ import typing as ty
 from ..protocols.xiaomi import XiaomiPoller
 from .base import SENSOR_DOMAIN
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 class XiaomiHumidityTemperature(XiaomiPoller, abc.ABC):

@@ -12,7 +12,7 @@ from bleak.backends.device import BLEDevice
 from ..devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
 from ..utils import format_binary, rssi_to_linkquality
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 registered_device_types = {}
 
 
@@ -59,7 +59,7 @@ def done_callback(future: aio.Future):
             exc_info,
             exc_info.__traceback__,
         )
-        logger.exception(
+        _LOGGER.exception(
             f'{future} stopped unexpectedly',
             exc_info=exc_info,
         )
@@ -119,7 +119,7 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
                 loop=self._loop,
             )
         except (aio.TimeoutError, BleakError, AttributeError):
-            logger.exception(f'Cannot connect to device {self}')
+            _LOGGER.exception(f'Cannot connect to device {self}')
             result = None
         return result
 
@@ -355,10 +355,10 @@ class Device(BaseDevice, abc.ABC):
             self.disconnected_event.set()
             raise
         self._advertisement_seen.clear()
-        logger.info(f'Connected to {self.client.address}')
+        _LOGGER.info(f'Connected to {self.client.address}')
 
     def _on_disconnect(self, client, *args):
-        logger.debug(f'Client {client.address} disconnected, device={self}')
+        _LOGGER.debug(f'Client {client.address} disconnected, device={self}')
         self.disconnected_event.set()
 
     async def close(self):
@@ -410,7 +410,7 @@ class Sensor(Device, abc.ABC):
         return state
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
+        _LOGGER.info(f'[{self}] send state={self._state}')
         state = self.get_entity_map()
         if state:
             state['linkquality'] = self.linkquality
@@ -462,7 +462,7 @@ class SubscribeAndSetDataMixin:
         self._state = self.SENSOR_CLASS.from_data(data)
 
     def notification_handler(self, sender, data: bytearray):
-        logger.debug("{0} notification: {1}: {2}".format(
+        _LOGGER.debug("{0} notification: {1}: {2}".format(
             self,
             sender,
             format_binary(data),

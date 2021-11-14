@@ -7,7 +7,7 @@ from ..utils import format_binary
 from .uuids import ENVIRONMENTAL_SENSING
 from .xiaomi_base import XiaomiHumidityTemperature
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -57,7 +57,7 @@ class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature):
                     battery=adv_data[9],
                     sends_custom=sends_custom,
                 )
-                logger.debug(
+                _LOGGER.debug(
                     f'Advert received for {self}, {format_binary(adv_data)}, '
                     f'current state: {self._state}',
                 )

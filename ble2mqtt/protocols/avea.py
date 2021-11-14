@@ -8,7 +8,7 @@ from ..devices.base import BaseDevice
 from ..utils import color_rgb_to_rgbw, color_rgbw_to_rgb, format_binary
 from .base import BaseCommand, BLEQueueMixin, SendAndWaitReplyMixin
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 CMD_COLOR = 0x35
 CMD_BRIGHTNESS = 0x57
@@ -40,7 +40,7 @@ class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
         return await aio.wait_for(command.answer, timeout)
 
     async def process_command(self, command: AveaCommand):
-        logger.debug(f'... send cmd {format_binary(command.cmd)}')
+        _LOGGER.debug(f'... send cmd {format_binary(command.cmd)}')
         self.clear_ble_queue()
         cmd_resp = await aio.wait_for(
             self.client.write_gatt_char(self.DATA_CHAR, command.cmd, True),
@@ -148,10 +148,12 @@ class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
             self.convert_value(_g),
             self.convert_value(_b),
         )
-        logger.info(f'Writing color ({(_r, _g, _b, _w)}): {format_binary(cmd)}')
+        _LOGGER.info(
+            f'Writing color ({(_r, _g, _b, _w)}): {format_binary(cmd)}',
+        )
         await self.send_command(cmd)
 
     async def write_brightness(self, brightness):
         cmd = self.get_brightness_cmd(self.convert_value(brightness))
-        logger.info(f'Writing brightness {brightness}: {format_binary(cmd)}')
+        _LOGGER.info(f'Writing brightness {brightness}: {format_binary(cmd)}')
         await self.send_command(cmd)

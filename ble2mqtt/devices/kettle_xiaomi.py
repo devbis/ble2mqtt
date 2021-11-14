@@ -13,7 +13,7 @@ from ..utils import format_binary
 from .base import BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, ConnectionMode, Device
 from .uuids import SOFTWARE_VERSION
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 UUID_SERVICE_KETTLE = uuid.UUID('0000fe95-0000-1000-8000-00805f9b34fb')
@@ -136,7 +136,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         }
 
     def notification_handler(self, sender: int, data: bytearray):
-        logger.debug("Notification: {0}: {1}".format(
+        _LOGGER.debug("Notification: {0}: {1}".format(
             sender,
             format_binary(data),
         ))
@@ -162,7 +162,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
             True,
         )
         auth_response = await aio.wait_for(self.queue.get(), timeout=10)
-        logger.debug(f'{self} auth response: {auth_response}')
+        _LOGGER.debug(f'{self} auth response: {auth_response}')
         await self.client.write_gatt_char(
             UUID_AUTH,
             XiaomiCipherMixin.cipher(self._token, AUTH_MAGIC2),
@@ -178,11 +178,11 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         version = await self.client.read_gatt_char(SOFTWARE_VERSION)
         if version:
             self._version = version.decode()
-        logger.debug(f'{self} version: {version}')
+        _LOGGER.debug(f'{self} version: {version}')
         await self.client.start_notify(UUID_STATUS, self.notification_handler)
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
+        _LOGGER.info(f'[{self}] send state={self._state}')
         state = {}
         for sensor_name, value in (
             (KETTLE_ENTITY, self._state),

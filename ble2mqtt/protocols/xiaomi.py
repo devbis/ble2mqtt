@@ -5,7 +5,7 @@ import uuid
 
 from ..devices.base import Sensor, SubscribeAndSetDataMixin
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 # Xiaomi Humidity/Temperature sensors
@@ -26,7 +26,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
         raise NotImplementedError()
 
     async def handle_active(self, publish_topic, send_config, *args, **kwargs):
-        logger.debug(f'Wait {self} for connecting...')
+        _LOGGER.debug(f'Wait {self} for connecting...')
         sec_to_wait_connection = 0
         while True:
             if not self.client.is_connected:
@@ -38,7 +38,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
                 await aio.sleep(self.NOT_READY_SLEEP_INTERVAL)
                 continue
             try:
-                logger.debug(f'{self} connected!')
+                _LOGGER.debug(f'{self} connected!')
                 # in case of bluetooth error populating queue
                 # could stop and will wait for self._stack.get() forever
                 await self.update_device_data(send_config)
@@ -47,7 +47,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
                     timeout=15,
                 )
             except ValueError as e:
-                logger.error(f'[{self}] Cannot read values {str(e)}')
+                _LOGGER.error(f'[{self}] Cannot read values {str(e)}')
             else:
                 await self.close()
                 return

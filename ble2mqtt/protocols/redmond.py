@@ -11,7 +11,7 @@ from ..devices.base import BaseDevice
 from ..utils import format_binary
 from .base import BaseCommand, BLEQueueMixin, SendAndWaitReplyMixin
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 BOIL_TIME_RELATIVE_DEFAULT = 0x80
@@ -303,7 +303,7 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
 
     async def process_command(self, command: RedmondCommand):
         cmd = self._get_command(command.cmd.value, command.payload)
-        logger.debug(
+        _LOGGER.debug(
             f'... send cmd {command.cmd.value:04x} ['
             f'{format_binary(command.payload, delimiter="")}] '
             f'{format_binary(cmd)}',
@@ -338,7 +338,7 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         assert not self._cmd_queue_task.done()
         # check for fresh client
         assert not self.client._notification_callbacks
-        logger.debug(f'Enable BLE notifications from [{self.client.address}]')
+        _LOGGER.debug(f'Enable BLE notifications from [{self.client.address}]')
         await self.client.write_gatt_char(
             self.TX_CHAR,
             bytearray(0x01.to_bytes(2, byteorder="little")),
@@ -376,24 +376,24 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
 class RedmondCommonProtocol(RedmondBaseProtocol, abc.ABC):
     """ Shared methods between different devices """
     async def login(self, key):
-        logger.debug('logging in...')
+        _LOGGER.debug('logging in...')
         resp = await self.send_command(Command.AUTH, key, True)
         self._check_success(resp, "Not logged in")
 
     async def get_version(self):
-        logger.debug('fetching version...')
+        _LOGGER.debug('fetching version...')
         resp = await self.send_command(Command.VERSION, b'', True)
         version = tuple(resp)
-        logger.debug(f'version: {version}')
+        _LOGGER.debug(f'version: {version}')
         return version
 
     async def run(self):
-        logger.debug('Run mode')
+        _LOGGER.debug('Run mode')
         resp = await self.send_command(Command.RUN_CURRENT_MODE)
         self._check_success(resp)
 
     async def stop(self):
-        logger.debug('Stop mode')
+        _LOGGER.debug('Stop mode')
         resp = await self.send_command(Command.STOP_CURRENT_MODE)
         self._check_success(resp)
 
@@ -405,7 +405,7 @@ class RedmondKettle200Protocol(RedmondCommonProtocol, abc.ABC):
         ts = int(ts)
         offset = time.timezone \
             if (time.localtime().tm_isdst == 0) else time.altzone
-        logger.debug(f'Setting time ts={ts} offset={offset}')
+        _LOGGER.debug(f'Setting time ts={ts} offset={offset}')
         resp = await self.send_command(
             Command.SET_TIME,
             struct.pack('<ii', ts, -offset * 60 * 60),
@@ -413,12 +413,12 @@ class RedmondKettle200Protocol(RedmondCommonProtocol, abc.ABC):
         self._check_zero_response(resp, 'Cannot set time')
 
     async def get_mode(self):
-        logger.debug('Get mode...')
+        _LOGGER.debug('Get mode...')
         response = await self.send_command(Command.READ_MODE)
         return KettleG200State.from_bytes(response)
 
     async def set_mode(self, state: KettleG200State):
-        logger.debug('Set mode...')
+        _LOGGER.debug('Set mode...')
         resp = await self.send_command(
             Command.WRITE_MODE,
             state.to_bytes(),
@@ -450,7 +450,7 @@ class RedmondKettle200Protocol(RedmondCommonProtocol, abc.ABC):
         self._check_zero_response(resp, 'Cannot set color')
 
     async def get_statistics(self):
-        logger.debug('Get statistics')
+        _LOGGER.debug('Get statistics')
         # b'\x00\x00\xdf\x01\x00\x00$\x01\x00\x00\t\x00\x00\x00\x00\x00'
         resp = await self.send_command(Command.GET_STATISTICS, b'\0')
         _, seconds_run, watts_hours, starts, _, _ = \
@@ -462,7 +462,7 @@ class RedmondKettle200Protocol(RedmondCommonProtocol, abc.ABC):
         }
 
     async def get_starts_count(self):
-        logger.debug('Get number of start')
+        _LOGGER.debug('Get number of start')
         # b'\x00\x00\x00\t\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         # b'\x00\x00\x00\n\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         resp = await self.send_command(Command.GET_STARTS_COUNT, b'\0')
@@ -472,12 +472,12 @@ class RedmondKettle200Protocol(RedmondCommonProtocol, abc.ABC):
 
 class RedmondCookerProtocol(RedmondCommonProtocol, abc.ABC):
     async def get_mode(self):
-        logger.debug('Get mode...')
+        _LOGGER.debug('Get mode...')
         response = await self.send_command(Command.READ_MODE)
         return CookerState.from_bytes(response)
 
     async def set_mode(self, state: CookerState, ignore_result=True):
-        logger.debug(f'Set mode {state}...')
+        _LOGGER.debug(f'Set mode {state}...')
         resp = await self.send_command(
             Command.WRITE_MODE,
             state.to_bytes(),
@@ -487,11 +487,11 @@ class RedmondCookerProtocol(RedmondCommonProtocol, abc.ABC):
             raise RedmondError('Cannot set mode')
 
     async def set_predefined_program(self, mode_name: str):
-        logger.debug(f'Set predefined mode {mode_name}...')
+        _LOGGER.debug(f'Set predefined mode {mode_name}...')
         await self.set_mode(COOKER_PREDEFINED_PROGRAMS[mode_name])
 
     async def set_delay(self, minutes: int):
-        logger.debug('Set delay...')
+        _LOGGER.debug('Set delay...')
         resp = await self.send_command(
             Command.WRITE_DELAY,
             bytes([
@@ -504,7 +504,7 @@ class RedmondCookerProtocol(RedmondCommonProtocol, abc.ABC):
             raise RedmondError('Cannot set delay')
 
     async def set_temperature(self, temperature: int):
-        logger.debug('Set temperature...')
+        _LOGGER.debug('Set temperature...')
         resp = await self.send_command(
             Command.WRITE_TEMPERATURE,
             bytes([temperature]),
@@ -514,7 +514,7 @@ class RedmondCookerProtocol(RedmondCommonProtocol, abc.ABC):
             raise RedmondError('Cannot set temperature')
 
     async def set_lock(self, value: bool):
-        logger.debug(f'Set lock {value}...')
+        _LOGGER.debug(f'Set lock {value}...')
         resp = await self.send_command(
             Command.SET_LOCK,
             bytes([1 if value else 0]),
@@ -524,7 +524,7 @@ class RedmondCookerProtocol(RedmondCommonProtocol, abc.ABC):
             raise RedmondError('Cannot set lock')
 
     async def set_sound(self, value: bool):
-        logger.debug(f'Set sound {value}...')
+        _LOGGER.debug(f'Set sound {value}...')
         resp = await self.send_command(
             Command.SET_SOUND,
             bytes([1 if value else 0]),

@@ -9,7 +9,7 @@ from ble2mqtt.devices.base import SENSOR_DOMAIN, ConnectionMode, Sensor
 from ble2mqtt.devices.uuids import DEVICE_NAME
 from ble2mqtt.protocols.wp6003 import WP6003Protocol
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 TX_CHAR = uuid.UUID('0000fff1-0000-1000-8000-00805f9b34fb')
 RX_CHAR = uuid.UUID('0000fff4-0000-1000-8000-00805f9b34fb')
@@ -95,7 +95,7 @@ class VsonWP6003(WP6003Protocol, Sensor):
             try:
                 self._state = SensorState.from_bytes(response)
             except ValueError as e:
-                logger.warning(f'{self} {repr(e)}')
+                _LOGGER.warning(f'{self} {repr(e)}')
                 await aio.sleep(1)
             else:
                 break
@@ -116,10 +116,10 @@ class VsonWP6003(WP6003Protocol, Sensor):
         except (aio.CancelledError, KeyboardInterrupt):
             raise
         except Exception:
-            logger.exception(f'{self} problem with reading values')
+            _LOGGER.exception(f'{self} problem with reading values')
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
+        _LOGGER.info(f'[{self}] send state={self._state}')
         state = self.get_entity_map()
         if state:
             state['linkquality'] = self.linkquality

@@ -9,7 +9,7 @@ from .base import ConnectionMode
 from .uuids import BATTERY
 from .xiaomi_base import XiaomiHumidityTemperature
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 MJHT_DATA = uuid.UUID('226caa55-6476-4566-7562-66734470666d')
 ADVERTISING = uuid.UUID('0000fe95-0000-1000-8000-00805f9b34fb')
@@ -77,7 +77,7 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature):
                 self._state.temperature = from_word(adv_data[14:16])
                 self._state.humidity = from_word(adv_data[16:18])
 
-            logger.debug(
+            _LOGGER.debug(
                 f'Advert received for {self}, {format_binary(adv_data)}, '
                 f'current state: {self._state}',
             )

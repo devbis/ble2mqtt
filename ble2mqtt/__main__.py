@@ -8,7 +8,7 @@ from ble2mqtt.ble2mqtt import Ble2Mqtt
 
 from .devices import registered_device_types
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 is_shutting_down: aio.Lock = aio.Lock()
 
@@ -19,26 +19,26 @@ async def shutdown(loop, service: Ble2Mqtt, signal=None):
         return
     async with is_shutting_down:
         if signal:
-            logger.info(f"Received exit signal {signal.name}...")
-        logger.info("Closing ble2mqtt service")
+            _LOGGER.info(f"Received exit signal {signal.name}...")
+        _LOGGER.info("Closing ble2mqtt service")
         await service.close()
         tasks = [t for t in aio.all_tasks() if t is not aio.current_task()]
 
         [task.cancel() for task in tasks]
 
-        logger.info(f"Cancelling {len(tasks)} outstanding tasks")
+        _LOGGER.info(f"Cancelling {len(tasks)} outstanding tasks")
         try:
             await aio.wait_for(
                 aio.gather(*tasks, return_exceptions=True),
                 timeout=10,
             )
         except (Exception, aio.CancelledError):
-            logger.exception(f'Cancelling caused error: {tasks}')
+            _LOGGER.exception(f'Cancelling caused error: {tasks}')
         loop.stop()
 
 
 def handle_exception(loop, context, service):
-    logger.error(f"Caught exception: {context}")
+    _LOGGER.error(f"Caught exception: {context}")
     loop.default_exception_handler(context)
     exception_str = context.get('task') or context.get('future') or ''
     exception = context.get('exception')
@@ -49,7 +49,7 @@ def handle_exception(loop, context, service):
         # Task was destroyed but it is pending!
         # Need further investigating.
         # Skip this exception for now.
-        logger.info("Ignore this exception.")
+        _LOGGER.info("Ignore this exception.")
         return
 
     if "'NoneType' object has no attribute" in \
@@ -58,16 +58,16 @@ def handle_exception(loop, context, service):
         # AttributeError: 'NoneType' object has no attribute 'set'
         # await self._disconnect_monitor_event.wait()
         # AttributeError: 'NoneType' object has no attribute 'wait'
-        logger.info("Ignore this exception.")
+        _LOGGER.info("Ignore this exception.")
         return
 
     if isinstance(exception, BrokenPipeError):
         # task = asyncio.ensure_future(self._cleanup_all())
         # in bluezdbus/client.py: _parse_msg() can fail while remove_match()
-        logger.info("Ignore this exception.")
+        _LOGGER.info("Ignore this exception.")
         return
 
-    logger.info("Shutting down...")
+    _LOGGER.info("Shutting down...")
     aio.create_task(shutdown(loop, service))
 
 
@@ -107,7 +107,7 @@ async def amain(config):
     try:
         await service.start()
     except KeyboardInterrupt:
-        logger.info('Exiting...')
+        _LOGGER.info('Exiting...')
     finally:
         await service.close()
 
@@ -134,13 +134,13 @@ def main():
 
     logging.basicConfig(level=config['log_level'].upper())
     # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
-    logger.info(f'Starting BLE2MQTT version {VERSION}')
+    _LOGGER.info(f'Starting BLE2MQTT version {VERSION}')
 
     try:
         aio.run(amain(config), debug=(config['log_level'].upper() == 'DEBUG'))
     except KeyboardInterrupt:
         pass
-    logger.info('Bye.')
+    _LOGGER.info('Bye.')
 
 
 if __name__ == '__main__':

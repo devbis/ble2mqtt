@@ -6,7 +6,7 @@ import typing as ty
 from ..devices.base import BaseDevice
 from ..utils import format_binary
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 class BLEQueueMixin(BaseDevice, abc.ABC):
@@ -18,7 +18,7 @@ class BLEQueueMixin(BaseDevice, abc.ABC):
         """
         This method must be used as notification callback for BLE connection
         """
-        logger.debug(f'Notification: {sender_handle}: {format_binary(data)}')
+        _LOGGER.debug(f'Notification: {sender_handle}: {format_binary(data)}')
         self._loop.call_soon_threadsafe(
             self._ble_queue.put_nowait, (sender_handle, data),
         )
@@ -83,12 +83,12 @@ class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
             try:
                 await self.process_command(command)
             except aio.CancelledError:
-                logger.exception(f'{self} _handle_cmd_queue is cancelled!')
+                _LOGGER.exception(f'{self} _handle_cmd_queue is cancelled!')
                 raise
             except Exception as e:
                 if command and not command.answer.done():
                     command.answer.set_exception(e)
-                logger.exception(
+                _LOGGER.exception(
                     f'{self} raise an error in handle_queue, ignore it',
                 )
 
@@ -108,7 +108,7 @@ class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
                 exc_info,
                 exc_info.__traceback__,
             )
-            logger.exception(
+            _LOGGER.exception(
                 f'{self} _handle_cmd_queue() stopped unexpectedly',
                 exc_info=exc_info,
             )

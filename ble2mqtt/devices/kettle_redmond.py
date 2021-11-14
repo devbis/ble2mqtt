@@ -9,7 +9,7 @@ from .base import (LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
                    Device)
 from .uuids import DEVICE_NAME
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 UUID_NORDIC_TX = uuid.UUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
 UUID_NORDIC_RX = uuid.UUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
@@ -113,7 +113,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         )
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
+        _LOGGER.info(f'[{self}] send state={self._state}')
         coros = []
 
         state = {'linkquality': self.linkquality}
@@ -133,7 +133,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             ))
 
         # keep statistics in a separate topic
-        logger.info(f'[{self}] send statistics={self._statistics}')
+        _LOGGER.info(f'[{self}] send statistics={self._statistics}')
         for sensor_name, value in (
             ('statistics', self._statistics),
         ):
@@ -276,7 +276,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 skip_unique_id=True,
             ):
                 value = self.transform_value(value)
-                logger.info(
+                _LOGGER.info(
                     f'[{self}] switch kettle {BOIL_ENTITY} value={value}',
                 )
                 while True:
@@ -294,7 +294,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                         )
                         break
                     except ConnectionError as e:
-                        logger.exception(str(e))
+                        _LOGGER.exception(str(e))
                     await aio.sleep(5)
                 continue
 
@@ -303,7 +303,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 entity,
                 skip_unique_id=True,
             ):
-                logger.info(f'set backlight {value}')
+                _LOGGER.info(f'set backlight {value}')
                 if value.get('state'):
                     await self._switch_backlight(value['state'])
                 if value.get('color') or value.get('brightness'):

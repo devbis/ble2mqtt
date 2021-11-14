@@ -9,7 +9,7 @@ from ble2mqtt.protocols.base import (BaseCommand, BLEQueueMixin,
                                      SendAndWaitReplyMixin)
 from ble2mqtt.utils import format_binary
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 CMD_SET_TIME = 0xaa
@@ -67,7 +67,7 @@ class WP6003Protocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         return await aio.wait_for(command.answer, timeout)
 
     async def process_command(self, command: WP6003Command):
-        logger.debug(f'... send cmd {format_binary(command.cmd)}')
+        _LOGGER.debug(f'... send cmd {format_binary(command.cmd)}')
         self.clear_ble_queue()
         cmd_resp = await aio.wait_for(
             self.client.write_gatt_char(self.TX_CHAR, command.cmd),

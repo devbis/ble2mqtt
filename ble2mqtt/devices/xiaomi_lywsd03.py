@@ -7,7 +7,7 @@ from ..utils import cr2032_voltage_to_percent
 from .base import ConnectionMode
 from .xiaomi_base import XiaomiHumidityTemperature
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 LYWSD_DATA = uuid.UUID('EBE0CCC1-7A0A-4B0C-8A1A-6FF2997DA3A6')
 LYWSD_BATTERY = uuid.UUID('EBE0CCC4-7A0A-4B0C-8A1A-6FF2997DA3A6')

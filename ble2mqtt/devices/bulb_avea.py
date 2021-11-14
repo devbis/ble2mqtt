@@ -9,7 +9,7 @@ from ble2mqtt.protocols.avea import AveaProtocol
 
 AVEA_CONTROL = uuid.UUID("f815e811-456c-6761-746f-4d756e696368")
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 LIGHT_ENTITY = 'light'
 
@@ -47,7 +47,7 @@ class AveaBulb(AveaProtocol, Device):
         try:
             self._model = await self.read_name()
         except Exception as e:
-            logger.warning(f'[{self}] Cannot read name: {e}')
+            _LOGGER.warning(f'[{self}] Cannot read name: {e}')
             self._model = 'Bulb'
         version = await self._read_with_timeout(FIRMWARE_VERSION)
         if isinstance(version, (bytes, bytearray)):
@@ -85,7 +85,7 @@ class AveaBulb(AveaProtocol, Device):
                 self.get_entity_by_name(LIGHT_DOMAIN, LIGHT_ENTITY),
                 skip_unique_id=True,
             ):
-                logger.info(f'[{self}] set light {value}')
+                _LOGGER.info(f'[{self}] set light {value}')
 
                 if value.get('brightness'):
                     self._brightness = value['brightness']
@@ -124,7 +124,7 @@ class AveaBulb(AveaProtocol, Device):
         self._brightness = value
 
     async def _notify_state(self, publish_topic):
-        logger.info(
+        _LOGGER.info(
             f'[{self}] send color={self._color}, brightness={self._brightness}',
         )
         coros = []

@@ -6,7 +6,7 @@ from ..devices.base import BaseDevice
 from ..utils import format_binary
 from .base import BLEQueueMixin
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 # command IDs
 AM43_CMD_MOVE = 0x0a
@@ -43,7 +43,7 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
 
     async def send_command(self, cmd_id, data: list,
                            wait_reply=True, timeout=25):
-        logger.debug(f'[{self}] - send command 0x{cmd_id:x} {data}')
+        _LOGGER.debug(f'[{self}] - send command 0x{cmd_id:x} {data}')
         cmd = bytearray([0x9a, cmd_id, len(data)] + data)
         csum = 0
         for x in cmd:
@@ -54,9 +54,9 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
         await self.client.write_gatt_char(self.DATA_CHAR, cmd)
         ret = None
         if wait_reply:
-            logger.debug(f'[{self}] waiting for reply')
+            _LOGGER.debug(f'[{self}] waiting for reply')
             ble_notification = await self.ble_get_notification(timeout)
-            logger.debug(f'[{self}] reply: {repr(ble_notification[1])}')
+            _LOGGER.debug(f'[{self}] reply: {repr(ble_notification[1])}')
             ret = bytes(ble_notification[1])
         return ret
 
@@ -131,13 +131,13 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
             self.handle_illuminance(int(data[4]) * 12.5)
         elif data[1] in [AM43_CMD_MOVE, AM43_CMD_SET_POSITION]:
             if data[3] != AM43_RESPONSE_ACK:
-                logger.error(f'[{self}] Problem with moving: NACK')
+                _LOGGER.error(f'[{self}] Problem with moving: NACK')
         elif data[1] in [AM43_REPLY_UNKNOWN1, AM43_REPLY_UNKNOWN2]:
             # [9a a8 00 32]
             # [9a a9 10 00 00 00 11 00 00 00 00 01 00 00 11 00 00 00 00 22]
             pass
         else:
-            logger.error(
+            _LOGGER.error(
                 f'{self} BLE notification unknown response '
                 f'[{format_binary(data)}]',
             )

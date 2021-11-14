@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from .base import (SENSOR_DOMAIN, ConnectionMode, Sensor,
                    SubscribeAndSetDataMixin)
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 MAIN_DATA = uuid.UUID('70BC767E-7A1A-4304-81ED-14B9AF54F7BD')
 

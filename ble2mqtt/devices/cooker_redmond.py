@@ -11,7 +11,7 @@ from .base import (SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
                    Device)
 from .uuids import DEVICE_NAME
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 UUID_NORDIC_TX = uuid.UUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
 UUID_NORDIC_RX = uuid.UUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
@@ -137,7 +137,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
         )
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
+        _LOGGER.info(f'[{self}] send state={self._state}')
         coros = []
 
         state = {'linkquality': self.linkquality}
@@ -242,7 +242,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
         @asynccontextmanager
         async def process_entity_change(entity, value):
             value = self.transform_value(value)
-            logger.info(
+            _LOGGER.info(
                 f'[{self}] switch cooker {entity["name"]} value={value}',
             )
             for _ in range(10):
@@ -260,7 +260,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                     )
                     break
                 except ConnectionError as e:
-                    logger.exception(str(e))
+                    _LOGGER.exception(str(e))
                 await aio.sleep(5)
 
         while True:
@@ -285,7 +285,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                     try:
                         await self.switch_running_mode(value)
                     except RedmondError:
-                        logger.exception(
+                        _LOGGER.exception(
                             f'[{self}] Problem with switching cooker',
                         )
                 continue
@@ -310,9 +310,9 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                 try:
                     value = option_to_const(value)
                 except KeyError:
-                    logger.error(f'{self} program "{value}" does not exist')
+                    _LOGGER.error(f'{self} program "{value}" does not exist')
                     continue
-                logger.info(f'set predefined program {value}')
+                _LOGGER.info(f'set predefined program {value}')
 
                 while True:
                     try:
@@ -331,6 +331,6 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                         )
                         break
                     except ConnectionError as e:
-                        logger.exception(str(e))
+                        _LOGGER.exception(str(e))
                     await aio.sleep(5)
                 continue

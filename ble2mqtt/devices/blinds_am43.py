@@ -10,7 +10,7 @@ from ..protocols.am43 import AM43Protocol
 from .base import (COVER_DOMAIN, SENSOR_DOMAIN, ConnectionMode, CoverRunState,
                    Device)
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 COVER_ENTITY = 'cover'
 
@@ -78,7 +78,7 @@ class AM43Cover(AM43Protocol, Device):
         await self._get_full_state()
 
     async def _notify_state(self, publish_topic):
-        logger.info(f'[{self}] send state={self._state}')
+        _LOGGER.info(f'[{self}] send state={self._state}')
         coros = []
 
         state = {'linkquality': self.linkquality}
@@ -119,20 +119,20 @@ class AM43Cover(AM43Protocol, Device):
             timer += self.ACTIVE_SLEEP_INTERVAL
             if timer >= self.SEND_DATA_PERIOD * multiplier:
                 if is_running:
-                    logger.debug(f'[{self}] check for position')
+                    _LOGGER.debug(f'[{self}] check for position')
                     await self._get_position()
                     if self._state.position == self.CLOSED_POSITION:
-                        logger.info(
+                        _LOGGER.info(
                             f'[{self}] Minimum position reached. Set to CLOSED',
                         )
                         self._state.run_state = CoverRunState.CLOSED
                     elif self._state.position == self.OPEN_POSITION:
-                        logger.info(
+                        _LOGGER.info(
                             f'[{self}] Maximum position reached. Set to OPEN',
                         )
                         self._state.run_state = CoverRunState.OPEN
                 else:
-                    logger.debug(f'[{self}] check for full state')
+                    _LOGGER.debug(f'[{self}] check for full state')
                     await self._get_full_state()
                 await self._notify_state(publish_topic)
                 timer = 0
@@ -167,7 +167,7 @@ class AM43Cover(AM43Protocol, Device):
                     else:
                         self._state.run_state = CoverRunState.STOPPED
             else:
-                logger.error(
+                _LOGGER.error(
                     f'[{self}] Incorrect position value: '
                     f'{repr(target_position)}',
                 )
@@ -198,7 +198,7 @@ class AM43Cover(AM43Protocol, Device):
                 value = self.transform_value(value)
                 target_position = None
                 if action_postfix == self.SET_POSTFIX:
-                    logger.info(
+                    _LOGGER.info(
                         f'[{self}] set mode {entity_topic} to "{value}"',
                     )
                     if value.lower() == 'open':
@@ -211,7 +211,7 @@ class AM43Cover(AM43Protocol, Device):
                         movement_type = MovementType.STOP
                 elif action_postfix == self.SET_POSITION_POSTFIX:
                     movement_type = MovementType.POSITION
-                    logger.info(
+                    _LOGGER.info(
                         f'[{self}] set position {entity_topic} to "{value}"',
                     )
                     try:
@@ -219,7 +219,7 @@ class AM43Cover(AM43Protocol, Device):
                     except ValueError:
                         pass
                 else:
-                    logger.warning(
+                    _LOGGER.warning(
                         f'[{self}] unknows action postfix {action_postfix}',
                     )
                     continue
@@ -230,5 +230,5 @@ class AM43Cover(AM43Protocol, Device):
                         await self._notify_state(publish_topic)
                         break
                     except ConnectionError as e:
-                        logger.exception(str(e))
+                        _LOGGER.exception(str(e))
                     await aio.sleep(5)
