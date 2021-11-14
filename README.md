@@ -6,7 +6,7 @@
 - Any bluetooth device can work as a presence tracker
 
 ### Kettles
-- **Redmond RK-G2xxS series (redmond_rk_g200)**
+- **Redmond RK-G2xxS series (type: redmond_rk_g200)**
 
   The default key that is used is `"ffffffffffffffff"`
   and can be omitted in the config.
@@ -14,7 +14,7 @@
   key in the config file for the device: 
   `"key": "16 random hex numbers"`
 
-- **Mi Kettle (mikettle)**
+- **Mi Kettle (type: mikettle)**
 
   Use correct `product_id` for your kettle:
   - yunmi.kettle.v1: `131`
@@ -22,7 +22,7 @@
   - yunmi.kettle.v7: `1116`
 
 ### Multi-Cookers
-- **Redmond RMC-M225S, RMC-M227S (redmond_rmc_m200)**
+- **Redmond RMC-M225S, RMC-M227S (type: redmond_rmc_m200)**
 
   Notes about the key parameter you can read above for the 
   Redmond kettles. 
@@ -31,23 +31,26 @@
   on the device panel.*
 
 ### Humidity sensors
-- **Xiaomi MJ_HT_V1 (xiaomihtv1)**
-- **Xiaomi LYWSD03MMC (xiaomilywsd)** (due to the connection to the device on 
+- **Xiaomi MJ_HT_V1 (type: xiaomihtv1)**
+- **Xiaomi LYWSD03MMC (type: xiaomilywsd)** (due to the connection to the device on 
   every data fetch, it consumes more battery power. Flashing to the custom
   firmware is recommended)
 - **Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)**
   - supported both atc1441 and pvvx formats
 
+### Air sensors
+- **Vson WP6003 (type: wp6003)**
+
 ### Blinds
-- **Generic AM43 (am43)**
+- **Generic AM43 (type: am43)**
 
   Manufacturer can be A-OK, Zemismart, etc.
 
 ### Bulbs
-- **Avea RGBW bulbs (avea_rgbw)**
+- **Avea RGBW bulbs (type: avea_rgbw)**
 
 ### Dosimeters
-- **Atom Fast (atomfast)**
+- **Atom Fast (type: atomfast)**
 
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
