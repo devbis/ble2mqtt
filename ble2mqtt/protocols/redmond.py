@@ -260,11 +260,9 @@ COOKER_PREDEFINED_PROGRAMS = {
 
 
 class RedmondCommand(BaseCommand):
-    def __init__(self, cmd, payload, wait_reply, timeout, *args, **kwargs):
+    def __init__(self, cmd, payload, *args, **kwargs):
         super().__init__(cmd, *args, **kwargs)
         self.payload = payload
-        self.wait_reply = wait_reply
-        self.timeout = timeout
 
 
 class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
@@ -278,28 +276,6 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._cmd_counter = 0
-        self.run_queue_handler(self._loop)
-        self._cmd_queue_task.add_done_callback(
-            self._queue_handler_done_callback,
-        )
-
-    def _queue_handler_done_callback(self, future: aio.Future):
-        exc_info = None
-        try:
-            exc_info = future.exception()
-        except aio.CancelledError:
-            pass
-
-        if exc_info is not None:
-            exc_info = (  # type: ignore
-                type(exc_info),
-                exc_info,
-                exc_info.__traceback__,
-            )
-            logger.exception(
-                f'{self} _handle_cmd_queue() stopped unexpectedly',
-                exc_info=exc_info,
-            )
 
     def _get_command(self, cmd: int, payload: bytes):
         container = struct.pack(
@@ -316,7 +292,12 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
 
     async def send_command(self, cmd: Command, payload: bytes = b'',
                            wait_reply=True, timeout=25):
-        command = RedmondCommand(cmd, payload, wait_reply, timeout)
+        command = RedmondCommand(
+            cmd,
+            payload=payload,
+            wait_reply=wait_reply,
+            timeout=timeout,
+        )
         await self.cmd_queue.put(command)
         return await aio.wait_for(command.answer, timeout)
 

@@ -56,8 +56,6 @@ class RedmondCooker(RedmondCookerProtocol, Device):
         self._send_data_period_multiplier = \
             self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         self.initial_status_sent = False
-        self.init_ble_queue(loop)
-        self.init_cmd_queue(loop)
 
     @property
     def entities(self):

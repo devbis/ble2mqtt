@@ -34,8 +34,8 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
 
     def __init__(self, mac, key='ffffffffffffffff',
-                 *args, loop, **kwargs):
-        super().__init__(mac, *args, loop=loop, **kwargs)
+                 *args, **kwargs):
+        super().__init__(mac, *args, **kwargs)
         assert isinstance(key, str) and len(key) == 16
         self._key = bytes.fromhex(key)
         self._state = None
@@ -46,8 +46,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         self._send_data_period_multiplier = \
             self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         self.initial_status_sent = False
-        self.init_ble_queue(loop)
-        self.init_cmd_queue(loop)
 
     @property
     def entities(self):

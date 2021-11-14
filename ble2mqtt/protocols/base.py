@@ -12,10 +12,7 @@ logger = logging.getLogger(__name__)
 class BLEQueueMixin(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._ble_queue = None
-
-    def init_ble_queue(self, loop):
-        self._ble_queue = aio.Queue(loop=loop)
+        self._ble_queue = aio.Queue(loop=self._loop)
 
     def notification_callback(self, sender_handle: int, data: bytearray):
         """
@@ -57,24 +54,23 @@ class BLEQueueMixin(BaseDevice, abc.ABC):
 
 
 class BaseCommand:
-    def __init__(self, cmd, *args, **kwargs):
+    def __init__(self, cmd, *args, wait_reply, timeout, **kwargs):
         self.cmd = cmd
         self.answer = aio.Future()
+        self.wait_reply = wait_reply
+        self.timeout = timeout
 
 
-class SendAndWaitReplyMixin:
+class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cmd_queue: aio.Queue[BaseCommand] = None
-        self._cmd_queue_task = ty.Optional[aio.Task]
-
-    def init_cmd_queue(self, loop):
-        self.cmd_queue = aio.Queue(loop=loop)
-
-    def run_queue_handler(self, loop):
+        self.cmd_queue: aio.Queue[BaseCommand] = aio.Queue(loop=self._loop)
         self._cmd_queue_task = aio.ensure_future(
             self._handle_cmd_queue(),
-            loop=loop,
+            loop=self._loop,
+        )
+        self._cmd_queue_task.add_done_callback(
+            self._queue_handler_done_callback,
         )
 
     def clear_cmd_queue(self):
@@ -98,3 +94,21 @@ class SendAndWaitReplyMixin:
 
     async def process_command(self, command):
         raise NotImplementedError()
+
+    def _queue_handler_done_callback(self, future: aio.Future):
+        exc_info = None
+        try:
+            exc_info = future.exception()
+        except aio.CancelledError:
+            pass
+
+        if exc_info is not None:
+            exc_info = (  # type: ignore
+                type(exc_info),
+                exc_info,
+                exc_info.__traceback__,
+            )
+            logger.exception(
+                f'{self} _handle_cmd_queue() stopped unexpectedly',
+                exc_info=exc_info,
+            )

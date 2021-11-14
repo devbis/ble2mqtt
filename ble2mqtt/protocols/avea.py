@@ -16,21 +16,11 @@ CMD_NAME = 0x58
 
 
 class AveaCommand(BaseCommand):
-    def __init__(self, cmd, wait_reply, timeout, *args, **kwargs):
-        super().__init__(cmd, *args, **kwargs)
-        self.wait_reply = wait_reply
-        self.timeout = timeout
+    pass
 
 
 class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
     DATA_CHAR: uuid.UUID = None  # type: ignore
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.run_queue_handler(self._loop)
-        self._cmd_queue_task.add_done_callback(
-            self._queue_handler_done_callback,
-        )
 
     async def get_device_data(self):
         if self.DATA_CHAR:
@@ -45,27 +35,9 @@ class AveaProtocol(BLEQueueMixin, SendAndWaitReplyMixin, BaseDevice, abc.ABC):
 
     async def send_command(self, cmd: bytes = b'',
                            wait_reply=False, timeout=10):
-        command = AveaCommand(cmd, wait_reply, timeout)
+        command = AveaCommand(cmd, wait_reply=wait_reply, timeout=timeout)
         await self.cmd_queue.put(command)
         return await aio.wait_for(command.answer, timeout)
-
-    def _queue_handler_done_callback(self, future: aio.Future):
-        exc_info = None
-        try:
-            exc_info = future.exception()
-        except aio.CancelledError:
-            pass
-
-        if exc_info is not None:
-            exc_info = (  # type: ignore
-                type(exc_info),
-                exc_info,
-                exc_info.__traceback__,
-            )
-            logger.exception(
-                f'{self} _handle_cmd_queue() stopped unexpectedly',
-                exc_info=exc_info,
-            )
 
     async def process_command(self, command: AveaCommand):
         logger.debug(f'... send cmd {format_binary(command.cmd)}')

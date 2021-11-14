@@ -377,6 +377,7 @@ class Sensor(Device, abc.ABC):
     # to send data.
     # E.g. only battery updated, but wait for temperature and humidity
     REQUIRED_VALUES: ty.Sequence[str] = ()
+    READ_DATA_IN_ACTIVE_LOOP: bool = False
 
     def __init__(self, mac, *args, loop, **kwargs) -> None:
         super().__init__(mac, *args, loop=loop, **kwargs)
@@ -427,7 +428,7 @@ class Sensor(Device, abc.ABC):
     async def handle_active(self, publish_topic, send_config, *args, **kwargs):
         while True:
             await self.update_device_data(send_config)
-            if not self._state:
+            if not self.READ_DATA_IN_ACTIVE_LOOP and not self._state:
                 await aio.sleep(self.NOT_READY_SLEEP_INTERVAL)
                 continue
 

@@ -31,8 +31,6 @@ class AveaBulb(AveaProtocol, Device):
         self._brightness = 255
 
         self.initial_status_sent = False
-        self.init_ble_queue(self._loop)
-        self.init_cmd_queue(self._loop)
 
     @property
     def entities(self):

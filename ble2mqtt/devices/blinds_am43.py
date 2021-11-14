@@ -68,7 +68,6 @@ class AM43Cover(AM43Protocol, Device):
         super().__init__(*args, **kwargs)
         self._model = 'AM43'
         self._state = AM43State()
-        self.init_ble_queue(self._loop)
 
     async def get_device_data(self):
         await super().get_device_data()
