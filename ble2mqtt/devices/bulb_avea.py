@@ -59,7 +59,7 @@ class AveaBulb(AveaProtocol, Device):
             await self.update_device_data(send_config)
             await self.read_state()
 
-            if timer >= self.SEND_DATA_PERIOD:
+            if not self.initial_status_sent or timer >= self.SEND_DATA_PERIOD:
                 await self._notify_state(publish_topic)
                 timer = 0
             timer += self.ACTIVE_SLEEP_INTERVAL
@@ -156,3 +156,4 @@ class AveaBulb(AveaProtocol, Device):
                 ))
         if coros:
             await aio.gather(*coros)
+            self.initial_status_sent = True

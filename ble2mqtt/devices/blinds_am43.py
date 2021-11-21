@@ -68,6 +68,7 @@ class AM43Cover(AM43Protocol, Device):
         super().__init__(*args, **kwargs)
         self._model = 'AM43'
         self._state = AM43State()
+        self.initial_status_sent = False
 
     async def get_device_data(self):
         await super().get_device_data()
@@ -98,6 +99,7 @@ class AM43Cover(AM43Protocol, Device):
                 ))
         if coros:
             await aio.gather(*coros)
+            self.initial_status_sent = True
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         # request every SEND_DATA_PERIOD if running and
@@ -117,7 +119,8 @@ class AM43Cover(AM43Protocol, Device):
             )
 
             timer += self.ACTIVE_SLEEP_INTERVAL
-            if timer >= self.SEND_DATA_PERIOD * multiplier:
+            if not self.initial_status_sent or \
+                    timer >= self.SEND_DATA_PERIOD * multiplier:
                 if is_running:
                     _LOGGER.debug(f'[{self}] check for position')
                     await self._get_position()
