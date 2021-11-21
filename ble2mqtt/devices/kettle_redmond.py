@@ -17,6 +17,7 @@ UUID_NORDIC_RX = uuid.UUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
 BOIL_ENTITY = 'boil'
 HEAT_ENTITY = 'heat'  # not implemented yet
 TEMPERATURE_ENTITY = 'temperature'
+ENERGY_ENTITY = 'energy'
 LIGHT_ENTITY = 'backlight'
 
 
@@ -42,6 +43,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         self._color = (255, 255, 255)
         self._brightness = 255
         self._statistics = {}
+        self._energy = None
 
         self._send_data_period_multiplier = \
             self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
@@ -62,6 +64,11 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'name': TEMPERATURE_ENTITY,
                     'device_class': 'temperature',
                     'unit_of_measurement': '\u00b0C',
+                },
+                {
+                    'name': ENERGY_ENTITY,
+                    'device_class': 'energy',
+                    'unit_of_measurement': 'Wh',
                 },
                 {
                     'name': 'statistics',
@@ -119,6 +126,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
         state = {'linkquality': self.linkquality}
         for sensor_name, value in (
             (TEMPERATURE_ENTITY, self._state.temperature),
+            (ENERGY_ENTITY, self._energy),
         ):
             if any(
                     x['name'] == sensor_name
@@ -213,6 +221,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             'Energy spent (kWh)': round(statistics['watts_hours']/1000, 2),
             'Working time (minutes)': round(statistics['seconds_run']/60, 1),
         }
+        self._energy = statistics['watts_hours']
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         counter = 0
