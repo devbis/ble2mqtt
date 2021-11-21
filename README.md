@@ -3,7 +3,9 @@
 ## Supported devices:
 
 ### Any device
-- Any bluetooth device can work as a presence tracker
+- Any bluetooth device can work as a presence tracker 
+  You can provide `"threshold"` parameter to the device to set the limit in 
+  second when the device is considered away. The default value is 180 seconds.
 
 ### Kettles
 - **Redmond RK-G2xxS series (type: redmond_rk_g200)**

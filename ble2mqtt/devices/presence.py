@@ -26,7 +26,7 @@ class Presence(Sensor):
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False
     MANUFACTURER = 'Generic'
-    THRESHOLD = 120  # if no activity more than THRESHOLD, consider presence=OFF
+    THRESHOLD = 300  # if no activity more than THRESHOLD, consider presence=OFF
     PASSIVE_SLEEP_INTERVAL = 1
     SEND_DATA_PERIOD = 60
 
@@ -34,6 +34,7 @@ class Presence(Sensor):
         super().__init__(*args, **kwargs)
         cls = self.SENSOR_CLASS
         self._state: cls = None
+        self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
 
     @property
     def entities(self):
@@ -68,7 +69,7 @@ class Presence(Sensor):
     async def do_passive_loop(self, publish_topic):
         if self._state.presence and \
                 self._state.last_check + \
-                timedelta(seconds=self.THRESHOLD) < datetime.now():
+                timedelta(seconds=self._threshold) < datetime.now():
             self._state.presence = False
         # send if changed or update value every SEND_DATA_PERIOD secs
         if self.last_sent_value is None or \
