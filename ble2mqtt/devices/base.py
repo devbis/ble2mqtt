@@ -347,7 +347,9 @@ class Device(BaseDevice, abc.ABC):
         )
         self.disconnected_event.clear()
         try:
-            await self.client.connect()
+            # 10 is the implicit timeout in bleak client, add 2 more seconds
+            # for internal routines
+            await aio.wait_for(self.client.connect(), timeout=12)
         except aio.TimeoutError as e:
             self.disconnected_event.set()
             raise ConnectionTimeoutError() from e
