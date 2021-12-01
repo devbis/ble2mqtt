@@ -68,7 +68,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 {
                     'name': ENERGY_ENTITY,
                     'device_class': 'energy',
-                    'unit_of_measurement': 'Wh',
+                    'unit_of_measurement': 'kWh',
                 },
                 {
                     'name': 'statistics',
@@ -221,7 +221,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             'Energy spent (kWh)': round(statistics['watts_hours']/1000, 2),
             'Working time (minutes)': round(statistics['seconds_run']/60, 1),
         }
-        self._energy = statistics['watts_hours']
+        self._energy = round(statistics['watts_hours']/1000, 2)
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         counter = 0
