@@ -678,7 +678,7 @@ class Ble2Mqtt:
 
         self._reconnection_interval = reconnection_interval
         self._loop = loop or aio.get_event_loop()
-        BLUETOOTH_RESTARTING = aio.Lock(loop=self._loop)
+        BLUETOOTH_RESTARTING = aio.Lock()
 
         self._mqtt_client = aio_mqtt.Client(
             client_id_prefix=f'{base_topic}_',
