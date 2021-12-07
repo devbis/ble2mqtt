@@ -1,9 +1,11 @@
 import logging
+import typing as ty
 import uuid
 from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
+from ..protocols.xiaomi import parse_fe95_advert
 from ..utils import format_binary
 from .base import ConnectionMode
 from .uuids import BATTERY
@@ -20,6 +22,7 @@ class SensorState:
     battery: int = 0
     temperature: float = 0
     humidity: float = 0
+    voltage: ty.Optional[float] = None
 
     @classmethod
     def from_data(cls, sensor_data, battery_data):
@@ -56,26 +59,21 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature):
         service_data = adv_data.service_data
         adv_data = service_data.get(str(ADVERTISING))
 
-        def from_word(data):
-            return int.from_bytes(data, byteorder='little', signed=True) / 10
-
         if adv_data:
-            #                 <----- mac -----> typ  len <-- data -->
+            # frctrl devic id <----- mac -----> type len <-- data -->
             # [50 20 aa 01 e4 69 e0 32 34 2d 58 0d 10 04 df 00 55 01]
             # [50 20 aa 01 80 69 e0 32 34 2d 58 0d 10 04 d6 00 29 01]
-            adv_data = bytes(adv_data)
-            typ = adv_data[11]
+
+            try:
+                parsed_advert = parse_fe95_advert(bytes(adv_data))
+            except (ValueError, IndexError):
+                _LOGGER.exception(f'{self} Cannot parse advert packet')
+                return
+
             if self._state is None:
                 self._state = self.SENSOR_CLASS()
-            if typ == 0x04:  # temperature
-                self._state.temperature = from_word(adv_data[14:16])
-            if typ == 0x06:  # humidity
-                self._state.humidity = from_word(adv_data[14:16])
-            if typ == 0x0a:  # battery
-                self._state.battery = adv_data[14]
-            if typ == 0x0d:  # humidity + temperature
-                self._state.temperature = from_word(adv_data[14:16])
-                self._state.humidity = from_word(adv_data[16:18])
+            for k, v in parsed_advert.items():
+                setattr(self._state, k, v)
 
             _LOGGER.debug(
                 f'Advert received for {self}, {format_binary(adv_data)}, '
