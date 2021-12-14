@@ -43,10 +43,12 @@
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
 
-### Blinds
+### Shades and Blinds
 - **Generic AM43 (type: am43)**
 
   Manufacturer can be A-OK, Zemismart, etc.
+- **Soma Shades (type: soma_shades)**
+  
 
 ### Bulbs
 - **Avea RGBW bulbs (type: avea_rgbw)**

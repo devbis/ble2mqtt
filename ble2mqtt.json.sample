@@ -27,6 +27,10 @@
             "type": "am43"
         },
         {
+            "address": "11:22:33:aa:bb:ed",
+            "type": "soma_shades"
+        },
+        {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
         },
