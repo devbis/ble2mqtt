@@ -1,5 +1,4 @@
 import asyncio as aio
-import json
 import logging
 import struct
 import time
@@ -135,6 +134,12 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
             ],
         }
 
+    def get_values_by_entities(self):
+        return {
+            KETTLE_ENTITY: self._state.as_dict(),
+            HEAT_ENTITY: self._state.mode in [Mode.HEATING, Mode.KEEP_WARM],
+        }
+
     def notification_handler(self, sender: int, data: bytearray):
         _LOGGER.debug("Notification: {0}: {1}".format(
             sender,
@@ -180,34 +185,6 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
             self._version = version.decode()
         _LOGGER.debug(f'{self} version: {version}')
         await self.client.start_notify(UUID_STATUS, self.notification_handler)
-
-    async def _notify_state(self, publish_topic):
-        _LOGGER.info(f'[{self}] send state={self._state}')
-        state = {}
-        for sensor_name, value in (
-            (KETTLE_ENTITY, self._state),
-        ):
-            if any(
-                x['name'] == sensor_name
-                for x in self.entities.get(SENSOR_DOMAIN, [])
-            ):
-                state.update(value.as_dict())
-
-        if state:
-            state['linkquality'] = self.linkquality
-            await publish_topic(
-                topic=self._get_topic(self.STATE_TOPIC),
-                value=json.dumps(state),
-            )
-        for sensor_name, value in (
-            (HEAT_ENTITY, self._state.mode in [Mode.HEATING, Mode.KEEP_WARM]),
-        ):
-            entity = self.get_entity_by_name(BINARY_SENSOR_DOMAIN, sensor_name)
-            if entity:
-                await publish_topic(
-                    topic=self._get_topic_for_entity(entity),
-                    value=self.transform_value(value),
-                )
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         send_time = None

@@ -1,5 +1,4 @@
 import asyncio as aio
-import json
 import logging
 import uuid
 
@@ -40,6 +39,27 @@ class AveaBulb(AveaProtocol, Device):
                     'name': 'light',
                 },
             ],
+        }
+
+    def get_values_by_entities(self):
+        return {
+            LIGHT_ENTITY: {
+                'state': (
+                    'ON'
+                    if (
+                        self._brightness != 0 and
+                        self._real_color != (0, 0, 0)
+                    )
+                    else 'OFF'
+                ),
+                'brightness': self._brightness,
+                'color': {
+                    'r': self._color[0],
+                    'g': self._color[1],
+                    'b': self._color[2],
+                },
+                'color_mode': 'rgb',
+            },
         }
 
     async def get_device_data(self):
@@ -122,38 +142,3 @@ class AveaBulb(AveaProtocol, Device):
 
     def handle_brightness(self, value):
         self._brightness = value
-
-    async def _notify_state(self, publish_topic):
-        _LOGGER.info(
-            f'[{self}] send color={self._color}, brightness={self._brightness}',
-        )
-        coros = []
-
-        state = {'linkquality': self.linkquality}
-        lights = self.entities.get(LIGHT_DOMAIN, [])
-        for light in lights:
-            if light['name'] == LIGHT_ENTITY:
-                state.update({
-                    'state': (
-                        'ON'
-                        if (
-                            self._brightness != 0 and
-                            self._real_color != (0, 0, 0)
-                        )
-                        else 'OFF'
-                    ),
-                    'brightness': self._brightness,
-                    'color': {
-                        'r': self._color[0],
-                        'g': self._color[1],
-                        'b': self._color[2],
-                    },
-                    'color_mode': 'rgb',
-                })
-                coros.append(publish_topic(
-                    topic=self._get_topic_for_entity(light),
-                    value=json.dumps(state),
-                ))
-        if coros:
-            await aio.gather(*coros)
-            self.initial_status_sent = True

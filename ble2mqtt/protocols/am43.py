@@ -89,7 +89,7 @@ class AM43Protocol(BLEQueueMixin, BaseDevice, abc.ABC):
         # not used
         await self.send_command(AM43_CMD_MOVE, [0xee])
 
-    async def _get_full_state(self):
+    async def _update_full_state(self):
         await self._get_position()
         await self._get_battery()
         await self._get_illuminance()

@@ -1,5 +1,4 @@
 import asyncio as aio
-import json
 import logging
 import uuid
 
@@ -19,6 +18,7 @@ HEAT_ENTITY = 'heat'  # not implemented yet
 TEMPERATURE_ENTITY = 'temperature'
 ENERGY_ENTITY = 'energy'
 LIGHT_ENTITY = 'backlight'
+STATISTICS_ENTITY = 'statistics'
 
 
 class RedmondKettle(RedmondKettle200Protocol, Device):
@@ -71,8 +71,8 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'unit_of_measurement': 'kWh',
                 },
                 {
-                    'name': 'statistics',
-                    'topic': 'statistics',
+                    'name': STATISTICS_ENTITY,
+                    'topic': STATISTICS_ENTITY,
                     'icon': 'chart-bar',
                     'json': True,
                     'main_value': 'number_of_starts',
@@ -85,6 +85,28 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'topic': LIGHT_ENTITY,
                 },
             ],
+        }
+
+    def get_values_by_entities(self):
+        return {
+            TEMPERATURE_ENTITY: self._state.temperature,
+            ENERGY_ENTITY: self._energy,
+            STATISTICS_ENTITY: self._statistics,
+            LIGHT_ENTITY: {
+                'state': (
+                    KettleRunState.ON.name
+                    if self._state.state == KettleRunState.ON and
+                    self._state.mode == KettleG200Mode.LIGHT
+                    else KettleRunState.OFF.name
+                ),
+                'brightness': 255,
+                'color': {
+                    'r': self._color[0],
+                    'g': self._color[1],
+                    'b': self._color[2],
+                },
+                'color_mode': 'rgb',
+            },
         }
 
     async def get_device_data(self):
@@ -118,64 +140,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
             ]
             else self.STANDBY_SEND_DATA_PERIOD_MULTIPLIER
         )
-
-    async def _notify_state(self, publish_topic):
-        _LOGGER.info(f'[{self}] send state={self._state}')
-        coros = []
-
-        state = {'linkquality': self.linkquality}
-        for sensor_name, value in (
-            (TEMPERATURE_ENTITY, self._state.temperature),
-            (ENERGY_ENTITY, self._energy),
-        ):
-            if any(
-                    x['name'] == sensor_name
-                    for x in self.entities.get(SENSOR_DOMAIN, [])
-            ):
-                state[sensor_name] = self.transform_value(value)
-
-        if state:
-            coros.append(publish_topic(
-                topic=self._get_topic(self.STATE_TOPIC),
-                value=json.dumps(state),
-            ))
-
-        # keep statistics in a separate topic
-        _LOGGER.info(f'[{self}] send statistics={self._statistics}')
-        for sensor_name, value in (
-            ('statistics', self._statistics),
-        ):
-            entity = self.get_entity_by_name(SENSOR_DOMAIN, sensor_name)
-            if entity:
-                coros.append(publish_topic(
-                    topic=self._get_topic_for_entity(entity),
-                    value=json.dumps(value),
-                ))
-
-        lights = self.entities.get(LIGHT_DOMAIN, [])
-        for light in lights:
-            if light['name'] == LIGHT_ENTITY:
-                light_state = {
-                    'state': (
-                        KettleRunState.ON.name
-                        if self._state.state == KettleRunState.ON and
-                        self._state.mode == KettleG200Mode.LIGHT
-                        else KettleRunState.OFF.name
-                    ),
-                    'brightness': 255,
-                    'color': {
-                        'r': self._color[0],
-                        'g': self._color[1],
-                        'b': self._color[2],
-                    },
-                    'color_mode': 'rgb',
-                }
-                coros.append(publish_topic(
-                    topic=self._get_topic_for_entity(light),
-                    value=json.dumps(light_state),
-                ))
-        if coros:
-            await aio.gather(*coros)
 
     async def notify_run_state(self, new_state: KettleG200State, publish_topic):
         if not self.initial_status_sent or \

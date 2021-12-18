@@ -4,6 +4,7 @@ import json
 import logging
 import typing as ty
 import uuid
+from collections import defaultdict, namedtuple
 from enum import Enum
 
 from bleak import BleakClient, BleakError
@@ -293,8 +294,12 @@ class Device(BaseDevice, abc.ABC):
 
     @property
     @abc.abstractmethod
-    def entities(self):
+    def entities(self) -> ty.Dict[str, ty.Any]:
         return {}
+
+    @abc.abstractmethod
+    def get_values_by_entities(self) -> ty.Dict[str, ty.Any]:
+        pass
 
     async def send_availability(self, publish_topic, value: bool):
         await publish_topic(
@@ -372,6 +377,39 @@ class Device(BaseDevice, abc.ABC):
         if connected:
             await self.client.disconnect()
         await super().close()
+
+    async def _notify_state(self, publish_topic):
+        values_by_name = {
+            'linkquality': self.linkquality,
+            **self.get_values_by_entities(),
+        }
+
+        _LOGGER.info(f'[{self}] send state={values_by_name}')
+
+        data_by_topic = defaultdict(dict)
+        for domain, entities in self.entities.items():
+            for entity in entities:
+                name = entity['name']
+                if name not in values_by_name:
+                    continue
+
+                value = values_by_name[name]
+                content_values = (
+                    value if isinstance(value, dict) else {name: value}
+                )
+
+                for parameter, val in content_values.items():
+                    if domain in [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN]:
+                        val = self.transform_value(val)
+                    topic = self._get_topic_for_entity(entity)
+                    data_by_topic[topic][parameter] = val
+        coros = [
+            publish_topic(topic=topic, value=json.dumps(values))
+            for topic, values in data_by_topic.items()
+        ]
+        if coros:
+            await aio.gather(*coros)
+            self.initial_status_sent = True
 
 
 class Sensor(Device, abc.ABC):
@@ -479,3 +517,157 @@ class SubscribeAndSetDataMixin:
                 self.notification_handler,
             )
         await super().get_device_data()
+
+
+class CoverMovementType(Enum):
+    STOP = 0
+    POSITION = 1
+
+
+class BaseCover(Device, abc.ABC):
+    COVER_ENTITY = 'cover'
+
+    # HA notation. We convert value on setting and receiving data
+    CLOSED_POSITION = 0
+    OPEN_POSITION = 100
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._state = namedtuple(
+            'CoverState',
+            (
+                'position', 'target_position', 'run_state',
+            ),
+        )(position=0, target_position=0, run_state=CoverRunState.STOPPED)
+
+    @property
+    def entities(self):
+        return {
+            COVER_DOMAIN: [
+                {
+                    'name': self.COVER_ENTITY,
+                    'topic': self.COVER_ENTITY,
+                    'device_class': 'shade',
+                },
+            ],
+            SENSOR_DOMAIN: [
+                {
+                    'name': 'battery',
+                    'device_class': 'battery',
+                    'unit_of_measurement': '%',
+                },
+                {
+                    'name': 'illuminance',
+                    'device_class': 'illuminance',
+                    'unit_of_measurement': 'lx',
+                },
+            ],
+        }
+
+    @abc.abstractmethod
+    async def _stop(self):
+        pass
+
+    @abc.abstractmethod
+    async def _set_position(self, value):
+        pass
+
+    @abc.abstractmethod
+    async def _update_running_state(self):
+        """ This method is called as a short update while
+        opening the shades"""
+
+    @abc.abstractmethod
+    async def _update_full_state(self):
+        """ This method is called to refetch all values from the device"""
+
+    async def _do_movement(self, movement_type: CoverMovementType,
+                           target_position: ty.Optional[int]):
+        if movement_type == CoverMovementType.POSITION and \
+                target_position is not None:
+            if self.CLOSED_POSITION <= target_position <= self.OPEN_POSITION:
+                await self._set_position(target_position)
+                if self._state.position > target_position:
+                    self._state.target_position = target_position
+                    self._state.run_state = CoverRunState.CLOSING
+                elif self._state.position < target_position:
+                    self._state.target_position = target_position
+                    self._state.run_state = CoverRunState.OPENING
+                else:
+                    self._state.target_position = None
+                    if target_position == self.OPEN_POSITION:
+                        self._state.run_state = CoverRunState.OPEN
+                    elif target_position == self.CLOSED_POSITION:
+                        self._state.run_state = CoverRunState.CLOSED
+                    else:
+                        self._state.run_state = CoverRunState.STOPPED
+            else:
+                _LOGGER.error(
+                    f'[{self}] Incorrect position value: '
+                    f'{repr(target_position)}',
+                )
+        else:
+            await self._stop()
+            self._state.run_state = CoverRunState.STOPPED
+
+    async def _handle_message(self, message, publish_topic):
+        value = message['value']
+        entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
+            message['topic'],
+        )
+        if entity_topic == self._get_topic_for_entity(
+                self.get_entity_by_name(COVER_DOMAIN, self.COVER_ENTITY),
+                skip_unique_id=True,
+        ):
+            value = self.transform_value(value)
+            target_position = None
+            if action_postfix == self.SET_POSTFIX:
+                _LOGGER.info(
+                    f'[{self}] set mode {entity_topic} to "{value}"',
+                )
+                if value.lower() == 'open':
+                    movement_type = CoverMovementType.POSITION
+                    target_position = self.OPEN_POSITION
+                elif value.lower() == 'close':
+                    movement_type = CoverMovementType.POSITION
+                    target_position = self.CLOSED_POSITION
+                else:
+                    movement_type = CoverMovementType.STOP
+            elif action_postfix == self.SET_POSITION_POSTFIX:
+                movement_type = CoverMovementType.POSITION
+                _LOGGER.info(
+                    f'[{self}] set position {entity_topic} to "{value}"',
+                )
+                try:
+                    target_position = int(value)
+                except ValueError:
+                    pass
+            else:
+                _LOGGER.warning(
+                    f'[{self}] unknown action postfix {action_postfix}',
+                )
+                return False
+
+            while True:
+                try:
+                    await self._do_movement(movement_type, target_position)
+                    await self._notify_state(publish_topic)
+                    break
+                except ConnectionError as e:
+                    _LOGGER.exception(str(e))
+                await aio.sleep(5)
+            return True
+
+    async def handle_messages(self, publish_topic, *args, **kwargs):
+        while True:
+            try:
+                if not self.client.is_connected:
+                    raise ConnectionError()
+                message = await aio.wait_for(
+                    self.message_queue.get(),
+                    timeout=60,
+                )
+            except aio.TimeoutError:
+                await aio.sleep(1)
+                continue
+            await self._handle_message(message, publish_topic)

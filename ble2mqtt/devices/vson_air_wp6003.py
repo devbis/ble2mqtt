@@ -1,5 +1,4 @@
 import asyncio as aio
-import json
 import logging
 import struct
 import uuid
@@ -117,13 +116,3 @@ class VsonWP6003(WP6003Protocol, Sensor):
             raise
         except Exception:
             _LOGGER.exception(f'{self} problem with reading values')
-
-    async def _notify_state(self, publish_topic):
-        _LOGGER.info(f'[{self}] send state={self._state}')
-        state = self.get_entity_map()
-        if state:
-            state['linkquality'] = self.linkquality
-            await publish_topic(
-                topic=self._get_topic(self.STATE_TOPIC),
-                value=json.dumps(state),
-            )
