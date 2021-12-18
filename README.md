@@ -34,6 +34,7 @@
 
 ### Humidity sensors
 - **Xiaomi MJ_HT_V1 (type: xiaomihtv1)**
+- **Xiaomi LYWSD02MMC (type: xiaomihtv1)**
 - **Xiaomi LYWSD03MMC (type: xiaomilywsd)** (due to the connection to the device on 
   every data fetch, it consumes more battery power. Flashing to the custom
   firmware is recommended)
@@ -48,7 +49,6 @@
 
   Manufacturer can be A-OK, Zemismart, etc.
 - **Soma Shades (type: soma_shades)**
-  
 
 ### Bulbs
 - **Avea RGBW bulbs (type: avea_rgbw)**
