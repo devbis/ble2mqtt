@@ -69,6 +69,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'name': ENERGY_ENTITY,
                     'device_class': 'energy',
                     'unit_of_measurement': 'kWh',
+                    'state_class': 'total_increasing',
                 },
                 {
                     'name': STATISTICS_ENTITY,
