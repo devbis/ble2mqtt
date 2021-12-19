@@ -263,23 +263,7 @@ class DeviceManager:
             return result
 
         messages_to_send = []
-        sensor_entities = device.entities.get(SENSOR_DOMAIN, [])
-        sensor_entities.append(
-            {
-                'name': 'linkquality',
-                'unit_of_measurement': 'lqi',
-                'icon': 'signal',
-                **(
-                    {'topic': device.LINKQUALITY_TOPIC}
-                    if device.LINKQUALITY_TOPIC else {}
-                ),
-            },
-        )
-        entities = {
-            **device.entities,
-            SENSOR_DOMAIN: sensor_entities,
-        }
-        for cls, entities in entities.items():
+        for cls, entities in device.entities_with_lqi.items():
             if cls in (
                 BINARY_SENSOR_DOMAIN,
                 SENSOR_DOMAIN,

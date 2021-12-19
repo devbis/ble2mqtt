@@ -162,6 +162,7 @@ class Device(BaseDevice, abc.ABC):
     RECONNECTION_SLEEP_INTERVAL = 60
     ACTIVE_SLEEP_INTERVAL = 60
     PASSIVE_SLEEP_INTERVAL = 60
+    # deprecated
     LINKQUALITY_TOPIC: ty.Optional[str] = None
     STATE_TOPIC: str = DEFAULT_STATE_TOPIC
 
@@ -378,6 +379,25 @@ class Device(BaseDevice, abc.ABC):
             await self.client.disconnect()
         await super().close()
 
+    @property
+    def entities_with_lqi(self):
+        sensor_entities = self.entities.get(SENSOR_DOMAIN, [])
+        sensor_entities.append(
+            {
+                'name': 'linkquality',
+                'unit_of_measurement': 'lqi',
+                'icon': 'signal',
+                **(
+                    {'topic': self.LINKQUALITY_TOPIC}
+                    if self.LINKQUALITY_TOPIC else {}
+                ),
+            },
+        )
+        return {
+            **self.entities,
+            SENSOR_DOMAIN: sensor_entities,
+        }
+
     async def _notify_state(self, publish_topic):
         values_by_name = {
             'linkquality': self.linkquality,
@@ -387,7 +407,7 @@ class Device(BaseDevice, abc.ABC):
         _LOGGER.info(f'[{self}] send state={values_by_name}')
 
         data_by_topic = defaultdict(dict)
-        for domain, entities in self.entities.items():
+        for domain, entities in self.entities_with_lqi.items():
             for entity in entities:
                 name = entity['name']
                 if name not in values_by_name:
