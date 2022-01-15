@@ -9,7 +9,7 @@ import aio_mqtt
 from bleak import BleakError, BleakScanner
 from bleak.backends.device import BLEDevice
 
-from .devices.base import (BINARY_SENSOR_DOMAIN, COVER_DOMAIN,
+from .devices.base import (BINARY_SENSOR_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN,
                            DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
                            SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
                            ConnectionTimeoutError, Device, done_callback)
@@ -451,6 +451,53 @@ class DeviceManager:
                         **get_generic_vals(entity),
                         'state_topic': state_topic,
                         'command_topic': set_topic,
+                    }
+                    payload = json.dumps(config_params)
+                    _LOGGER.debug(
+                        f'Publish config topic={config_topic}: {payload}',
+                    )
+                    messages_to_send.append(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=config_topic,
+                            payload=payload,
+                            qos=aio_mqtt.QOSLevel.QOS_1,
+                            retain=True,
+                        ),
+                    )
+            if cls == CLIMATE_DOMAIN:
+                for entity in entities:
+                    entity_name = entity['name']
+                    state_topic = self._get_topic(
+                        device.unique_id,
+                        entity.get('topic', device.STATE_TOPIC),
+                    )
+                    mode_command_topic = '/'.join(
+                        (state_topic, device.SET_MODE_POSTFIX),
+                    )
+                    temperature_command_topic = '/'.join(
+                        (state_topic, device.SET_TARGET_TEMPERATURE_POSTFIX),
+                    )
+                    config_topic = '/'.join((
+                        CONFIG_MQTT_NAMESPACE,
+                        cls,
+                        self._config_device_topic,
+                        entity_name,
+                        'config',
+                    ))
+                    config_params = {
+                        **get_generic_vals(entity),
+                        'current_temperature_topic': state_topic,
+                        'current_temperature_template':
+                            '{{ value_json.temperature }}',
+                        'mode_state_topic': state_topic,
+                        'mode_state_template': '{{ value_json.mode }}',
+                        'mode_command_topic': mode_command_topic,
+                        'temperature_state_topic': state_topic,
+                        'temperature_state_template':
+                            '{{ value_json.target_temperature }}',
+                        'temperature_command_topic': temperature_command_topic,
+                        'json_attributes_topic': state_topic,
+                        'temp_step': 0.5,
                     }
                     payload = json.dumps(config_params)
                     _LOGGER.debug(

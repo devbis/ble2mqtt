@@ -18,12 +18,13 @@ registered_device_types = {}
 
 
 BINARY_SENSOR_DOMAIN = 'binary_sensor'
-SENSOR_DOMAIN = 'sensor'
-LIGHT_DOMAIN = 'light'
-SWITCH_DOMAIN = 'switch'
+CLIMATE_DOMAIN = 'climate'
 COVER_DOMAIN = 'cover'
 DEVICE_TRACKER_DOMAIN = 'device_tracker'
+LIGHT_DOMAIN = 'light'
 SELECT_DOMAIN = 'select'
+SENSOR_DOMAIN = 'sensor'
+SWITCH_DOMAIN = 'switch'
 
 DEFAULT_STATE_TOPIC = ''  # send to the parent topic
 
@@ -156,6 +157,8 @@ class Device(BaseDevice, abc.ABC):
     MQTT_VALUES = None
     SET_POSTFIX: str = 'set'
     SET_POSITION_POSTFIX: str = 'set_position'  # for covers. Consider rework
+    SET_MODE_POSTFIX: str = 'set_mode'  # for climate
+    SET_TARGET_TEMPERATURE_POSTFIX: str = 'set_temperature'  # for climate
     MAC_TYPE: str = 'public'
     MANUFACTURER: str = None  # type: ignore
     CONNECTION_FAILURES_LIMIT = 100
@@ -182,13 +185,14 @@ class Device(BaseDevice, abc.ABC):
 
         assert set(self.entities.keys()) <= {
             BINARY_SENSOR_DOMAIN,
-            SENSOR_DOMAIN,
-            LIGHT_DOMAIN,
-            SWITCH_DOMAIN,
+            CLIMATE_DOMAIN,
             COVER_DOMAIN,
-            SELECT_DOMAIN,
             DEVICE_TRACKER_DOMAIN,
-        }
+            LIGHT_DOMAIN,
+            SELECT_DOMAIN,
+            SENSOR_DOMAIN,
+            SWITCH_DOMAIN,
+        }, f'Unknown domain: {list(self.entities.keys())}'
 
     def set_advertisement_seen(self):
         self._advertisement_seen.set()
@@ -212,7 +216,12 @@ class Device(BaseDevice, abc.ABC):
         action_postfix = None
         if topic.startswith(self.unique_id):
             topic = topic[len(self.unique_id):]
-        for postfix in [self.SET_POSTFIX, self.SET_POSITION_POSTFIX]:
+        for postfix in [
+            self.SET_POSTFIX,
+            self.SET_POSITION_POSTFIX,
+            self.SET_MODE_POSTFIX,
+            self.SET_TARGET_TEMPERATURE_POSTFIX,
+        ]:
             if topic.endswith(postfix):
                 action_postfix = postfix
                 topic = topic[:-len(postfix)]
@@ -221,25 +230,30 @@ class Device(BaseDevice, abc.ABC):
 
     @property
     def subscribed_topics(self):
-        return [
-            '/'.join(filter(None, (
-                self.unique_id,
-                entity.get('topic', self.STATE_TOPIC),
-                self.SET_POSTFIX,
-            )))
-            for cls, items in self.entities.items()
-            for entity in items
-            if cls in [SWITCH_DOMAIN, LIGHT_DOMAIN, COVER_DOMAIN, SELECT_DOMAIN]
-        ] + [
-            '/'.join(filter(None, (
-                self.unique_id,
-                entity.get('topic', self.STATE_TOPIC),
-                self.SET_POSITION_POSTFIX,
-            )))
-            for cls, items in self.entities.items()
-            for entity in items
-            if cls in [COVER_DOMAIN]
-        ]
+        postfix_domains = {
+            self.SET_POSTFIX:
+                [
+                    CLIMATE_DOMAIN, COVER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
+                    SWITCH_DOMAIN,
+                ],
+            self.SET_POSITION_POSTFIX: [COVER_DOMAIN],
+            self.SET_MODE_POSTFIX: [CLIMATE_DOMAIN],
+            self.SET_TARGET_TEMPERATURE_POSTFIX: [CLIMATE_DOMAIN],
+        }
+
+        topics = []
+        for postfix, domains in postfix_domains.items():
+            topics.extend((
+                '/'.join(filter(None, (
+                    self.unique_id,
+                    entity.get('topic', self.STATE_TOPIC),
+                    postfix,
+                )))
+                for cls, items in self.entities.items()
+                for entity in items
+                if cls in domains
+            ))
+        return topics
 
     @property
     def manufacturer(self):
@@ -671,6 +685,102 @@ class BaseCover(Device, abc.ABC):
             while True:
                 try:
                     await self._do_movement(movement_type, target_position)
+                    await self._notify_state(publish_topic)
+                    break
+                except ConnectionError as e:
+                    _LOGGER.exception(str(e))
+                await aio.sleep(5)
+            return True
+
+    async def handle_messages(self, publish_topic, *args, **kwargs):
+        while True:
+            try:
+                if not self.client.is_connected:
+                    raise ConnectionError()
+                message = await aio.wait_for(
+                    self.message_queue.get(),
+                    timeout=60,
+                )
+            except aio.TimeoutError:
+                await aio.sleep(1)
+                continue
+            await self._handle_message(message, publish_topic)
+
+
+class ClimateMode(Enum):
+    OFF = 'off'
+    HEAT = 'heat'
+
+
+class BaseClimate(Device, abc.ABC):
+    CLIMATE_ENTITY = 'climate'
+    MODES: ty.Iterable[ClimateMode] = ()
+
+    @property
+    def entities(self):
+        return {
+            CLIMATE_DOMAIN: [
+                {
+                    'name': self.CLIMATE_ENTITY,
+                    'modes': [x.value for x in self.MODES],
+                },
+            ],
+        }
+
+    @abc.abstractmethod
+    async def _set_target_temperature(self, value):
+        pass
+
+    @abc.abstractmethod
+    async def _switch_mode(self, next_mode):
+        pass
+
+    async def _handle_message(self, message, publish_topic):
+        value = message['value']
+        entity_topic, action_postfix = self.get_entity_subtopic_from_topic(
+            message['topic'],
+        )
+        if entity_topic == self._get_topic_for_entity(
+                self.get_entity_by_name(CLIMATE_DOMAIN, self.CLIMATE_ENTITY),
+                skip_unique_id=True,
+        ):
+            if action_postfix == self.SET_MODE_POSTFIX:
+                _LOGGER.info(
+                    f'[{self}] set mode {entity_topic} to "{value}"',
+                )
+                try:
+                    value = ClimateMode(value.lower())
+                except ValueError:
+                    _LOGGER.warning(f"{self} Incorrect mode {value}")
+                    return False
+                else:
+                    if value not in self.MODES:
+                        _LOGGER.warning(f"{self} Incorrect mode {value}")
+                        return False
+                state_change_coro = self._switch_mode(value)
+            elif action_postfix == self.SET_TARGET_TEMPERATURE_POSTFIX:
+                try:
+                    target_temperature = float(value)
+                except ValueError:
+                    _LOGGER.exception("Incorrect temperature")
+                    return False
+                _LOGGER.info(
+                    f'[{self}] set temperature {entity_topic} to "{value}"',
+                )
+                state_change_coro = \
+                    self._set_target_temperature(target_temperature)
+            else:
+                _LOGGER.warning(
+                    f'[{self}] unknown action postfix {action_postfix}',
+                )
+                return False
+
+            if not state_change_coro:
+                return False
+
+            while True:
+                try:
+                    await state_change_coro
                     await self._notify_state(publish_topic)
                     break
                 except ConnectionError as e:

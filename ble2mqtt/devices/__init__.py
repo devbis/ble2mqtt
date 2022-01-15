@@ -7,6 +7,7 @@ from .cover_soma import SomaCover  # noqa: F401
 from .kettle_redmond import RedmondKettle  # noqa: F401
 from .kettle_xiaomi import XiaomiKettle  # noqa: F401
 from .presence import Presence  # noqa: F401
+from .thermostat_ensto import EnstoThermostat  # noqa: F401
 from .vson_air_wp6003 import VsonWP6003  # noqa: F401
 from .xiaomi_ht import XiaomiHumidityTemperatureV1  # noqa: F401
 from .xiaomi_lywsd03 import XiaomiHumidityTemperatureLYWSD  # noqa: F401
