@@ -550,6 +550,18 @@ class DeviceManager:
                     finished = [t for t in tasks if not t.cancelled()]
                     await handle_returned_tasks(*finished)
             except aio.CancelledError:
+                # the only way to send availability=False on program shutdown
+                if self.device.ACTIVE_CONNECTION_MODE in (
+                    ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT,
+                    ConnectionMode.ON_DEMAND_CONNECTION,
+                ):
+                    try:
+                        await aio.wait_for(
+                            self.send_availability(False),
+                            timeout=1,
+                        )
+                    except aio.TimeoutError:
+                        pass
                 raise
             except KeyboardInterrupt:
                 raise
@@ -595,10 +607,17 @@ class DeviceManager:
                     missing_device_count = 0
                     await restart_bluetooth()
             finally:
-                try:
-                    await aio.wait_for(self.send_availability(False), timeout=1)
-                except aio.TimeoutError:
-                    pass
+                if self.device.ACTIVE_CONNECTION_MODE not in (
+                    ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT,
+                    ConnectionMode.ON_DEMAND_CONNECTION,
+                ):
+                    try:
+                        await aio.wait_for(
+                            self.send_availability(False),
+                            timeout=1,
+                        )
+                    except aio.TimeoutError:
+                        pass
                 try:
                     await aio.wait_for(device.close(), timeout=5)
                 except aio.CancelledError:
