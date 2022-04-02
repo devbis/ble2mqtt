@@ -203,6 +203,35 @@ Devices accept `friendly_name` parameter to replace mac address in device
 names for Home Assistant.
 
 
+## Systemd unit file to start on boot
+
+Put the following content to the unit file `/etc/systemd/system/ble2mqtt.service`
+
+```
+[Unit]
+Description=ble2mqtt bridge
+
+[Service]
+Type=Simple
+ExecStart=/usr/local/bin/ble2mqtt
+User=ble2mqtt
+Group=ble2mqtt
+Wants=bluetooth.target
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The user and group should match the owner and group of the configuration file /etc/ble2mqtt.json.
+
+Afterwards you simply have to enable and start the service:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable ble2mqtt
+sudo systemctl start ble2mqtt
+```
+
 ## Installation on OpenWRT
 
 Execute the following commands in the terminal:
