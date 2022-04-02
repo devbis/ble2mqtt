@@ -56,6 +56,17 @@
 ### Dosimeters
 - **Atom Fast (type: atomfast)**
 
+### Heaters
+- **Ensto EPHBEBT10PR, EPHBEBT15PR (type: ensto_thermostat)**
+
+  These devices require [manual pairing](#manual-pairing-in-linux).
+  After the device is paired on the host device, see the logs for the `key` and 
+  put it to the config.
+
+  The adapter uses holiday mode to control temperature as thermostat. You cannot 
+  use this feature in the official app while ble2mqtt is working.
+
+
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
 To use connection to the device provide `"passive": false` parameter.
@@ -63,6 +74,42 @@ To use connection to the device provide `"passive": false` parameter.
 **Supported devices in passive mode:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
+- Any device as presence tracker
+
+## Manual pairing in Linux
+
+Some devices (e.g. Ensto heaters) require paired connection to work with it. 
+You need to pair the device with linux machine before using it. 
+
+Find out MAC addresses of your devices. Put the device in pairing mode if it is supported.
+
+Open console and run `bluetoothctl` command. It is a command line tool to work with BLE devices.
+Wait for the prompt 
+
+```
+[bluetooth]#
+```
+
+Print a command to enable scanning. Linux must know the device is present before pairing.
+
+```
+[bluetooth]# scan on
+```
+
+Wait for MAC address of the device appears in the list of found devices.
+Print a pairing command (replace MAC address to the one from your device)
+
+```
+[bluetooth]# pair 90:fd:00:00:00:01
+```
+
+On successful pairing you'll see a message:
+
+```
+[CHG] Device 90:FD:00:00:00:01 Paired: yes
+Pairing successful
+```
+You can proceed with the next configuration steps now.
 
 
 ### Known issues:
@@ -104,6 +151,12 @@ The configuration file is a JSON with the following content:
             "address": "11:22:33:aa:bb:c0",
             "type": "redmond_rmc_m200",
             "key": "ffffffffffffffff"
+        },
+        {
+            "address": "11:22:33:aa:bb:c1",
+            "type": "ensto_thermostat",
+            "# see logs after pairing and put the key to config": "",
+            "key": "00112233"
         },
         {
             "address": "11:22:33:aa:bb:cd",
