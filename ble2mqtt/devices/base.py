@@ -401,6 +401,7 @@ class Device(BaseDevice, abc.ABC):
                 'name': 'linkquality',
                 'unit_of_measurement': 'lqi',
                 'icon': 'signal',
+                'entity_category': 'diagnostic',
                 **(
                     {'topic': self.LINKQUALITY_TOPIC}
                     if self.LINKQUALITY_TOPIC else {}

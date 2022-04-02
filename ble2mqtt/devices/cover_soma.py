@@ -70,6 +70,7 @@ class SomaCover(SomaProtocol, BaseCover):
                     'name': BATTERY_ENTITY,
                     'device_class': 'battery',
                     'unit_of_measurement': '%',
+                    'entity_category': 'diagnostic',
                 },
                 {
                     'name': ILLUMINANCE_ENTITY,

@@ -31,6 +31,7 @@ class XiaomiHumidityTemperature(XiaomiPoller, abc.ABC):
                     'name': 'battery',
                     'device_class': 'battery',
                     'unit_of_measurement': '%',
+                    'entity_category': 'diagnostic',
                 },
             ],
         }

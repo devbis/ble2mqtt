@@ -70,6 +70,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'device_class': 'energy',
                     'unit_of_measurement': 'kWh',
                     'state_class': 'total_increasing',
+                    'entity_category': 'diagnostic',
                 },
                 {
                     'name': STATISTICS_ENTITY,
@@ -78,6 +79,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'json': True,
                     'main_value': 'number_of_starts',
                     'unit_of_measurement': ' ',
+                    'entity_category': 'diagnostic',
                 },
             ],
             LIGHT_DOMAIN: [

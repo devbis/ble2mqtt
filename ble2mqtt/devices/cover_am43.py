@@ -52,6 +52,7 @@ class AM43Cover(AM43Protocol, BaseCover):
                     'name': BATTERY_ENTITY,
                     'device_class': 'battery',
                     'unit_of_measurement': '%',
+                    'entity_category': 'diagnostic',
                 },
                 {
                     'name': ILLUMINANCE_ENTITY,
