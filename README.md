@@ -1,4 +1,7 @@
-# Service to export BLE devices to MQTT with Home Assistant discovery
+# BLE2MQTT
+### Control your Bluetooth devices with smart home
+
+![ble2mqtt devices](./ble2mqtt.png)
 
 ## Supported devices:
 
