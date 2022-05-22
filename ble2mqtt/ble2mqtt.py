@@ -4,6 +4,7 @@ import logging
 import typing as ty
 from contextlib import asynccontextmanager
 from uuid import getnode
+import os.path
 
 import aio_mqtt
 from bleak import BleakError, BleakScanner
@@ -145,10 +146,22 @@ async def restart_bluetooth():
             'hciconfig', 'hci0', 'down',
         )
         await proc.wait()
-        proc = await aio.create_subprocess_exec(
-            '/etc/init.d/bluetoothd', 'restart',
-        )
-        await proc.wait()
+
+        if os.path.exists('/etc/init.d/bluetoothd'):
+            proc = await aio.create_subprocess_exec(
+                '/etc/init.d/bluetoothd', 'restart',
+            )
+            await proc.wait()
+
+        elif os.path.exists('/etc/init.d/bluetooth'):
+            proc = await aio.create_subprocess_exec(
+                '/etc/init.d/bluetooth', 'restart',
+            )
+            await proc.wait()
+
+        else:
+            _LOGGER.error('init.d bluetoothd script not found')
+
         await aio.sleep(3)
         proc = await aio.create_subprocess_exec(
             'hciconfig', 'hci0', 'up',

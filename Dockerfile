@@ -1,5 +1,5 @@
 # First stage, build requirements
-FROM python:slim as builder
+FROM python:3.9-slim as builder
 
 RUN apt-get update && \
     apt-get install gcc git -y && \
@@ -8,17 +8,15 @@ RUN apt-get update && \
 WORKDIR /usr/src/app
 
 # To speed up consecutive builds, copy only requirements and install them
-COPY ./requirements.txt .
+COPY . .
 
 # Install requirements and ignore warnings for local installation
 RUN pip install --user --no-warn-script-location -r requirements.txt
 
-COPY . .
-
-RUN pip install --user --no-warn-script-location ble2mqtt
+RUN pip install --user --no-warn-script-location .
 
 # Second stage
-FROM python:slim as app
+FROM python:3.9-slim as app
 
 # Bluetoothctl is required
 RUN apt-get update && \
@@ -28,6 +26,10 @@ RUN apt-get update && \
 # Copy the local python packages
 COPY --from=builder /root/.local /root/.local
 
+# Copy run script
+COPY ./docker_entrypoint.sh docker_entrypoint.sh
+RUN chmod +x docker_entrypoint.sh
+
 ENV PATH=/root/.local/bin:$PATH
 
-CMD [ "ble2mqtt" ]
+CMD [ "./docker_entrypoint.sh" ]

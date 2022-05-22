@@ -323,3 +323,50 @@ ble2mqtt:dev
 Instead of sharing `/var/run/dbus`, you can export `DBUS_SYSTEM_BUS_ADDRESS`.
 
 NOTE: `--net=host` is required as it needs to use the bluetooth interface
+
+NOTE: `podman` is the same as `docker`
+
+
+## Running in Container FULLy
+
+> **ATTENTION:** Make sure `bluez` is not running (or not intalled) on your host. 
+
+Build the image as:
+
+```shell script
+docker build -t ble2mqtt:dev .
+```
+
+Start the container and share the config file:
+```shell script
+docker run \
+-d \
+--net=host \
+--cap-add=NET_ADMIN \
+-v $PWD/ble2mqtt.json.sample:/etc/ble2mqtt.json:ro \
+ble2mqtt:dev
+```
+
+Docker compose:
+``` docker yaml
+version: '3.7'
+services:
+
+  ble2mqtt:
+    image: ble2mqtt:dev
+    build: ./ble2mqtt
+    hostname: ble2mqtt
+    restart: always
+    environment:
+      - TZ=Asia/Yekaterinburg
+    volumes:
+      - ./ble2mqtt/ble2mqtt.json:/etc/ble2mqtt.json:ro
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+
+```
+
+You do not need sharing `/var/run/dbus`, because `dbus` will start in the container.
+
+NOTE: `--net=host` and `--cap-add=NET_ADMIN` is required as it needs to use and control the bluetooth interface
