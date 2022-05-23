@@ -132,7 +132,11 @@ def main():
         **config,
     }
 
-    logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=config['log_level'].upper(), datefmt='%Y-%m-%d %H:%M:%S')
+    logging.basicConfig(
+        format='%(asctime)s %(levelname)s: %(message)s',
+        level=config['log_level'].upper(),
+        datefmt='%Y-%m-%d %H:%M:%S',
+    )
     # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
     _LOGGER.info(f'Starting BLE2MQTT version {VERSION}')
 

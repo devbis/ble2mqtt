@@ -1,10 +1,10 @@
 import asyncio as aio
 import json
 import logging
+import os.path
 import typing as ty
 from contextlib import asynccontextmanager
 from uuid import getnode
-import os.path
 
 import aio_mqtt
 from bleak import BleakError, BleakScanner
