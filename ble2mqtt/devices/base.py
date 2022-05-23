@@ -10,6 +10,7 @@ from enum import Enum
 from bleak import BleakClient, BleakError
 from bleak.backends.device import BLEDevice
 
+from ..compat import get_loop_param
 from ..devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
 from ..utils import format_binary, rssi_to_linkquality
 
@@ -174,7 +175,7 @@ class Device(BaseDevice, abc.ABC):
 
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.message_queue: aio.Queue = aio.Queue()
+        self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
         self.mac = mac
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None

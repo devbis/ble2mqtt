@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 
+from ..compat import get_loop_param
 from ..protocols.xiaomi import XiaomiCipherMixin
 from ..utils import format_binary
 from .base import BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, ConnectionMode, Device
@@ -177,7 +178,7 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
         await self.client.stop_notify(UUID_AUTH)
 
     async def get_device_data(self):
-        self.queue = aio.Queue()
+        self.queue = aio.Queue(**get_loop_param(self._loop))
         await self.auth()
         self._model = 'MiKettle'
         version = await self.client.read_gatt_char(SOFTWARE_VERSION)

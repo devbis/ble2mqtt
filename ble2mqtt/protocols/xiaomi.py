@@ -4,6 +4,7 @@ import logging
 import struct
 import uuid
 
+from ..compat import get_loop_param
 from ..devices.base import Sensor, SubscribeAndSetDataMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
 
     def __init__(self, *args, loop, **kwargs):
         super().__init__(*args, loop=loop, **kwargs)
-        self._stack = aio.LifoQueue(loop=loop)
+        self._stack = aio.LifoQueue(**get_loop_param(loop))
 
     def process_data(self, data):
         self._loop.call_soon_threadsafe(self._stack.put_nowait, data)

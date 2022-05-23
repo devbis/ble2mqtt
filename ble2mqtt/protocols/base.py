@@ -3,6 +3,7 @@ import asyncio as aio
 import logging
 import typing as ty
 
+from ..compat import get_loop_param
 from ..devices.base import BaseDevice
 from ..utils import format_binary
 
@@ -12,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 class BLEQueueMixin(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._ble_queue = aio.Queue(loop=self._loop)
+        self._ble_queue = aio.Queue(**get_loop_param(self._loop))
 
     def notification_callback(self, sender_handle: int, data: bytearray):
         """
@@ -64,7 +65,8 @@ class BaseCommand:
 class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cmd_queue: aio.Queue[BaseCommand] = aio.Queue(loop=self._loop)
+        self.cmd_queue: aio.Queue[BaseCommand] = \
+            aio.Queue(**get_loop_param(self._loop))
         self._cmd_queue_task = aio.ensure_future(
             self._handle_cmd_queue(),
             loop=self._loop,

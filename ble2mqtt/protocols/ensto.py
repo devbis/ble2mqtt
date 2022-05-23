@@ -59,7 +59,8 @@ class EnstoProtocol(BLEQueueMixin, BaseDevice, abc.ABC):
         # Need to check if key is provided. Otherwise, read the reset_ket from
         # characteristic
         if not self._reset_id:
-            # TODO: pairing in python code doesn't work. Use one-time bluetoothctl pairing
+            # TODO: pairing in python code doesn't work.
+            #   Use one-time bluetoothctl pairing
             # _LOGGER.info('pairing...')
             # await self.client.pair()
             _LOGGER.info(f'{self} reading RESET_ID_CHAR {self.AUTH_CHAR}')
