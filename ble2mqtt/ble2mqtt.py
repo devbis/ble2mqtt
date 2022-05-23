@@ -775,8 +775,10 @@ class Ble2Mqtt:
                 await self._mqtt_client.disconnect()
             except aio.CancelledError:
                 raise
+            except aio_mqtt.ConnectionClosedError:
+                pass
             except Exception as e:
-                _LOGGER.warning(f'Error on MQTT  disconnecting: {repr(e)}')
+                _LOGGER.warning(f'Error on MQTT disconnecting: {repr(e)}')
 
     def register(self, device_class: ty.Type[Device], *args, **kwargs):
         device = device_class(*args, **kwargs)
@@ -957,7 +959,7 @@ class Ble2Mqtt:
         dev_id = hex(getnode())
         while True:
             try:
-                mqtt_connection = await self._mqtt_client.connect(
+                mqtt_connection = await aio.wait_for(self._mqtt_client.connect(
                     host=self._mqtt_host,
                     port=self._mqtt_port,
                     username=self._mqtt_user,
@@ -969,7 +971,7 @@ class Ble2Mqtt:
                         qos=aio_mqtt.QOSLevel.QOS_1,
                         retain=True,
                     ),
-                )
+                ), timeout=self._reconnection_interval)
                 _LOGGER.info(f'Connected to {self._mqtt_host}')
                 await self._mqtt_client.publish(
                     aio_mqtt.PublishableMessage(
@@ -980,15 +982,18 @@ class Ble2Mqtt:
                     ),
                 )
                 await self._run_device_tasks(mqtt_connection.disconnect_reason)
+            except aio.TimeoutError:
+                logging.warning('Cannot connect to MQTT broker')
             except (aio.CancelledError, KeyboardInterrupt):
-                await self._mqtt_client.publish(
-                    aio_mqtt.PublishableMessage(
-                        topic_name=self.availability_topic,
-                        payload='offline',
-                        qos=aio_mqtt.QOSLevel.QOS_0,
-                        retain=True,
-                    ),
-                )
+                if self._mqtt_client.is_connected():
+                    await self._mqtt_client.publish(
+                        aio_mqtt.PublishableMessage(
+                            topic_name=self.availability_topic,
+                            payload='offline',
+                            qos=aio_mqtt.QOSLevel.QOS_0,
+                            retain=True,
+                        ),
+                    )
                 raise
             except Exception:
                 _LOGGER.exception(
