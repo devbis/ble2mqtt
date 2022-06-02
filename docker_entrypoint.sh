@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ -f "/var/run/dbus" ]; then
+if [ -d "/var/run/dbus" ]; then
     ble2mqtt
 else 
     service dbus start
