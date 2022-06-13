@@ -239,7 +239,7 @@ sudo systemctl start ble2mqtt
 
 Execute the following commands in the terminal:
 
-```shell script
+```sh
 opkg update
 opkg install python3-pip python3-asyncio
 pip3 install "bleak>=0.11.0"
@@ -251,19 +251,19 @@ append your devices.
 
 Bluetooth must be turned on.
 
-```shell script
+```sh
 hciconfig hci0 up
 ```
 
 Run the service in background
 
-```shell script
+```sh
 ble2mqtt 2> /tmp/ble2mqtt.log &
 ```
 
 Add a service script to start:
 
-```
+```sh
 cat <<EOF > /etc/init.d/ble2mqtt
 #!/bin/sh /etc/rc.common
 
@@ -306,12 +306,12 @@ it is recommended to do several workarounds:
 
 Build the image as:
 
-```shell script
+```sh
 podman build -t ble2mqtt:dev .
 ```
 
 Start the container and share the config file and DBus for Bluetooth connectivity:
-```shell script
+```sh
 podman run \
 -d \
 --net=host \
@@ -333,12 +333,12 @@ NOTE: `podman` is the same as `docker`
 
 Build the image as:
 
-```shell script
+```sh
 docker build -t ble2mqtt:dev .
 ```
 
 Start the container and share the config file:
-```shell script
+```sh
 docker run \
 -d \
 --net=host \
@@ -348,7 +348,7 @@ ble2mqtt:dev
 ```
 
 Docker compose:
-``` docker yaml
+```yaml
 version: '3.7'
 services:
 
