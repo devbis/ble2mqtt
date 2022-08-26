@@ -14,6 +14,14 @@ from ..compat import get_loop_param
 from ..devices.uuids import DEVICE_NAME, FIRMWARE_VERSION
 from ..utils import format_binary, rssi_to_linkquality
 
+try:
+    from bleak.backends.bluezdbus.manager import get_global_bluez_manager
+except ImportError:
+    # bleak < 0.15
+    async def nothing(): return None
+
+    get_global_bluez_manager = nothing
+
 _LOGGER = logging.getLogger(__name__)
 registered_device_types = {}
 
@@ -66,6 +74,21 @@ def done_callback(future: aio.Future):
             f'{future} stopped unexpectedly',
             exc_info=exc_info,
         )
+
+
+async def extract_rssi(client: BleakClient) -> ty. Optional[int]:
+    if hasattr(client, 'get_rssi'):
+        return await client.get_rssi()
+    try:
+        if client.manager:
+            # bleak >= 0.15
+            props = client.manager._properties.get(
+                client._device_path, {}).get("org.bluez.Device1", {})
+        else:
+            props = client._properties
+    except AttributeError:
+        return None
+    return props.get('RSSI')
 
 
 class RegisteredType(abc.ABCMeta):
@@ -336,8 +359,7 @@ class Device(BaseDevice, abc.ABC):
         if not self.config_sent:
             await send_config()
         if self.client:  # in passive mode, client is None
-            props = self.client._properties
-            self.rssi = props.get('RSSI')
+            self.rssi = await extract_rssi(self.client)
 
     def __str__(self):
         return self.unique_name
@@ -357,7 +379,9 @@ class Device(BaseDevice, abc.ABC):
 
     async def get_client(self, **kwargs) -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
-        return BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
+        client = BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
+        client.manager = await get_global_bluez_manager()
+        return client
 
     async def connect(self):
         if self.is_passive:
