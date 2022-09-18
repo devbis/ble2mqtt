@@ -104,8 +104,8 @@ class XiaomiKettle(XiaomiCipherMixin, Device):
     ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_KEEP_CONNECTION
 
     def __init__(self, mac, product_id=275, token=None,
-                 *args, loop, **kwargs):
-        super().__init__(mac, *args, loop=loop, **kwargs)
+                 *args, **kwargs):
+        super().__init__(mac, *args, **kwargs)
         self._product_id = product_id
         if token:
             assert isinstance(token, str) and len(token) == 24

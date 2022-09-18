@@ -3,6 +3,7 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 
+from ..compat import get_loop_param
 from ..protocols.redmond import (COOKER_PREDEFINED_PROGRAMS, CookerRunState,
                                  CookerState, RedmondCookerProtocol,
                                  RedmondError)
@@ -45,8 +46,8 @@ class RedmondCooker(RedmondCookerProtocol, Device):
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
 
     def __init__(self, mac, key='ffffffffffffffff', default_program='express',
-                 *args, loop, **kwargs):
-        super().__init__(mac, *args, loop=loop, **kwargs)
+                 *args, **kwargs):
+        super().__init__(mac, *args, **kwargs)
         assert isinstance(key, str) and len(key) == 16
         self._default_program = default_program
         self._key = bytes.fromhex(key)
@@ -232,7 +233,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                             value=self.transform_value(value),
                         ),
                         self._notify_state(publish_topic),
-                        loop=self._loop,
+                        **get_loop_param(self._loop),
                     )
                     break
                 except ConnectionError as e:
@@ -303,7 +304,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                                 ),
                             ),
                             self._notify_state(publish_topic),
-                            loop=self._loop,
+                            **get_loop_param(self._loop),
                         )
                         break
                     except ConnectionError as e:

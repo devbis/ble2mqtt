@@ -142,7 +142,7 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
             result = await aio.wait_for(
                 self.client.read_gatt_char(char),
                 timeout=timeout,
-                loop=self._loop,
+                **get_loop_param(self._loop),
             )
         except (aio.TimeoutError, BleakError, AttributeError):
             _LOGGER.exception(f'Cannot connect to device {self}')
@@ -479,8 +479,8 @@ class Sensor(Device, abc.ABC):
     REQUIRED_VALUES: ty.Sequence[str] = ()
     READ_DATA_IN_ACTIVE_LOOP: bool = False
 
-    def __init__(self, mac, *args, loop, **kwargs) -> None:
-        super().__init__(mac, *args, loop=loop, **kwargs)
+    def __init__(self, mac, *args, **kwargs) -> None:
+        super().__init__(mac, *args, **kwargs)
         self._state = None
 
     @property

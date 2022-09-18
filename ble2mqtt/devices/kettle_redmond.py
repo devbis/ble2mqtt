@@ -2,6 +2,7 @@ import asyncio as aio
 import logging
 import uuid
 
+from ..compat import get_loop_param
 from ..protocols.redmond import (ColorTarget, KettleG200Mode, KettleG200State,
                                  KettleRunState, RedmondKettle200Protocol)
 from .base import (LIGHT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
@@ -266,7 +267,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                                 value=self.transform_value(value),
                             ),
                             self._notify_state(publish_topic),
-                            loop=self._loop,
+                            **get_loop_param(self._loop),
                         )
                         break
                     except ConnectionError as e:
@@ -298,5 +299,5 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                             self._brightness,
                         ),
                         self._notify_state(publish_topic),
-                        loop=self._loop,
+                        **get_loop_param(self._loop),
                     )
