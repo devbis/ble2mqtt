@@ -101,7 +101,7 @@ class EnstoProtocol(BLEQueueMixin, BaseDevice, abc.ABC):
         target_temperature = \
             int.from_bytes(data[1:3], byteorder='little') / 10
         temperature = \
-            int.from_bytes(data[4:6], byteorder='little') / 10
+            int.from_bytes(data[4:6], byteorder='little', signed=True) / 10
         relay_is_on = data[8] == 1
         alarm_code = int.from_bytes(data[9:13], byteorder='little')
 
