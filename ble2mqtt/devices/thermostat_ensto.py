@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from ble2mqtt.protocols.ensto import ActiveMode, EnstoProtocol, Measurements
 
 from ..utils import format_binary
-from .base import BaseClimate, ClimateMode, ConnectionMode
+from .base import (BINARY_SENSOR_DOMAIN, BaseClimate, ClimateMode,
+                   ConnectionMode)
 from .uuids import DEVICE_NAME, SOFTWARE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,6 +19,9 @@ UUID_VACATION = uuid.UUID('6584e9c6-4784-41aa-ac09-c899191048ae')
 UUID_DATE = uuid.UUID('b43f918a-b084-45c8-9b60-df648c4a4a1e')
 UUID_HEATING_POWER = uuid.UUID('53b7bf87-6cf0-4790-839a-e72d3afbec44')
 UUID_FACTORY_RESET = uuid.UUID('f366dddb-ebe2-43ee-83c0-472ded74c8fa')
+
+
+RELAY_ENTITY = 'relay'
 
 
 @dataclass
@@ -53,6 +57,19 @@ class EnstoThermostat(EnstoProtocol, BaseClimate):
             assert len(key) == 8, f'{self}: Key must be 8 chars long'
             self._reset_id = bytes.fromhex(key)
         self.initial_status_sent = False
+
+    @property
+    def entities(self):
+        return {
+            **super().entities,
+            BINARY_SENSOR_DOMAIN: [
+                {
+                    'name': RELAY_ENTITY,
+                    'device_class': 'power',
+                    'entity_category': 'diagnostic',
+                },
+            ],
+        }
 
     async def get_device_data(self):
         await super().get_device_data()
@@ -111,6 +128,9 @@ class EnstoThermostat(EnstoProtocol, BaseClimate):
                 'temperature': self._state.temperature,
                 'target_temperature': self._state.target_temperature,
             },
+            RELAY_ENTITY: {
+                'relay': 'ON' if self._state.relay_is_on else 'OFF',
+            }
         }
 
     def set_current_potentiometer_value(self, measurements: Measurements,
