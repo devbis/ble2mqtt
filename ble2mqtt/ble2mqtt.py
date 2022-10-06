@@ -7,9 +7,10 @@ from contextlib import asynccontextmanager
 from uuid import getnode
 
 import aio_mqtt
-from bleak import BleakError, BleakScanner
+from bleak import BleakError
 from bleak.backends.device import BLEDevice
 
+from .compat import get_scanner
 from .devices.base import (BINARY_SENSOR_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN,
                            DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
                            SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
@@ -881,10 +882,7 @@ class Ble2Mqtt:
 
             try:
                 async with handle_ble_exceptions():
-                    scanner = BleakScanner()
-                    scanner.register_detection_callback(
-                        self.device_detection_callback,
-                    )
+                    scanner = get_scanner(self.device_detection_callback)
                     try:
                         await aio.wait_for(scanner.start(), 10)
                     except aio.TimeoutError:

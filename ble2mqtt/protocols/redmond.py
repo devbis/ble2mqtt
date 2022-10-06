@@ -336,8 +336,6 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         # if not self.notification_started:
         assert self.client.is_connected
         assert not self._cmd_queue_task.done()
-        # check for fresh client
-        assert not self.client._notification_callbacks
         _LOGGER.debug(f'Enable BLE notifications from [{self.client.address}]')
         await self.client.write_gatt_char(
             self.TX_CHAR,
