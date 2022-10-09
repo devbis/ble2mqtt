@@ -201,6 +201,7 @@ Extra configuration parameters:
 - `"base_topic"`- the default value is 'ble2mqtt'
 - `"mqtt_prefix"`- a prefix to distinguish ble devices from other instances and
   programs. The default value is 'b2m_'.
+- `"hci_adapter"` - an adapter to use. The default value is "hci0"
 
 Devices accept `friendly_name` parameter to replace mac address in device
 names for Home Assistant.

@@ -383,11 +383,12 @@ class Device(BaseDevice, abc.ABC):
         client.manager = await get_global_bluez_manager()
         return client
 
-    async def connect(self):
+    async def connect(self, adapter):
         if self.is_passive:
             return
 
         self.client = await self.get_client(
+            adapter=adapter,
             disconnected_callback=self._on_disconnect,
         )
         self.disconnected_event.clear()

@@ -83,6 +83,7 @@ async def amain(config):
         password=config.get('mqtt_password'),
         base_topic=config['base_topic'],
         mqtt_config_prefix=config['mqtt_config_prefix'],
+        hci_adapter=config['hci_adapter'],
     )
 
     loop.set_exception_handler(
@@ -128,7 +129,7 @@ def main():
         'base_topic': 'ble2mqtt',
         'mqtt_config_prefix': 'b2m_',
         'log_level': 'INFO',
-        # 'hci_device': 'hci0',
+        'hci_adapter': 'hci0',
         **config,
     }
 
