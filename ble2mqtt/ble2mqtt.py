@@ -184,8 +184,8 @@ async def handle_ble_exceptions(adapter: str):
 
 
 class DeviceManager:
-    def __init__(self, device, *, hci_adapter, mqtt_client, base_topic, config_prefix,
-                 global_availability_topic):
+    def __init__(self, device, *, hci_adapter, mqtt_client, base_topic,
+                 config_prefix, global_availability_topic):
         self.device: Device = device
         self._hci_adapter = hci_adapter
         self._mqtt_client = mqtt_client
@@ -885,7 +885,10 @@ class Ble2Mqtt:
 
             try:
                 async with handle_ble_exceptions(self._hci_adapter):
-                    scanner = get_scanner(self._hci_adapter, self.device_detection_callback)
+                    scanner = get_scanner(
+                        self._hci_adapter,
+                        self.device_detection_callback,
+                    )
                     try:
                         await aio.wait_for(scanner.start(), 10)
                     except aio.TimeoutError:
