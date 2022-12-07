@@ -31,6 +31,7 @@ class SensorState:
 
 class QingpingTempRHMonitorLite(XiaomiHumidityTemperature):
     NAME = 'qingpingCGDK2'
+    MANUFACTURER = 'Qingping'
     DATA_CHAR = SERVICE_DATA_UUID
     BATTERY_CHAR = BATTERY
     SENSOR_CLASS = SensorState
