@@ -12,3 +12,4 @@ from .vson_air_wp6003 import VsonWP6003  # noqa: F401
 from .xiaomi_ht import XiaomiHumidityTemperatureV1  # noqa: F401
 from .xiaomi_lywsd03 import XiaomiHumidityTemperatureLYWSD  # noqa: F401
 from .xiaomi_lywsd03_atc import XiaomiHumidityTemperatureLYWSDATC  # noqa: F401
+from .qingping_cgdk2 import QingpingTempRHMonitorLite  # noqa: F401
