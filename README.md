@@ -43,6 +43,7 @@
   firmware is recommended)
 - **Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)**
   - supported both atc1441 and pvvx formats
+- **Qingping CGDK2 (type: qingpingCGDK2)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
