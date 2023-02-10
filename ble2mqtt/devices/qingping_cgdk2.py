@@ -44,6 +44,9 @@ class QingpingTempRHMonitorLite(XiaomiHumidityTemperature):
     def handle_advert(self, scanned_device: BLEDevice, adv_data):
         service_data = adv_data.service_data
         adv_data = service_data.get(str("0000fdcd-0000-1000-8000-00805f9b34fb"))
+        if adv_data is  None :
+              return
+
         data_str = format_binary(adv_data," ")
         
         # adv_data = bytes(adv_data)
