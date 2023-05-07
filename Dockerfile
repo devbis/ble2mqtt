@@ -1,5 +1,5 @@
 # First stage, build requirements
-FROM python:3.9-slim as builder
+FROM python:3-slim as builder
 
 RUN apt-get update && \
     apt-get install gcc git -y && \
@@ -16,7 +16,7 @@ RUN pip install --user --no-warn-script-location -r requirements.txt
 RUN pip install --user --no-warn-script-location .
 
 # Second stage
-FROM python:3.9-slim as app
+FROM python:3-slim as app
 
 # Bluetoothctl is required
 RUN apt-get update && \
