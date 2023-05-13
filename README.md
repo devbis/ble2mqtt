@@ -70,6 +70,10 @@
   The adapter uses holiday mode to control temperature as thermostat. You cannot 
   use this feature in the official app while ble2mqtt is working.
 
+### Battery voltage meters
+
+- **BM2 car battery voltage meter (type: voltage_bm2)**
+
 
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
@@ -191,6 +195,10 @@ The configuration file is a JSON with the following content:
         {
             "address": "11:22:33:aa:aa:aa",
             "type": "atomfast"
+        },
+        {
+            "address": "11:22:33:aa:aa:bb",
+            "type": "voltage_bm2"
         }
     ]
 }
