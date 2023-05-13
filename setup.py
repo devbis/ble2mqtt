@@ -24,6 +24,9 @@ setup(
         'aio-mqtt-mod>=0.3.0',
         'bleak>=0.12.0',
     ],
+    extras_require={
+        'full': ['pycryptodome']
+    },
     classifiers=[
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
