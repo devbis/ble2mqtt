@@ -47,7 +47,7 @@ class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature):
     SUPPORT_PASSIVE = True
     ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT
 
-    def filter_notifications(self, sender):
+    def filter_notifications(self, sender, data):
         # sender is 0xd or several requests it becomes
         # /org/bluez/hci0/dev_58_2D_34_32_E0_69/service000c/char000d
         return (

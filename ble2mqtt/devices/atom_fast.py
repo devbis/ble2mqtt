@@ -66,5 +66,5 @@ class AtomFast(SubscribeAndSetDataMixin, Sensor):
             ],
         }
 
-    def filter_notifications(self, sender):
+    def filter_notifications(self, sender, data):
         return sender == 0x24

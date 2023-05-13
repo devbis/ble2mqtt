@@ -556,7 +556,7 @@ class SubscribeAndSetDataMixin:
     DATA_CHAR: uuid.UUID = None  # type: ignore
     SENSOR_CLASS: ty.Any = None  # type: ignore
 
-    def filter_notifications(self, sender):
+    def filter_notifications(self, sender, data):
         return True
 
     def process_data(self, data: bytearray):
@@ -568,7 +568,7 @@ class SubscribeAndSetDataMixin:
             sender,
             format_binary(data),
         ))
-        if self.filter_notifications(sender):
+        if self.filter_notifications(sender, data):
             self.process_data(data)
 
     async def get_device_data(self):
