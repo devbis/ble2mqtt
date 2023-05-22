@@ -40,7 +40,7 @@ class Presence(Sensor):
         cls = self.SENSOR_CLASS
         self._state: cls = None
         self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
-        self._sdp_activation = kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION)
+        self._sdp_activation = bool(kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION))
 
     @property
     def entities(self):
@@ -83,9 +83,9 @@ class Presence(Sensor):
         # send if changed or update value every SEND_DATA_PERIOD secs
         if self.last_sent_value is None or \
                 self.last_sent_value != self._state.presence or \
-                ( self._sdp_activation and (datetime.now() - self.last_sent_time).seconds > \
-                self.SEND_DATA_PERIOD ) or \
-                ( self._state.presence and (datetime.now() - self.last_sent_time).seconds > \
+                (self._sdp_activation and (datetime.now() - self.last_sent_time).seconds > \
+                self.SEND_DATA_PERIOD) or \
+                (self._state.presence and (datetime.now() - self.last_sent_time).seconds > \
                 self.SEND_DATA_PERIOD):
 
             _LOGGER.debug(f'Try publish {self._state}')
