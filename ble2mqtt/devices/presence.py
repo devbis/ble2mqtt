@@ -36,7 +36,7 @@ class Presence(Sensor):
         cls = self.SENSOR_CLASS
         self._state: cls = None
         self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
-        self._sdp_activation = int(kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION))
+        self._sdp_activation = kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION)
 
     @property
     def entities(self):
