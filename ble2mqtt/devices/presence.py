@@ -29,12 +29,14 @@ class Presence(Sensor):
     THRESHOLD = 300  # if no activity more than THRESHOLD, consider presence=OFF
     PASSIVE_SLEEP_INTERVAL = 1
     SEND_DATA_PERIOD = 60
+    SEND_DATA_PERIOD_ACTIVATION = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         cls = self.SENSOR_CLASS
         self._state: cls = None
         self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
+        self._sdp_activation = int(kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION))
 
     @property
     def entities(self):
@@ -74,8 +76,10 @@ class Presence(Sensor):
         # send if changed or update value every SEND_DATA_PERIOD secs
         if self.last_sent_value is None or \
                 self.last_sent_value != self._state.presence or \
-                (datetime.now() - self.last_sent_time).seconds > \
-                self.SEND_DATA_PERIOD:
+                ( self._sdp_activation == True and (datetime.now() - self.last_sent_time).seconds > \
+                self.SEND_DATA_PERIOD ) or \
+                ( self._state.presence == True and (datetime.now() - self.last_sent_time).seconds > \
+                self.SEND_DATA_PERIOD):
 
             _LOGGER.debug(f'Try publish {self._state}')
             await self._notify_state(publish_topic)
