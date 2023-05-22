@@ -40,6 +40,7 @@ class Presence(Sensor):
         cls = self.SENSOR_CLASS
         self._state: cls = None
         self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
+        self._send_data_period = int(kwargs.get('send_data_period', self.SEND_DATA_PERIOD))
         self._sdp_activation = bool(kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION))
 
     @property
@@ -84,9 +85,9 @@ class Presence(Sensor):
         if self.last_sent_value is None or \
                 self.last_sent_value != self._state.presence or \
                 (self._sdp_activation and (datetime.now() - self.last_sent_time).seconds > \
-                self.SEND_DATA_PERIOD) or \
+                self._send_data_period) or \
                 (self._state.presence and (datetime.now() - self.last_sent_time).seconds > \
-                self.SEND_DATA_PERIOD):
+                self._send_data_period):
 
             _LOGGER.debug(f'Try publish {self._state}')
             await self._notify_state(publish_topic)
