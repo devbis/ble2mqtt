@@ -30,7 +30,6 @@ class Presence(Sensor):
     PASSIVE_SLEEP_INTERVAL = 1
     SEND_DATA_PERIOD = 60
     SEND_DATA_PERIOD_ACTIVATION = True
-    ONLY_ONLINE_NOTIFICATION = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -38,7 +37,6 @@ class Presence(Sensor):
         self._state: cls = None
         self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
         self._sdp_activation = kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION)
-        self._oo_notification = kwargs.get('oo_notification', self.ONLY_ONLINE_NOTIFICATION)
 
     @property
     def entities(self):
@@ -71,7 +69,7 @@ class Presence(Sensor):
         await super().handle_passive(*args, **kwargs)
 
     async def do_passive_loop(self, publish_topic):
-        if self._oo_notification == False and self._state.presence and \
+        if self._state.presence and \
                 self._state.last_check + \
                 timedelta(seconds=self._threshold) < datetime.now():
             self._state.presence = False
