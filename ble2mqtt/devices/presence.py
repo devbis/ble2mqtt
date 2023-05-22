@@ -18,6 +18,10 @@ class SensorState:
     @property
     def device_tracker(self):
         return 'home' if self.presence else 'not_home'
+    
+    @property
+    def manufacturer(self):
+        return 'generic'
 
 
 class Presence(Sensor):
@@ -51,6 +55,9 @@ class Presence(Sensor):
                 {
                     'name': 'device_tracker',
                 },
+                {
+                    'name': 'manufacturer',
+                },
             ],
         }
 
@@ -76,9 +83,9 @@ class Presence(Sensor):
         # send if changed or update value every SEND_DATA_PERIOD secs
         if self.last_sent_value is None or \
                 self.last_sent_value != self._state.presence or \
-                ( self._sdp_activation == True and (datetime.now() - self.last_sent_time).seconds > \
+                ( self._sdp_activation and (datetime.now() - self.last_sent_time).seconds > \
                 self.SEND_DATA_PERIOD ) or \
-                ( self._state.presence == True and (datetime.now() - self.last_sent_time).seconds > \
+                ( self._state.presence and (datetime.now() - self.last_sent_time).seconds > \
                 self.SEND_DATA_PERIOD):
 
             _LOGGER.debug(f'Try publish {self._state}')
