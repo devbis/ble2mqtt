@@ -18,6 +18,10 @@ class SensorState:
     @property
     def device_tracker(self):
         return 'home' if self.presence else 'not_home'
+    
+    @property
+    def manufacturer(self):
+        return 'generic'
 
 
 class Presence(Sensor):
@@ -29,12 +33,15 @@ class Presence(Sensor):
     THRESHOLD = 300  # if no activity more than THRESHOLD, consider presence=OFF
     PASSIVE_SLEEP_INTERVAL = 1
     SEND_DATA_PERIOD = 60
+    SEND_DATA_PERIOD_ACTIVATION = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         cls = self.SENSOR_CLASS
         self._state: cls = None
         self._threshold = int(kwargs.get('threshold', self.THRESHOLD))
+        self._send_data_period = int(kwargs.get('send_data_period', self.SEND_DATA_PERIOD))
+        self._sdp_activation = bool(kwargs.get('sdp_activation', self.SEND_DATA_PERIOD_ACTIVATION))
 
     @property
     def entities(self):
@@ -48,6 +55,9 @@ class Presence(Sensor):
             DEVICE_TRACKER_DOMAIN: [
                 {
                     'name': 'device_tracker',
+                },
+                {
+                    'name': 'manufacturer',
                 },
             ],
         }
@@ -74,8 +84,10 @@ class Presence(Sensor):
         # send if changed or update value every SEND_DATA_PERIOD secs
         if self.last_sent_value is None or \
                 self.last_sent_value != self._state.presence or \
-                (datetime.now() - self.last_sent_time).seconds > \
-                self.SEND_DATA_PERIOD:
+                (self._sdp_activation and (datetime.now() - self.last_sent_time).seconds > \
+                self._send_data_period) or \
+                (self._state.presence and (datetime.now() - self.last_sent_time).seconds > \
+                self._send_data_period):
 
             _LOGGER.debug(f'Try publish {self._state}')
             await self._notify_state(publish_topic)
