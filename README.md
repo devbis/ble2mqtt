@@ -1,4 +1,7 @@
 # BLE2MQTT
+
+### Base on `devbis/ble2mqtt` approach with some changes for presence detection.</p>
+
 ### Control your Bluetooth devices with smart home
 
 ![ble2mqtt devices](./ble2mqtt.png)
@@ -7,8 +10,10 @@
 
 ### Any device
 - Any bluetooth device can work as a presence tracker 
-  You can provide `"threshold"` parameter to the device to set the limit in 
-  second when the device is considered away. The default value is 180 seconds.
+  - `"threshold"` - set the limit in 
+  second when the device is considered away. The default value is 180 seconds. 
+  - `"send_data_period"` - variable defines a time when status update should be pushed. Default is 60 seconds of the refresh.
+  - `"sdp_activation"` - enable/disable `SEND_DATA_PERIOD` usage. Status is refreshed only when tracker has `ON` state. When is `OFF` it stops sending. Default is `True`.
 
 ### Kettles
 - **Redmond RK-G2xxS series (type: redmond_rk_g200)**
@@ -253,7 +258,7 @@ Execute the following commands in the terminal:
 opkg update
 opkg install python3-pip python3-asyncio
 pip3 install "bleak>=0.11.0"
-pip3 install -U ble2mqtt
+pip3 install -U git+https://github.com/orzechszek/ble2mqtt.git
 ```
 
 Create the configuration file in /etc/ble2mqtt.json and
@@ -317,66 +322,12 @@ it is recommended to do several workarounds:
 Build the image as:
 
 ```sh
-podman build -t ble2mqtt:dev .
-```
-
-Start the container and share the config file and DBus for Bluetooth connectivity:
-```sh
-podman run \
--d \
---net=host \
--v $PWD/ble2mqtt.json.sample:/etc/ble2mqtt.json:z \
--v /var/run/dbus:/var/run/dbus:z \
-ble2mqtt:dev
-```
-
-Instead of sharing `/var/run/dbus`, you can export `DBUS_SYSTEM_BUS_ADDRESS`.
-
-NOTE: `--net=host` is required as it needs to use the bluetooth interface
-
-NOTE: `podman` is the same as `docker`
-
-
-## Running in Container FULLy
-
-> **ATTENTION:** Make sure `bluez` is not running (or not intalled) on your host. 
-
-Build the image as:
-
-```sh
-docker build -t ble2mqtt:dev .
+docker build -t ble2mqtt .
 ```
 
 Start the container and share the config file:
 ```sh
-docker run \
--d \
---net=host \
---cap-add=NET_ADMIN \
--v $PWD/ble2mqtt.json.sample:/etc/ble2mqtt.json:ro \
-ble2mqtt:dev
+docker run -d --net=host --cap-add=NET_ADMIN --privileged --name ble2mqtt -e TZ=Europe/Warsaw -v /opt/ble2mqtt/data:/data -v /var/run/dbus:/var/run/dbus ble2mqtt:latest
 ```
-
-Docker compose:
-```yaml
-version: '3.7'
-services:
-
-  ble2mqtt:
-    image: ble2mqtt:dev
-    build: ./ble2mqtt
-    hostname: ble2mqtt
-    restart: always
-    environment:
-      - TZ=Asia/Yekaterinburg
-    volumes:
-      - ./ble2mqtt/ble2mqtt.json:/etc/ble2mqtt.json:ro
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-
-```
-
-You do not need sharing `/var/run/dbus`, because `dbus` will start in the container.
 
 NOTE: `--net=host` and `--cap-add=NET_ADMIN` is required as it needs to use and control the bluetooth interface
