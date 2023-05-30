@@ -220,14 +220,17 @@ class DeviceManager:
         if not self._mqtt_client.is_connected():
             _LOGGER.warning(f'{self.device} mqtt is disconnected')
             return
-        await self._mqtt_client.publish(
-            aio_mqtt.PublishableMessage(
-                topic_name='/'.join((self._base_topic, topic)),
-                payload=value,
-                qos=aio_mqtt.QOSLevel.QOS_1,
-            ),
-            nowait=nowait,
-        )
+        try:
+            await self._mqtt_client.publish(
+                aio_mqtt.PublishableMessage(
+                    topic_name='/'.join((self._base_topic, topic)),
+                    payload=value,
+                    qos=aio_mqtt.QOSLevel.QOS_1,
+                ),
+                nowait=nowait,
+            )
+        except ListOfMQTTConnectionErrors:
+            _LOGGER.exception('Error while publishing to MQTT')
 
     def _get_topic(self, dev_id, subtopic, *args):
         return '/'.join(
