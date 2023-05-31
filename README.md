@@ -120,6 +120,10 @@ Pairing successful
 You can proceed with the next configuration steps now.
 
 
+## Selinux issues
+
+If using SELinux and you are experience issues, see [README.md](selinux/README.md).
+
 ### Known issues:
 - *High cpu usage due to underlying library to work with bluetooth*
 

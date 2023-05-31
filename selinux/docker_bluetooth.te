@@ -1,0 +1,11 @@
+module docker_bluetooth 1.0;
+
+require {
+	type spc_t;
+	type bluetooth_t;
+	class dbus send_msg;
+}
+
+#============= bluetooth_t ==============
+allow bluetooth_t spc_t:dbus send_msg;
+
