@@ -7,4 +7,3 @@ else
     bluetoothd &
     ble2mqtt
 fi
-
