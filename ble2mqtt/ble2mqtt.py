@@ -725,6 +725,7 @@ class Ble2Mqtt:
 
     def __init__(
             self,
+            ssl,
             host: str,
             port: int = None,
             user: ty.Optional[str] = None,
@@ -743,6 +744,7 @@ class Ble2Mqtt:
         self._mqtt_port = port
         self._mqtt_user = user
         self._mqtt_password = password
+        self._ssl = ssl
         self._base_topic = base_topic
         self._mqtt_config_prefix = mqtt_config_prefix
 
@@ -976,6 +978,7 @@ class Ble2Mqtt:
                     port=self._mqtt_port,
                     username=self._mqtt_user,
                     password=self._mqtt_password,
+                    ssl=self._ssl,
                     client_id=f'ble2mqtt_{dev_id}',
                     will_message=aio_mqtt.PublishableMessage(
                         topic_name=self.availability_topic,
