@@ -534,6 +534,11 @@ class Sensor(Device, abc.ABC):
                 continue
 
             await self.do_active_loop(publish_topic)
+            if (
+                self.ACTIVE_CONNECTION_MODE == ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT and
+                self.client.is_connected
+            ):
+                await self.client.disconnect()
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
 
     async def handle_passive(self, publish_topic, send_config, *args, **kwargs):
