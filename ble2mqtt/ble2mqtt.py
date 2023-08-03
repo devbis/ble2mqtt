@@ -670,7 +670,7 @@ class DeviceManager:
                         f'{missing_device_count} times. Restarting bluetooth.',
                     )
                     missing_device_count = 0
-                    await restart_bluetooth()
+                    await restart_bluetooth(self._hci_adapter)
             finally:
                 if self.device.ACTIVE_CONNECTION_MODE not in (
                     ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT,
@@ -706,7 +706,7 @@ class DeviceManager:
                     pass
 
             if failure_count >= FAILURE_LIMIT:
-                await restart_bluetooth()
+                await restart_bluetooth(self._hci_adapter)
                 failure_count = 0
             try:
                 if not device.disconnected_event.is_set():
