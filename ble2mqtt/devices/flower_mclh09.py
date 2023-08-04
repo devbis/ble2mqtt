@@ -10,6 +10,53 @@ from .uuids import BATTERY
 
 _LOGGER = logging.getLogger(__name__)
 
+TEMPERATURE_VALUES = [68.8, 49.8, 24.3, 6.4, 1.0, -5.5, -20.5, -41.0]
+TEMPERATURE_READINGS = [1035, 909, 668, 424, 368, 273, 159, 0]
+MOISTURE_VALUES = [60.0, 58.0, 54.0, 22.0, 2.0, 0.0]
+MOISTURE_READINGS = [1254, 1249, 1202, 1104, 944, 900]
+LIGHT_VALUES = [
+    175300.0, 45400.0, 32100.0, 20300.0, 14760.0, 7600.0, 1200.0, 444.0,
+    29.0, 17.0, 0.0,
+]
+LIGHT_READINGS = [911, 764, 741, 706, 645, 545, 196, 117, 24, 17, 0]
+
+
+def _interpolate(raw_value, values, raw_values):
+    index = 0
+    if raw_value > raw_values[0]:
+        index = 0
+    elif raw_value < raw_values[-2]:
+        index = len(raw_values) - 2
+    else:
+        while raw_value < raw_values[index + 1]:
+            index += 1
+
+    delta_value = values[index] - values[index + 1]
+    delta_raw = raw_values[index] - raw_values[index + 1]
+    return (
+        (raw_value - raw_values[index + 1]) * delta_value / delta_raw +
+        values[index + 1]
+    )
+
+
+def calculate_temperature(raw_value):
+    return _interpolate(raw_value, TEMPERATURE_VALUES, TEMPERATURE_READINGS)
+
+
+def calculate_moisture(raw_value):
+    humidity = _interpolate(raw_value, MOISTURE_VALUES, MOISTURE_READINGS)
+
+    if humidity > 60.0:
+        humidity = 60.0
+    if humidity < 0.0:
+        humidity = 0.0
+
+    return humidity
+
+
+def calculate_illuminance(raw_value):
+    return _interpolate(raw_value, LIGHT_VALUES, LIGHT_READINGS)
+
 
 @dataclass
 class SensorState:
@@ -20,11 +67,11 @@ class SensorState:
 
     @classmethod
     def from_data(cls, data: bytes, battery: bytes):
-        temp, _, moisture, illuminance = struct.unpack('<hHHH', data)
+        temp_raw, moisture_raw, illuminance_raw = struct.unpack('<HxxHH', data)
         return cls(
-            temperature=round(temp / 24.02482269503546, 2),
-            moisture=round(moisture / 13, 2),
-            illuminance=illuminance * 0.16,
+            temperature=round(calculate_temperature(temp_raw), 2),
+            moisture=round(calculate_moisture(moisture_raw), 2),
+            illuminance=int(calculate_illuminance(illuminance_raw)),
             battery=int.from_bytes(battery, byteorder='little'),
         )
 
