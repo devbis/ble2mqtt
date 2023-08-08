@@ -18,18 +18,27 @@ RUN pip install --user --no-warn-script-location .
 # Second stage
 FROM python:3-slim as app
 
+ENV ROOTLESS_UID 1001
+ENV ROOTLESS_GID 1001
+ENV ROOTLESS_NAME "rootless"
+
 # Bluetoothctl is required
 RUN apt-get update && \
     apt-get install bluez -y && \
     apt-get clean
 
 # Copy the local python packages
-COPY --from=builder /root/.local /root/.local
+RUN groupadd --gid ${ROOTLESS_GID} ${ROOTLESS_NAME} && \
+    useradd --gid ${ROOTLESS_GID} --uid ${ROOTLESS_UID} -d /home/${ROOTLESS_NAME} ${ROOTLESS_NAME}
+
+COPY --from=builder /root/.local /home/${ROOTLESS_NAME}/.local
 
 # Copy run script
-COPY ./docker_entrypoint.sh docker_entrypoint.sh
-RUN chmod +x docker_entrypoint.sh
+COPY ./docker_entrypoint.sh /home/${ROOTLESS_NAME}/docker_entrypoint.sh
+RUN chmod +x /home/${ROOTLESS_NAME}/docker_entrypoint.sh
+RUN chown -R ${ROOTLESS_UID}:${ROOTLESS_GID} /home/${ROOTLESS_NAME}
 
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/home/rootless/.local/bin:$PATH
 
-CMD [ "./docker_entrypoint.sh" ]
+USER ${ROOTLESS_NAME}
+CMD [ "/home/rootless/docker_entrypoint.sh" ]
