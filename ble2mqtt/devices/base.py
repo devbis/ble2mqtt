@@ -376,25 +376,48 @@ class Device(BaseDevice, abc.ABC):
         """Here put the initial configuration for the device"""
         pass
 
-    async def get_client(self, **kwargs) -> BleakClient:
+    async def get_client(self, ble_device: ty.Optional[BLEDevice], **kwargs) \
+            -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
-        client = BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
+        client = BleakClient(
+            ble_device or self.mac,
+            address_type=self.MAC_TYPE,
+            **kwargs,
+        )
         client.manager = await get_global_bluez_manager()
         return client
 
-    async def connect(self, adapter):
-        if self.is_passive:
-            return
+    async def _get_client_and_connect(self, adapter: str,
+                                      known_devices: ty.Dict,
+                                      timeout: int):
+        while self.mac.lower() not in known_devices:
+            await aio.sleep(0.2)
 
-        self.client = await self.get_client(
+        client = await self.get_client(
+            ble_device=known_devices[self.mac.lower()],
             adapter=adapter,
             disconnected_callback=self._on_disconnect,
         )
         self.disconnected_event.clear()
+
+        await aio.wait_for(client.connect(), timeout=timeout)
+        return client
+
+    async def connect(self, adapter: str, known_devices: ty.Dict):
+        if self.is_passive:
+            return
+
         try:
-            # 10 is the implicit timeout in bleak client, add 2 more seconds
-            # for internal routines
-            await aio.wait_for(self.client.connect(), timeout=12)
+            self.client = await aio.wait_for(
+                self._get_client_and_connect(
+                    adapter,
+                    known_devices,
+                    timeout=10,
+                ),
+                # 10 is the implicit timeout in bleak client, add 2 more seconds
+                # for internal routines
+                timeout=12,
+            )
         except aio.TimeoutError as e:
             self.disconnected_event.set()
             raise ConnectionTimeoutError() from e

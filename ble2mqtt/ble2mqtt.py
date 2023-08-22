@@ -16,6 +16,11 @@ from .devices.base import (BINARY_SENSOR_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN,
                            SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
                            ConnectionTimeoutError, Device, done_callback)
 
+try:
+    from bleak import AdvertisementData
+except ImportError:
+    AdvertisementData = ty.Any
+
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_MQTT_NAMESPACE = 'homeassistant'
@@ -185,7 +190,7 @@ async def handle_ble_exceptions(adapter: str):
 
 class DeviceManager:
     def __init__(self, device, *, hci_adapter, mqtt_client, base_topic,
-                 config_prefix, global_availability_topic):
+                 config_prefix, global_availability_topic, known_devices):
         self.device: Device = device
         self._hci_adapter = hci_adapter
         self._mqtt_client = mqtt_client
@@ -193,6 +198,7 @@ class DeviceManager:
         self._config_prefix = config_prefix
         self._global_availability_topic = global_availability_topic
         self.manage_task = None
+        self._known_devices = known_devices
 
     async def close(self):
         if self.manage_task and not self.manage_task.done():
@@ -573,7 +579,7 @@ class DeviceManager:
                 _LOGGER.debug(f'[{device}] Check for lock')
             try:
                 async with handle_ble_exceptions(self._hci_adapter):
-                    await device.connect(self._hci_adapter)
+                    await device.connect(self._hci_adapter, self._known_devices)
                     initial_coros = []
                     if not device.is_passive:
                         if not device.DEVICE_DROPS_CONNECTION:
@@ -766,6 +772,7 @@ class Ble2Mqtt:
         ))
 
         self.device_registry: ty.List[Device] = []
+        self.known_devices_by_mac: ty.Dict[str, BLEDevice] = {}
 
     async def start(self):
         result = await run_tasks_and_cancel_on_first_return(
@@ -863,7 +870,8 @@ class Ble2Mqtt:
                 _LOGGER.exception(
                     f'Problem on closing dev manager {manager.device}')
 
-    def device_detection_callback(self, device: BLEDevice, advertisement_data):
+    def device_detection_callback(self, device: BLEDevice,
+                                  advertisement_data: AdvertisementData):
         for reg_device in self.device_registry:
             if reg_device.mac.lower() == device.address.lower():
                 if hasattr(advertisement_data, 'rssi'):
@@ -873,6 +881,9 @@ class Ble2Mqtt:
                 if rssi:
                     # update rssi for all devices if available
                     reg_device.rssi = rssi
+
+                self.known_devices_by_mac[reg_device.mac.lower()] = device
+
                 if reg_device.is_passive:
                     if device.name:
                         reg_device._model = device.name
@@ -920,7 +931,6 @@ class Ble2Mqtt:
             await aio.sleep(1)
 
     async def _run_device_tasks(self, mqtt_connection_fut: aio.Future) -> None:
-        has_passive_devices = False
         for dev in self.device_registry:
             self._device_managers[dev] = \
                 DeviceManager(
@@ -930,19 +940,17 @@ class Ble2Mqtt:
                     base_topic=self._base_topic,
                     config_prefix=self._mqtt_config_prefix,
                     global_availability_topic=self.availability_topic,
+                    known_devices=self.known_devices_by_mac,
                 )
-            if dev.is_passive:
-                has_passive_devices = True
         _LOGGER.debug("Wait for network interruptions...")
 
         device_tasks = [
             manager.run_task()
             for manager in self._device_managers.values()
         ]
-        if has_passive_devices:
-            scan_task = self._loop.create_task(self.scan_devices_task())
-            scan_task.add_done_callback(done_callback)
-            device_tasks.append(scan_task)
+        scan_task = self._loop.create_task(self.scan_devices_task())
+        scan_task.add_done_callback(done_callback)
+        device_tasks.append(scan_task)
 
         futs = [
             mqtt_connection_fut,
