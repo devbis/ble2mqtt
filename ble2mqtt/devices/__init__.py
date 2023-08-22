@@ -5,6 +5,7 @@ from .cooker_redmond import RedmondCooker  # noqa: F401
 from .cover_am43 import AM43Cover  # noqa: F401
 from .cover_soma import SomaCover  # noqa: F401
 from .flower_mclh09 import FlowerMonitorMCLH09  # noqa: F401
+from .flower_miflora import FlowerMonitorMiFlora  # noqa: F401
 from .kettle_redmond import RedmondKettle  # noqa: F401
 from .kettle_xiaomi import XiaomiKettle  # noqa: F401
 from .presence import Presence  # noqa: F401

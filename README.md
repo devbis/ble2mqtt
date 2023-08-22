@@ -79,7 +79,10 @@
 
 - **LifeControl MCLH-09 (type: mclh09)**
 
-  optionally, reconnection interval can be configured with `interval` parameter in seconds
+  optionally, polling interval can be configured with `interval` parameter in seconds
+- **Xiaomi Mi Flora (type: miflora)**
+
+  optionally, polling interval can be configured with `interval` parameter in seconds
 
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
@@ -211,9 +214,14 @@ The configuration file is a JSON with the following content:
             "type": "voltage_bm2"
         },
         {
-            "address": "11:22:33:aa:aa:bv",
+            "address": "11:22:33:aa:aa:bc",
             "type": "mclh09",
             "interval": 600
+        },
+        {
+            "address": "11:22:33:aa:aa:bd",
+            "type": "miflora",
+            "interval": 500
         }
     ]
 }
