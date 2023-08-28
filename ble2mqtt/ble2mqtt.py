@@ -190,7 +190,7 @@ async def handle_ble_exceptions(adapter: str):
 
 class DeviceManager:
     def __init__(self, device, *, hci_adapter, mqtt_client, base_topic,
-                 config_prefix, global_availability_topic, known_devices):
+                 config_prefix, global_availability_topic):
         self.device: Device = device
         self._hci_adapter = hci_adapter
         self._mqtt_client = mqtt_client
@@ -198,7 +198,13 @@ class DeviceManager:
         self._config_prefix = config_prefix
         self._global_availability_topic = global_availability_topic
         self.manage_task = None
-        self._known_devices = known_devices
+
+        self._scanned_device: ty.Union[BLEDevice, None] = None
+        self._scanned_device_set = aio.Event()
+
+    def set_scanned_device(self, ble_device: BLEDevice):
+        self._scanned_device = ble_device
+        self._scanned_device_set.set()
 
     async def close(self):
         if self.manage_task and not self.manage_task.done():
@@ -578,8 +584,12 @@ class DeviceManager:
             async with BLUETOOTH_RESTARTING:
                 _LOGGER.debug(f'[{device}] Check for lock')
             try:
+                try:
+                    await aio.wait_for(self._scanned_device_set.wait(), timeout=10)
+                except aio.TimeoutError as e:
+                    raise ConnectionTimeoutError(f'[{device}] is not visible for 10 sec') from e
                 async with handle_ble_exceptions(self._hci_adapter):
-                    await device.connect(self._hci_adapter, self._known_devices)
+                    await device.connect(self._hci_adapter, self._scanned_device)
                     initial_coros = []
                     if not device.is_passive:
                         if not device.DEVICE_DROPS_CONNECTION:
@@ -772,11 +782,10 @@ class Ble2Mqtt:
         ))
 
         self.device_registry: ty.List[Device] = []
-        self.known_devices_by_mac: ty.Dict[str, BLEDevice] = {}
 
     async def start(self):
         result = await run_tasks_and_cancel_on_first_return(
-            self._loop.create_task(self._connect_forever()),
+            self._loop.create_task(self._connect_mqtt_forever()),
             self._loop.create_task(self._handle_messages()),
         )
         for t in result:
@@ -882,7 +891,8 @@ class Ble2Mqtt:
                     # update rssi for all devices if available
                     reg_device.rssi = rssi
 
-                self.known_devices_by_mac[reg_device.mac.lower()] = device
+                if reg_device in self._device_managers:
+                    self._device_managers[reg_device].set_scanned_device(device)
 
                 if reg_device.is_passive:
                     if device.name:
@@ -940,7 +950,6 @@ class Ble2Mqtt:
                     base_topic=self._base_topic,
                     config_prefix=self._mqtt_config_prefix,
                     global_availability_topic=self.availability_topic,
-                    known_devices=self.known_devices_by_mac,
                 )
         _LOGGER.debug("Wait for network interruptions...")
 
@@ -977,7 +986,7 @@ class Ble2Mqtt:
         finished = [t for t in futs if t.done() and not t.cancelled()]
         await handle_returned_tasks(*finished)
 
-    async def _connect_forever(self) -> None:
+    async def _connect_mqtt_forever(self) -> None:
         dev_id = hex(getnode())
         while True:
             try:

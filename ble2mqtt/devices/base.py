@@ -119,6 +119,7 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
         self._loop = loop
         self.client: BleakClient = None
         self.disconnected_event = aio.Event()
+        self.disconnected_event.set()
         if kwargs.get('passive') and not self.SUPPORT_PASSIVE:
             raise NotImplementedError(
                 'This device doesn\'t support passive mode',
@@ -198,7 +199,7 @@ class Device(BaseDevice, abc.ABC):
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
-        self.mac = mac
+        self.mac = mac.lower()
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
         self._version = None
@@ -382,28 +383,25 @@ class Device(BaseDevice, abc.ABC):
         client = BleakClient(
             ble_device or self.mac,
             address_type=self.MAC_TYPE,
+            disconnected_callback=self._on_disconnect,
             **kwargs,
         )
         client.manager = await get_global_bluez_manager()
         return client
 
     async def _get_client_and_connect(self, adapter: str,
-                                      known_devices: ty.Dict,
+                                      ble_device: BLEDevice,
                                       timeout: int):
-        while self.mac.lower() not in known_devices:
-            await aio.sleep(0.2)
-
         client = await self.get_client(
-            ble_device=known_devices[self.mac.lower()],
+            ble_device=ble_device,
             adapter=adapter,
-            disconnected_callback=self._on_disconnect,
         )
         self.disconnected_event.clear()
 
         await aio.wait_for(client.connect(), timeout=timeout)
         return client
 
-    async def connect(self, adapter: str, known_devices: ty.Dict):
+    async def connect(self, adapter: str, ble_device: BLEDevice):
         if self.is_passive:
             return
 
@@ -411,7 +409,7 @@ class Device(BaseDevice, abc.ABC):
             self.client = await aio.wait_for(
                 self._get_client_and_connect(
                     adapter,
-                    known_devices,
+                    ble_device,
                     timeout=10,
                 ),
                 # 10 is the implicit timeout in bleak client, add 2 more seconds
