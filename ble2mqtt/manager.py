@@ -31,6 +31,7 @@ class DeviceManager:
         self._config_prefix = config_prefix
         self._global_availability_topic = global_availability_topic
         self.manage_task = None
+        self.last_connection_successful = True
 
         self._scanned_device: ty.Union[BLEDevice, None] = None
         self._scanned_device_set = aio.Event()
@@ -392,7 +393,12 @@ class DeviceManager:
             f'Sleep for {device.RECONNECTION_SLEEP_INTERVAL} secs to '
             f'reconnect to device={device}',
         )
-        if device._connection_mode == ConnectionMode.ACTIVE_KEEP_CONNECTION:
+        if (
+            device._connection_mode == ConnectionMode.ACTIVE_KEEP_CONNECTION or
+            # if last connection failed, connect as soon as device appears,
+            # don't wait for RECONNECTION_SLEEP_INTERVAL seconds
+            not self.last_connection_successful
+        ):
             try:
                 await aio.wait_for(
                     device._advertisement_seen.wait(),
@@ -417,6 +423,7 @@ class DeviceManager:
             async with BLUETOOTH_RESTARTING:
                 _LOGGER.debug(f'[{device}] Check for lock')
             try:
+                self.last_connection_successful = False
                 try:
                     await aio.wait_for(
                         self._scanned_device_set.wait(),
@@ -431,6 +438,7 @@ class DeviceManager:
                         self._hci_adapter,
                         self._scanned_device,
                     )
+                    self.last_connection_successful = True
                     initial_coros = []
                     if not device.is_passive:
                         if not device.DEVICE_DROPS_CONNECTION:
