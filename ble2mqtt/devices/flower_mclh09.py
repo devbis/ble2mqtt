@@ -4,9 +4,8 @@ import struct
 import uuid
 from dataclasses import dataclass
 
-from .base import Sensor, SENSOR_DOMAIN, ConnectionMode
+from .base import SENSOR_DOMAIN, ConnectionMode, Sensor
 from .uuids import BATTERY
-
 
 _LOGGER = logging.getLogger(__name__)
 

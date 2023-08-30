@@ -1,11 +1,11 @@
 import asyncio as aio
 import logging
 import struct
+import typing as ty
 import uuid
 from dataclasses import dataclass
-import typing as ty
 
-from .base import Sensor, SENSOR_DOMAIN, ConnectionMode
+from .base import SENSOR_DOMAIN, ConnectionMode, Sensor
 
 _LOGGER = logging.getLogger(__name__)
 
