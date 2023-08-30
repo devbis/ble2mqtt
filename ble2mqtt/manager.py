@@ -424,15 +424,16 @@ class DeviceManager:
                 _LOGGER.debug(f'[{device}] Check for lock')
             try:
                 self.last_connection_successful = False
-                try:
-                    await aio.wait_for(
-                        self._scanned_device_set.wait(),
-                        timeout=10,
-                    )
-                except aio.TimeoutError as e:
-                    raise ConnectionTimeoutError(
-                        f'[{device}] is not visible for 10 sec',
-                    ) from e
+                if not device.is_passive:
+                    try:
+                        await aio.wait_for(
+                            self._scanned_device_set.wait(),
+                            timeout=10,
+                        )
+                    except aio.TimeoutError as e:
+                        raise ConnectionTimeoutError(
+                            f'[{device}] is not visible for 10 sec',
+                        ) from e
                 async with handle_ble_exceptions(self._hci_adapter):
                     await device.connect(
                         self._hci_adapter,
