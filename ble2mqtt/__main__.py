@@ -71,6 +71,31 @@ def handle_exception(loop, context, service):
     aio.create_task(shutdown(loop, service))
 
 
+def get_ssl_context(config):
+    if config.get('mqtt_tls') != "True":
+        return None
+    import ssl
+    ca_cert = config.get('mqtt_ca')
+    client_cert = config.get('mqtt_cert')
+    client_keyfile = config.get('mqtt_key')
+    client_keyfile_password = config.get('mqtt_key_password')
+    ca_verify = config.get('mqtt_ca_verify') != "False"
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    if ca_cert is not None:
+        context.load_verify_locations(ca_cert)
+    else:
+        context.load_default_certs()
+    context.check_hostname = ca_verify
+    context.verify_mode = ssl.CERT_REQUIRED if ca_verify else ssl.CERT_NONE
+    if client_keyfile is not None:
+        context.load_cert_chain(
+            client_cert,
+            client_keyfile,
+            client_keyfile_password,
+        )
+    return context
+
+
 async def amain(config):
     loop = aio.get_running_loop()
 
@@ -81,6 +106,7 @@ async def amain(config):
         port=config['mqtt_port'],
         user=config.get('mqtt_user'),
         password=config.get('mqtt_password'),
+        ssl=get_ssl_context(config),
         base_topic=config['base_topic'],
         mqtt_config_prefix=config['mqtt_config_prefix'],
         hci_adapter=config['hci_adapter'],

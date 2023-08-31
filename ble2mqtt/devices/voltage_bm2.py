@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from ..devices.base import SENSOR_DOMAIN, Sensor, SubscribeAndSetDataMixin, ConnectionMode
+from ..devices.base import (SENSOR_DOMAIN, ConnectionMode, Sensor,
+                            SubscribeAndSetDataMixin)
 
 UUID_KEY_READ = "0000fff4-0000-1000-8000-00805f9b34fb"
 KEY = b"\x6c\x65\x61\x67\x65\x6e\x64\xff\xfe\x31\x38\x38\x32\x34\x36\x36"

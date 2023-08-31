@@ -80,6 +80,15 @@
 - **BM2 car battery voltage meter (type: voltage_bm2)**
 
 
+### Plant sensors:
+
+- **LifeControl MCLH-09 (type: mclh09)**
+
+  optionally, polling interval can be configured with `interval` parameter in seconds
+- **Xiaomi Mi Flora (type: miflora)**
+
+  optionally, polling interval can be configured with `interval` parameter in seconds
+
 By default, a device works in the passive mode without connection by 
 listening to advertisement packets from a device.
 To use connection to the device provide `"passive": false` parameter.
@@ -124,6 +133,10 @@ Pairing successful
 ```
 You can proceed with the next configuration steps now.
 
+
+## Selinux issues
+
+If using SELinux and you are experience issues, see [README.md](selinux/README.md).
 
 ### Known issues:
 - *High cpu usage due to underlying library to work with bluetooth*
@@ -204,6 +217,16 @@ The configuration file is a JSON with the following content:
         {
             "address": "11:22:33:aa:aa:bb",
             "type": "voltage_bm2"
+        },
+        {
+            "address": "11:22:33:aa:aa:bc",
+            "type": "mclh09",
+            "interval": 600
+        },
+        {
+            "address": "11:22:33:aa:aa:bd",
+            "type": "miflora",
+            "interval": 500
         }
     ]
 }

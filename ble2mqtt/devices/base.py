@@ -119,6 +119,7 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
         self._loop = loop
         self.client: BleakClient = None
         self.disconnected_event = aio.Event()
+        self.disconnected_event.set()
         if kwargs.get('passive') and not self.SUPPORT_PASSIVE:
             raise NotImplementedError(
                 'This device doesn\'t support passive mode',
@@ -178,7 +179,6 @@ class BaseDevice(abc.ABC, metaclass=RegisteredType):
 
 
 class Device(BaseDevice, abc.ABC):
-    MQTT_VALUES = None
     SET_POSTFIX: str = 'set'
     SET_POSITION_POSTFIX: str = 'set_position'  # for covers. Consider rework
     SET_MODE_POSTFIX: str = 'set_mode'  # for climate
@@ -199,7 +199,7 @@ class Device(BaseDevice, abc.ABC):
     def __init__(self, mac, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
-        self.mac = mac
+        self.mac = mac.lower()
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
         self._version = None
@@ -377,25 +377,45 @@ class Device(BaseDevice, abc.ABC):
         """Here put the initial configuration for the device"""
         pass
 
-    async def get_client(self, **kwargs) -> BleakClient:
+    async def get_client(self, ble_device: ty.Optional[BLEDevice], **kwargs) \
+            -> BleakClient:
         assert self.MAC_TYPE in ('public', 'random')
-        client = BleakClient(self.mac, address_type=self.MAC_TYPE, **kwargs)
+        client = BleakClient(
+            ble_device or self.mac,
+            address_type=self.MAC_TYPE,
+            disconnected_callback=self._on_disconnect,
+            **kwargs,
+        )
         client.manager = await get_global_bluez_manager()
         return client
 
-    async def connect(self, adapter):
+    async def _get_client_and_connect(self, adapter: str,
+                                      ble_device: BLEDevice,
+                                      timeout: int):
+        client = await self.get_client(
+            ble_device=ble_device,
+            adapter=adapter,
+        )
+        self.disconnected_event.clear()
+
+        await aio.wait_for(client.connect(), timeout=timeout)
+        return client
+
+    async def connect(self, adapter: str, ble_device: BLEDevice):
         if self.is_passive:
             return
 
-        self.client = await self.get_client(
-            adapter=adapter,
-            disconnected_callback=self._on_disconnect,
-        )
-        self.disconnected_event.clear()
         try:
-            # 10 is the implicit timeout in bleak client, add 2 more seconds
-            # for internal routines
-            await aio.wait_for(self.client.connect(), timeout=12)
+            self.client = await aio.wait_for(
+                self._get_client_and_connect(
+                    adapter,
+                    ble_device,
+                    timeout=10,
+                ),
+                # 10 is the implicit timeout in bleak client, add 2 more seconds
+                # for internal routines
+                timeout=12,
+            )
         except aio.TimeoutError as e:
             self.disconnected_event.set()
             raise ConnectionTimeoutError() from e
@@ -534,6 +554,15 @@ class Sensor(Device, abc.ABC):
                 continue
 
             await self.do_active_loop(publish_topic)
+            if (
+                self.ACTIVE_CONNECTION_MODE ==
+                ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT
+            ):
+                if self.client.is_connected:
+                    await self.client.disconnect()
+                # let DeviceManager.manage_device() handle reconnections
+                return
+
             await aio.sleep(self.ACTIVE_SLEEP_INTERVAL)
 
     async def handle_passive(self, publish_topic, send_config, *args, **kwargs):
