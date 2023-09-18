@@ -5,6 +5,7 @@ import os
 
 from ble2mqtt.__version__ import VERSION
 from ble2mqtt.ble2mqtt import Ble2Mqtt
+from ble2mqtt.compat import get_bleak_version
 
 from .devices import registered_device_types
 
@@ -165,7 +166,12 @@ def main():
         datefmt='%Y-%m-%d %H:%M:%S',
     )
     # logging.getLogger('bleak.backends.bluezdbus.scanner').setLevel('INFO')
-    _LOGGER.info(f'Starting BLE2MQTT version {VERSION}')
+    _LOGGER.info(
+        'Starting BLE2MQTT version %s, bleak %s, adapter %s',
+        VERSION,
+        get_bleak_version(),
+        config["hci_adapter"]
+    )
 
     try:
         aio.run(amain(config), debug=(config['log_level'].upper() == 'DEBUG'))
