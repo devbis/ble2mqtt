@@ -13,6 +13,21 @@ def cr2032_voltage_to_percent(mvolts: int):
     return max(min(int(round((mvolts/1000 - 2.1)/coeff, 2) * 100), 100), 0)
 
 
+def cr2477t_voltage_to_percent(mvolts: int):
+    # Based on https://github.com/custom-components/ble_monitor/blob/18d447a8f/custom_components/ble_monitor/ble_parser/ruuvitag.py#L184-195 (MIT licensed)
+    if mvolts >= 3000:
+        batt = 100
+    elif mvolts >= 2600:
+        batt = 60 + (mvolts - 2600) / 10
+    elif mvolts >= 2500:
+        batt = 40 + (mvolts - 2500) / 5
+    elif mvolts >= 2450:
+        batt = 20 + ((mvolts - 2450) * 2) / 5
+    else:
+        batt = 0
+    return int(round(batt, 1))
+
+
 def rssi_to_linkquality(rssi):
     return max(int(round(255 * (rssi - MIN_RSSI) / (MAX_RSSI - MIN_RSSI))), 0)
 
