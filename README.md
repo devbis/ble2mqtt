@@ -44,6 +44,7 @@
 - **Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)**
   - supported both atc1441 and pvvx formats
 - **Qingping CGDK2 (type: qingpingCGDK2)**
+- **RuuviTag (type: ruuvitag)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
@@ -91,6 +92,7 @@ To use connection to the device provide `"passive": false` parameter.
 **Supported devices in passive mode:**
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
+- RuuviTag (ruuvitag)
 - Any device as presence tracker
 
 ## Manual pairing in Linux
