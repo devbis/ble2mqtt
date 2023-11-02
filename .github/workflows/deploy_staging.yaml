@@ -1,0 +1,59 @@
+name: "[STAGING] Push Image"
+
+on:
+  release:
+    types:
+      - prereleased
+
+
+env:
+  IMAGE_NAME: obsapi
+  GCP_DOCKER_PROJECT: observability1-stg-ntd1
+  GCP_GAR_REGION: europe-west1
+  GCP_GAR_REPOSITORY: docker
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+
+  Build-And-Push-Image-To-Gar:
+    runs-on: [self-hosted, decathlon]
+    environment: staging
+    env:
+      IMAGE_VERSION: staging
+    steps:
+      - uses: actions/checkout@v2
+
+      #################################################################################################################
+      # PRE CLEAN
+      - name: Pre clean
+        uses: dktunited/.github/actions/cleaner@main
+
+      #################################################################################################################
+      # GOOGLE AUTHENTIFICATION
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WKI_POOL }}
+          service_account: ${{ secrets.GCP_WKI_GITHUB_SA }}
+
+      #################################################################################################################
+      # PUSH IMAGE
+      - name: Set env
+        run: echo "IMAGE_FULL_NAME=${GCP_GAR_REGION}-docker.pkg.dev/${GCP_DOCKER_PROJECT}/${GCP_GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_VERSION}-$(date '+%Y-%m-%d.%H%M%S')" >> $GITHUB_ENV
+      - name: Build parent docker image
+        run: |
+          docker build -t "${IMAGE_FULL_NAME}" ./app
+      - name: Push docker image on GAR
+        run: |
+          gcloud auth configure-docker "${GCP_GAR_REGION}-docker.pkg.dev"
+          docker push "${IMAGE_FULL_NAME}"
+
+      #################################################################################################################
+      # Post CLEAN
+      - name: Post clean
+        uses: dktunited/.github/actions/cleaner@main
