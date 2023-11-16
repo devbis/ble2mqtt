@@ -51,6 +51,7 @@ class RuuviTag(SubscribeAndSetDataMixin, Sensor):
                 {
                     'name': 'battery',
                     'device_class': 'battery',
+                    'unit_of_measurement': '%',
                     'entity_category': 'diagnostic',
                 },
             ],
