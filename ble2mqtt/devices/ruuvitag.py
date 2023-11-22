@@ -79,3 +79,58 @@ class RuuviTag(SubscribeAndSetDataMixin, Sensor):
                 f'Advert received for {self}, {format_binary(raw_data)}, '
                 f'current state: {self._state}',
             )
+
+class RuuviTagPro2in1(RuuviTag):
+    NAME = 'ruuvitag_pro_2in1'
+
+    @property
+    def entities(self):
+        return {
+            SENSOR_DOMAIN: [
+                {
+                    'name': 'temperature',
+                    'device_class': 'temperature',
+                    'unit_of_measurement': '\u00b0C',
+                },
+                {
+                    'name': 'movement_counter',
+                    'device_class': 'count',
+                },
+                {
+                    'name': 'battery',
+                    'device_class': 'battery',
+                    'unit_of_measurement': '%',
+                    'entity_category': 'diagnostic',
+                },
+            ],
+        }
+
+class RuuviTagPro3in1(RuuviTag):
+    NAME = 'ruuvitag_pro_3in1'
+
+    @property
+    def entities(self):
+        return {
+            SENSOR_DOMAIN: [
+                {
+                    'name': 'temperature',
+                    'device_class': 'temperature',
+                    'unit_of_measurement': '\u00b0C',
+                },
+                {
+                    'name': 'humidity',
+                    'device_class': 'humidity',
+                    'unit_of_measurement': '%',
+                },
+                {
+                    'name': 'movement_counter',
+                    'device_class': 'count',
+                },
+                {
+                    'name': 'battery',
+                    'device_class': 'battery',
+                    'unit_of_measurement': '%',
+                    'entity_category': 'diagnostic',
+                },
+            ],
+        }
