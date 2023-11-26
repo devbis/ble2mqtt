@@ -188,7 +188,8 @@ class Device(BaseDevice, abc.ABC):
     CONNECTION_FAILURES_LIMIT = 100
     RECONNECTION_SLEEP_INTERVAL = 60
     ACTIVE_SLEEP_INTERVAL = 60
-    PASSIVE_SLEEP_INTERVAL = 60
+    DEFAULT_PASSIVE_SLEEP_INTERVAL = 60
+    PASSIVE_SLEEP_INTERVAL = DEFAULT_PASSIVE_SLEEP_INTERVAL
     # deprecated
     LINKQUALITY_TOPIC: ty.Optional[str] = None
     STATE_TOPIC: str = DEFAULT_STATE_TOPIC
@@ -200,6 +201,7 @@ class Device(BaseDevice, abc.ABC):
         super().__init__(*args, **kwargs)
         self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
         self.mac = mac.lower()
+        self.PASSIVE_SLEEP_INTERVAL = int(kwargs.pop('interval', self.DEFAULT_PASSIVE_SLEEP_INTERVAL))
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
         self._version = None
