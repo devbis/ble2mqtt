@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from bleak.backends.device import BLEDevice
 
 from ..devices.base import Sensor, SENSOR_DOMAIN, SubscribeAndSetDataMixin
-from ..protocols.ruuvi import RuuviTagDataFormat5Decoder
+from ..protocols.ruuvi import DataFormat5Decoder
 from ..utils import format_binary, cr2477_voltage_to_percent
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class RuuviTag(SubscribeAndSetDataMixin, Sensor):
             return
 
         if raw_data:
-            decoder = RuuviTagDataFormat5Decoder(bytes(raw_data))
+            decoder = DataFormat5Decoder(bytes(raw_data))
             self._state = self.SENSOR_CLASS(
                 temperature=decoder.temperature_celsius,
                 humidity=decoder.humidity_percentage,
