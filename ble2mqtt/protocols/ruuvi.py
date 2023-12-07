@@ -9,7 +9,7 @@ import math
 import struct
 
 
-class RuuviTagDataFormat5Decoder:
+class DataFormat5Decoder:
     def __init__(self, raw_data: bytes) -> None:
         if len(raw_data) < 24:
             raise ValueError("Data must be at least 24 bytes long for data format 5")
