@@ -5,7 +5,7 @@ from bleak.backends.device import BLEDevice
 
 from ..devices.base import Sensor, SENSOR_DOMAIN, SubscribeAndSetDataMixin
 from ..protocols.ruuvi import RuuviTagDataFormat5Decoder
-from ..utils import format_binary, cr2477t_voltage_to_percent
+from ..utils import format_binary, cr2477_voltage_to_percent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class RuuviTag(SubscribeAndSetDataMixin, Sensor):
                 humidity=decoder.humidity_percentage,
                 pressure=decoder.pressure_hpa,
                 movement_counter=decoder.movement_counter,
-                battery=int(cr2477t_voltage_to_percent(decoder.battery_voltage_mv))
+                battery=int(cr2477_voltage_to_percent(decoder.battery_voltage_mv))
             )
 
             _LOGGER.debug(
