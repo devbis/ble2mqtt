@@ -282,6 +282,22 @@ sudo systemctl start ble2mqtt
 
 ## Installation on OpenWRT
 
+### OpenWRT 23.05 and later
+
+Create the configuration file in /etc/ble2mqtt.json and
+append your devices.
+
+Execute the following commands in the terminal:
+
+```sh
+opkg update
+opkg install python3-ble2mqtt
+/etc/init.d/ble2mqtt enable
+/etc/init.d/ble2mqtt start
+```
+
+### OpenWRT 22.03 and earlier
+
 Execute the following commands in the terminal:
 
 ```sh
