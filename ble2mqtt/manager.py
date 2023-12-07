@@ -14,6 +14,7 @@ from .exceptions import (BLUETOOTH_RESTARTING, ListOfConnectionErrors,
                          ListOfMQTTConnectionErrors, handle_ble_exceptions,
                          restart_bluetooth)
 from .tasks import handle_returned_tasks, run_tasks_and_cancel_on_first_return
+from ble2mqtt.__version__ import VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ class DeviceManager:
                         (self._base_topic, self.device.availability_topic),
                     )},
                 ],
+                'origin': {'name': 'ble2mqtt', 'sw_version': VERSION,},
             }
             icon = entity.pop('icon', None)
             if icon:
