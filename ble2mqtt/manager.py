@@ -103,6 +103,8 @@ class DeviceManager:
             device_info['manufacturer'] = device.manufacturer
         if device.version:
             device_info['sw_version'] = device.version
+        if device.suggested_area:
+            device_info['suggested_area'] = device.suggested_area
 
         def get_generic_vals(entity: dict):
             name = entity.pop('name')

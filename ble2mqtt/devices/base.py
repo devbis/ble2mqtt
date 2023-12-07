@@ -202,6 +202,7 @@ class Device(BaseDevice, abc.ABC):
         self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
         self.mac = mac.lower()
         self.PASSIVE_SLEEP_INTERVAL = int(kwargs.pop('interval', self.DEFAULT_PASSIVE_SLEEP_INTERVAL))
+        self._suggested_area = kwargs.pop('suggested_area', None)
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None
         self._version = None
@@ -314,6 +315,10 @@ class Device(BaseDevice, abc.ABC):
         # can change over time. Don't use it as an identifier
         parts = [self.manufacturer, self.model, self.friendly_id]
         return '_'.join([p.replace(' ', '_') for p in parts if p])
+
+    @property
+    def suggested_area(self):
+        return self._suggested_area
 
     @property
     def rssi(self):
