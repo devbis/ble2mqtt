@@ -196,6 +196,7 @@ The configuration file is a JSON with the following content:
         {
             "address": "11:22:33:aa:bb:dd",
             "type": "xiaomihtv1"
+            "interval": 60
         },
         {
             "address": "11:22:34:aa:bb:dd",
@@ -209,6 +210,7 @@ The configuration file is a JSON with the following content:
         {
             "address": "11:22:33:aa:bb:ff",
             "type": "xiaomilywsd_atc"
+            "interval": 60
         },
         {
             "address": "11:22:33:aa:aa:aa",
@@ -227,6 +229,11 @@ The configuration file is a JSON with the following content:
             "address": "11:22:33:aa:aa:bd",
             "type": "miflora",
             "interval": 500
+        },
+        {
+            "address": "11:22:33:aa:aa:be",
+            "type": "ruuvitag",
+            "interval": 60
         }
     ]
 }
