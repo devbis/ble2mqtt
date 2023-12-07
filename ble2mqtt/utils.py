@@ -13,7 +13,7 @@ def cr2032_voltage_to_percent(mvolts: int):
     return max(min(int(round((mvolts/1000 - 2.1)/coeff, 2) * 100), 100), 0)
 
 
-def cr2477t_voltage_to_percent(mvolts: int):
+def cr2477_voltage_to_percent(mvolts: int):
     # Based on https://github.com/custom-components/ble_monitor/blob/18d447a8f/custom_components/ble_monitor/ble_parser/ruuvitag.py#L184-195 (MIT licensed)
     if mvolts >= 3000:
         batt = 100
