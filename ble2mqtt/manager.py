@@ -119,7 +119,7 @@ class DeviceManager:
                         (self._base_topic, self.device.availability_topic),
                     )},
                 ],
-                'origin': {'name': 'ble2mqtt', 'sw_version': VERSION,},
+                'origin': {'name': 'ble2mqtt', 'sw_version': VERSION},
             }
             icon = entity.pop('icon', None)
             if icon:

@@ -201,7 +201,9 @@ class Device(BaseDevice, abc.ABC):
         super().__init__(*args, **kwargs)
         self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
         self.mac = mac.lower()
-        self.PASSIVE_SLEEP_INTERVAL = int(kwargs.pop('interval', self.DEFAULT_PASSIVE_SLEEP_INTERVAL))
+        self.PASSIVE_SLEEP_INTERVAL = int(
+            kwargs.pop('interval', self.DEFAULT_PASSIVE_SLEEP_INTERVAL),
+        )
         self._suggested_area = kwargs.pop('suggested_area', None)
         self.friendly_name = kwargs.pop('friendly_name', None)
         self._model = None

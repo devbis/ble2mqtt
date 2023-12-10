@@ -14,7 +14,7 @@ def cr2032_voltage_to_percent(mvolts: int):
 
 
 def cr2477_voltage_to_percent(mvolts: int):
-    # Based on https://github.com/custom-components/ble_monitor/blob/18d447a8f/custom_components/ble_monitor/ble_parser/ruuvitag.py#L184-195 (MIT licensed)
+    # Based on https://github.com/custom-components/ble_monitor/blob/18d447a8f/custom_components/ble_monitor/ble_parser/ruuvitag.py#L184-195 (MIT licensed)  # noqa: E501
     if mvolts >= 3000:
         batt = 100
     elif mvolts >= 2600:

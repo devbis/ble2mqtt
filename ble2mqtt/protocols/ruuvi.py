@@ -1,7 +1,7 @@
 """
 Decoder for RuuviTag Data Format 5 data.
-Based on https://github.com/Bluetooth-Devices/ruuvitag-ble/blob/0e99249/src/ruuvitag_ble/df5_decoder.py (MIT Licensed)
-Which was based on https://github.com/ttu/ruuvitag-sensor/blob/23e6555/ruuvitag_sensor/decoder.py (MIT Licensed)
+Based on https://github.com/Bluetooth-Devices/ruuvitag-ble/blob/0e99249/src/ruuvitag_ble/df5_decoder.py (MIT Licensed)  # noqa
+Which was based on https://github.com/ttu/ruuvitag-sensor/blob/23e6555/ruuvitag_sensor/decoder.py (MIT Licensed)  # noqa
 """
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ import struct
 class DataFormat5Decoder:
     def __init__(self, raw_data: bytes) -> None:
         if len(raw_data) < 24:
-            raise ValueError("Data must be at least 24 bytes long for data format 5")
+            raise ValueError(
+                "Data must be at least 24 bytes long for data format 5",
+            )
         self.data: tuple[int, ...] = struct.unpack(">BhHHhhhHBH6B", raw_data)
 
     @property
@@ -35,14 +37,15 @@ class DataFormat5Decoder:
         return round((self.data[3] + 50000) / 100, 2)
 
     @property
-    def acceleration_vector_mg(self) -> tuple[int, int, int] | tuple[None, None, None]:
+    def acceleration_vector_mg(self) \
+            -> tuple[int, int, int] | tuple[None, None, None]:
         ax = self.data[4]
         ay = self.data[5]
         az = self.data[6]
         if ax == -32768 or ay == -32768 or az == -32768:
-            return (None, None, None)
+            return None, None, None
 
-        return (ax, ay, az)
+        return ax, ay, az
 
     @property
     def acceleration_total_mg(self) -> float | None:

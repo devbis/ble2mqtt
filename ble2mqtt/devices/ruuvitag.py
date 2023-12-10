@@ -9,6 +9,7 @@ from ..utils import format_binary, cr2477_voltage_to_percent
 
 _LOGGER = logging.getLogger(__name__)
 
+
 @dataclass
 class SensorState:
     battery: int = 0
@@ -16,6 +17,7 @@ class SensorState:
     humidity: float = 0
     pressure: float = 0
     movement_counter: int = 0
+
 
 class RuuviTag(SubscribeAndSetDataMixin, Sensor):
     NAME = 'ruuvitag'
@@ -72,13 +74,16 @@ class RuuviTag(SubscribeAndSetDataMixin, Sensor):
                 humidity=decoder.humidity_percentage,
                 pressure=decoder.pressure_hpa,
                 movement_counter=decoder.movement_counter,
-                battery=int(cr2477_voltage_to_percent(decoder.battery_voltage_mv))
+                battery=int(cr2477_voltage_to_percent(
+                    decoder.battery_voltage_mv,
+                ))
             )
 
             _LOGGER.debug(
                 f'Advert received for {self}, {format_binary(raw_data)}, '
                 f'current state: {self._state}',
             )
+
 
 class RuuviTagPro2in1(RuuviTag):
     NAME = 'ruuvitag_pro_2in1'
@@ -104,6 +109,7 @@ class RuuviTagPro2in1(RuuviTag):
                 },
             ],
         }
+
 
 class RuuviTagPro3in1(RuuviTag):
     NAME = 'ruuvitag_pro_3in1'
