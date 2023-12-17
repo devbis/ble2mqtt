@@ -22,9 +22,9 @@ class GoveeDecoder:
 
     @property
     def humidity_percentage(self) -> float | None:
-        if self.data[1] == 65535:
+        if self.data[0] == -32768:
             return None
-        return round(self.data[1] / 200.0, 2)
+        return round(self.data[1] / 100.0, 2)
 
     @property
     def battery_percentage(self) -> int | None:
