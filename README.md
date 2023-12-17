@@ -48,6 +48,7 @@
 - **RuuviTag Pro 2in1 (type: ruuvitag_pro_2in1)**
 - **RuuviTag Pro 3in1 (type: ruuvitag_pro_3in1)**
 - **RuuviTag Pro 4in1 (type: ruuvitag)**
+- **Govee H5074 (type: govee)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
@@ -96,6 +97,7 @@ To use connection to the device provide `"passive": false` parameter.
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
 - RuuviTag (ruuvitag/ruuvitag_pro_2in1/ruuvitag_pro_3in1)
+- Govee (govee)
 - Any device as presence tracker
 
 ## Manual pairing in Linux
