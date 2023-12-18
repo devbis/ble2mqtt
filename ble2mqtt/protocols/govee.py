@@ -1,5 +1,5 @@
 """
-Decoder for Govee H5074 temperature/humidity sensor.
+Decoder for Govee temperature/humidity sensors.
 Based on https://github.com/wcbonner/GoveeBTTempLogger/blob/master/goveebttemplogger.cpp (MIT License)
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ import struct
 
 class GoveeDecoder:
     def __init__(self, raw_data: bytes) -> None:
+        # note: currently only H5074 is supported
         if len(raw_data) != 7:
             raise ValueError("Govee data must be 7 bytes long")
         self.data: tuple[int, ...] = struct.unpack("<xhhBx", raw_data)
