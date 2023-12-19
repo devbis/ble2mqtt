@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
-from ..devices.base import Sensor, SENSOR_DOMAIN, SubscribeAndSetDataMixin
+from ..devices.base import Sensor, SENSOR_DOMAIN
 from ..protocols.govee import GoveeDecoder
 from ..utils import format_binary
 
@@ -17,7 +17,7 @@ class SensorState:
     humidity: float = 0
 
 
-class GoveeTemperature(SubscribeAndSetDataMixin, Sensor):
+class GoveeTemperature(Sensor):
     NAME = 'govee'
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True

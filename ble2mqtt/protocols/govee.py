@@ -4,7 +4,6 @@ Based on https://github.com/wcbonner/GoveeBTTempLogger/blob/master/goveebttemplo
 """
 from __future__ import annotations
 
-import math
 import struct
 
 
