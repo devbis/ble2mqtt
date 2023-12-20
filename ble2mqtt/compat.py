@@ -1,4 +1,7 @@
-import importlib.metadata
+try:
+    from importlib import metadata
+except ImportError:
+    metadata = None
 import sys
 
 import bleak
@@ -12,7 +15,9 @@ def get_loop_param(loop):
 
 def get_bleak_version():
     # returns None if version info is messed up
-    return importlib.metadata.version('bleak')
+    if not metadata:
+        return None
+    return metadata.version('bleak')
 
 
 def get_scanner(hci_adapter: str, detection_callback) -> bleak.BleakScanner:

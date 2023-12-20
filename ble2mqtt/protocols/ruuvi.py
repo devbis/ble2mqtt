@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import struct
+import typing as ty
 
 
 class DataFormat5Decoder:
@@ -15,22 +16,22 @@ class DataFormat5Decoder:
             raise ValueError(
                 "Data must be at least 24 bytes long for data format 5",
             )
-        self.data: tuple[int, ...] = struct.unpack(">BhHHhhhHBH6B", raw_data)
+        self.data = struct.unpack(">BhHHhhhHBH6B", raw_data)
 
     @property
-    def temperature_celsius(self) -> float | None:
+    def temperature_celsius(self) -> ty.Optional[float]:
         if self.data[1] == -32768:
             return None
         return round(self.data[1] / 200.0, 2)
 
     @property
-    def humidity_percentage(self) -> float | None:
+    def humidity_percentage(self) -> ty.Optional[float]:
         if self.data[2] == 65535:
             return None
         return round(self.data[2] / 400, 2)
 
     @property
-    def pressure_hpa(self) -> float | None:
+    def pressure_hpa(self) -> ty.Optional[float]:
         if self.data[3] == 0xFFFF:
             return None
 
@@ -38,7 +39,10 @@ class DataFormat5Decoder:
 
     @property
     def acceleration_vector_mg(self) \
-            -> tuple[int, int, int] | tuple[None, None, None]:
+            -> ty.Union[
+                ty.Sequence[int, int, int],
+                ty.Sequence[None, None, None],
+            ]:
         ax = self.data[4]
         ay = self.data[5]
         az = self.data[6]
@@ -48,14 +52,14 @@ class DataFormat5Decoder:
         return ax, ay, az
 
     @property
-    def acceleration_total_mg(self) -> float | None:
+    def acceleration_total_mg(self) -> ty.Optional[float]:
         ax, ay, az = self.acceleration_vector_mg
         if ax is None or ay is None or az is None:
             return None
         return math.sqrt(ax * ax + ay * ay + az * az)
 
     @property
-    def battery_voltage_mv(self) -> int | None:
+    def battery_voltage_mv(self) -> ty.Optional[int]:
         voltage = self.data[7] >> 5
         if voltage == 0b11111111111:
             return None
@@ -63,7 +67,7 @@ class DataFormat5Decoder:
         return voltage + 1600
 
     @property
-    def tx_power_dbm(self) -> int | None:
+    def tx_power_dbm(self) -> ty.Optional[int]:
         tx_power = self.data[7] & 0x001F
         if tx_power == 0b11111:
             return None
