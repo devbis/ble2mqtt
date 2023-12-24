@@ -19,7 +19,7 @@ class SensorState:
     movement_counter: int = 0
 
 
-class RuuviTag(SubscribeAndSetDataMixin, Sensor):
+class RuuviTag(Sensor):
     NAME = 'ruuvitag'
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
