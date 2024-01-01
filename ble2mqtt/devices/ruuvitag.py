@@ -21,6 +21,7 @@ class SensorState:
 
 class RuuviTag(Sensor):
     NAME = 'ruuvitag'
+    MANUFACTURER = 'Ruuvi'
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False
