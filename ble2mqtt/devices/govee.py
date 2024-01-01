@@ -19,6 +19,7 @@ class SensorState:
 
 class GoveeTemperature(Sensor):
     NAME = 'govee'
+    MANUFACTURER = 'Govee'
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False
