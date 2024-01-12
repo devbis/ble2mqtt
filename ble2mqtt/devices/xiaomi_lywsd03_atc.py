@@ -1,25 +1,17 @@
 import logging
-from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
 from ..utils import format_binary
 from .uuids import ENVIRONMENTAL_SENSING
-from .xiaomi_base import XiaomiHumidityTemperature
+from .base import HumidityTemperatureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class SensorState:
-    battery: int = 0
-    temperature: float = 0
-    humidity: float = 0
-
-
-class XiaomiHumidityTemperatureLYWSDATC(XiaomiHumidityTemperature):
+class XiaomiHumidityTemperatureLYWSDATC(HumidityTemperatureSensor):
     NAME = 'xiaomilywsd_atc'
-    SENSOR_CLASS = SensorState
+    MANUFACTURER = 'Xiaomi'
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False
 

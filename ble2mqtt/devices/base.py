@@ -5,6 +5,7 @@ import logging
 import typing as ty
 import uuid
 from collections import defaultdict, namedtuple
+from dataclasses import dataclass
 from enum import Enum
 
 from bleak import BleakClient, BleakError
@@ -587,6 +588,41 @@ class Sensor(Device, abc.ABC):
         if self.is_passive:
             return await self.handle_passive(*args, **kwargs)
         return await self.handle_active(*args, **kwargs)
+
+
+@dataclass
+class HumidityTemperatureSensorState:
+    battery: int = 0
+    temperature: float = 0
+    humidity: float = 0
+
+class HumidityTemperatureSensor(Sensor, abc.ABC):
+    SENSOR_CLASS = HumidityTemperatureSensorState
+    # send data only if temperature or humidity is set
+    REQUIRED_VALUES = ('temperature', 'humidity')
+
+    @property
+    def entities(self):
+        return {
+            SENSOR_DOMAIN: [
+                {
+                    'name': 'temperature',
+                    'device_class': 'temperature',
+                    'unit_of_measurement': '\u00b0C',
+                },
+                {
+                    'name': 'humidity',
+                    'device_class': 'humidity',
+                    'unit_of_measurement': '%',
+                },
+                {
+                    'name': 'battery',
+                    'device_class': 'battery',
+                    'unit_of_measurement': '%',
+                    'entity_category': 'diagnostic',
+                },
+            ],
+        }
 
 
 class SubscribeAndSetDataMixin:

@@ -1,52 +1,18 @@
 import logging
-from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
-
-from ..devices.base import Sensor, SENSOR_DOMAIN
+from ..devices.base import HumidityTemperatureSensor
 from ..protocols.govee import GoveeDecoder
 from ..utils import format_binary
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class SensorState:
-    battery: int = 0
-    temperature: float = 0
-    humidity: float = 0
-
-
-class GoveeTemperature(Sensor):
+class GoveeTemperature(HumidityTemperatureSensor):
     NAME = 'govee'
     MANUFACTURER = 'Govee'
-    SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False
-    REQUIRED_VALUES = ('temperature', 'humidity')
-
-    @property
-    def entities(self):
-        return {
-            SENSOR_DOMAIN: [
-                {
-                    'name': 'temperature',
-                    'device_class': 'temperature',
-                    'unit_of_measurement': '\u00b0C',
-                },
-                {
-                    'name': 'humidity',
-                    'device_class': 'humidity',
-                    'unit_of_measurement': '%',
-                },
-                {
-                    'name': 'battery',
-                    'device_class': 'battery',
-                    'unit_of_measurement': '%',
-                    'entity_category': 'diagnostic',
-                },
-            ],
-        }
 
     def handle_advert(self, scanned_device: BLEDevice, adv_data):
         raw_data = adv_data.manufacturer_data.get(0xec88)
