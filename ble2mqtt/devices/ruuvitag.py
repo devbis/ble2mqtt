@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
-from ..devices.base import Sensor, SENSOR_DOMAIN, SubscribeAndSetDataMixin
+from ..devices.base import Sensor, SENSOR_DOMAIN
 from ..protocols.ruuvi import DataFormat5Decoder
 from ..utils import format_binary, cr2477_voltage_to_percent
 
