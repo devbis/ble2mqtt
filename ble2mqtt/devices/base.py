@@ -189,7 +189,6 @@ class Device(BaseDevice, abc.ABC):
     RECONNECTION_SLEEP_INTERVAL = 60
     ACTIVE_SLEEP_INTERVAL = 60
     DEFAULT_PASSIVE_SLEEP_INTERVAL = 60
-    PASSIVE_SLEEP_INTERVAL = DEFAULT_PASSIVE_SLEEP_INTERVAL
     # deprecated
     LINKQUALITY_TOPIC: ty.Optional[str] = None
     STATE_TOPIC: str = DEFAULT_STATE_TOPIC
@@ -201,7 +200,7 @@ class Device(BaseDevice, abc.ABC):
         super().__init__(*args, **kwargs)
         self.message_queue: aio.Queue = aio.Queue(**get_loop_param(self._loop))
         self.mac = mac.lower()
-        self.PASSIVE_SLEEP_INTERVAL = int(
+        self.passive_sleep_interval = int(
             kwargs.pop('interval', self.DEFAULT_PASSIVE_SLEEP_INTERVAL),
         )
         self._suggested_area = kwargs.pop('suggested_area', None)
@@ -582,7 +581,7 @@ class Sensor(Device, abc.ABC):
 
             await self.update_device_data(send_config)
             await self.do_passive_loop(publish_topic)
-            await aio.sleep(self.PASSIVE_SLEEP_INTERVAL)
+            await aio.sleep(self.passive_sleep_interval)
 
     async def handle(self, *args, **kwargs):
         if self.is_passive:
