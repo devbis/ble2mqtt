@@ -49,7 +49,6 @@ class RuuviTag(Sensor):
                 },
                 {
                     'name': 'movement_counter',
-                    'device_class': 'count',
                 },
                 {
                     'name': 'battery',
