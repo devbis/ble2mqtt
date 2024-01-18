@@ -596,6 +596,7 @@ class HumidityTemperatureSensorState:
     temperature: float = 0
     humidity: float = 0
 
+
 class HumidityTemperatureSensor(Sensor, abc.ABC):
     SENSOR_CLASS = HumidityTemperatureSensorState
     # send data only if temperature or humidity is set
