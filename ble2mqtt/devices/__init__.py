@@ -11,6 +11,7 @@ from .kettle_redmond import RedmondKettle  # noqa: F401
 from .kettle_xiaomi import XiaomiKettle  # noqa: F401
 from .presence import Presence  # noqa: F401
 from .qingping_cgdk2 import QingpingTempRHMonitorLite  # noqa: F401
+from .roidmi_cleaner import RoidmiCleaner  # noqa: F401
 from .ruuvitag import RuuviTag, RuuviTagPro2in1, RuuviTagPro3in1  # noqa: F401
 from .thermostat_ensto import EnstoThermostat  # noqa: F401
 from .voltage_bm2 import VoltageTesterBM2  # noqa: F401

@@ -5,7 +5,7 @@ import logging
 import typing as ty
 import uuid
 from collections import defaultdict, namedtuple
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 
 from bleak import BleakClient, BleakError
@@ -28,6 +28,7 @@ registered_device_types = {}
 
 
 BINARY_SENSOR_DOMAIN = 'binary_sensor'
+BUTTON_DOMAIN = 'button'
 CLIMATE_DOMAIN = 'climate'
 COVER_DOMAIN = 'cover'
 DEVICE_TRACKER_DOMAIN = 'device_tracker'
@@ -213,6 +214,7 @@ class Device(BaseDevice, abc.ABC):
         self._advertisement_seen = aio.Event()
 
         assert set(self.entities.keys()) <= {
+            BUTTON_DOMAIN,
             BINARY_SENSOR_DOMAIN,
             CLIMATE_DOMAIN,
             COVER_DOMAIN,
@@ -262,8 +264,8 @@ class Device(BaseDevice, abc.ABC):
         postfix_domains = {
             self.SET_POSTFIX:
                 [
-                    CLIMATE_DOMAIN, COVER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
-                    SWITCH_DOMAIN,
+                    BUTTON_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN, LIGHT_DOMAIN,
+                    SELECT_DOMAIN, SWITCH_DOMAIN,
                 ],
             self.SET_POSITION_POSTFIX: [COVER_DOMAIN],
             self.SET_MODE_POSTFIX: [CLIMATE_DOMAIN],
@@ -525,12 +527,19 @@ class Sensor(Device, abc.ABC):
         if isinstance(version, (bytes, bytearray)):
             self._version = version.decode().strip('\0')
 
-    def get_entity_map(self):
+    def get_values_by_entities(self) -> ty.Dict[str, ty.Any]:
         state = {}
+        if self._state is None:
+            return {}
+
+        if hasattr(self._state, 'as_dict'):
+            state_dict = self._state.as_dict()
+        else:
+            state_dict = asdict(self._state)
         for domain, entities in self.entities.items():
             for entity in entities:
                 sensor_name = entity['name']
-                value = getattr(self._state, sensor_name, None)
+                value = state_dict.get(sensor_name, None)
                 if value is not None:
                     state[sensor_name] = self.transform_value(value)
         if self.REQUIRED_VALUES and not any(
@@ -538,16 +547,6 @@ class Sensor(Device, abc.ABC):
         ):
             return {}
         return state
-
-    async def _notify_state(self, publish_topic):
-        _LOGGER.info(f'[{self}] send state={self._state}')
-        state = self.get_entity_map()
-        if state:
-            state['linkquality'] = self.linkquality
-            await publish_topic(
-                topic=self._get_topic(self.STATE_TOPIC),
-                value=json.dumps(state),
-            )
 
     async def do_active_loop(self, publish_topic):
         await self._notify_state(publish_topic)

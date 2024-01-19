@@ -8,10 +8,10 @@ from bleak.backends.device import BLEDevice
 
 from ble2mqtt.__version__ import VERSION
 
-from .devices.base import (BINARY_SENSOR_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN,
-                           DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
-                           SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
-                           ConnectionTimeoutError, Device)
+from .devices.base import (BINARY_SENSOR_DOMAIN, BUTTON_DOMAIN, CLIMATE_DOMAIN,
+                           COVER_DOMAIN, DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN,
+                           SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN,
+                           ConnectionMode, ConnectionTimeoutError, Device)
 from .exceptions import (BLUETOOTH_RESTARTING, ListOfConnectionErrors,
                          ListOfMQTTConnectionErrors, handle_ble_exceptions,
                          restart_bluetooth)
@@ -183,7 +183,8 @@ class DeviceManager:
                             retain=True,
                         ),
                     )
-            if cls == SWITCH_DOMAIN:
+            if cls in {BUTTON_DOMAIN, SWITCH_DOMAIN}:
+                has_state = cls == SWITCH_DOMAIN
                 for entity in entities:
                     entity_name = entity['name']
                     state_topic = self._get_topic(
@@ -200,7 +201,7 @@ class DeviceManager:
                     ))
                     payload = json.dumps({
                         **get_generic_vals(entity),
-                        'state_topic': state_topic,
+                        **({'state_topic': state_topic} if has_state else {}),
                         'command_topic': command_topic,
                     })
                     _LOGGER.debug(
@@ -214,15 +215,18 @@ class DeviceManager:
                             retain=True,
                         ),
                     )
-                    # TODO: send real state on receiving status from a device
-                    _LOGGER.debug(f'Publish initial state topic={state_topic}')
-                    await self._mqtt_client.publish(
-                        aio_mqtt.PublishableMessage(
-                            topic_name=state_topic,
-                            payload='OFF',
-                            qos=aio_mqtt.QOSLevel.QOS_1,
-                        ),
-                    )
+                    if has_state:
+                        # TODO: send real state on receiving status
+                        # from a device
+                        _LOGGER.debug(
+                            f'Publish initial state topic={state_topic}')
+                        await self._mqtt_client.publish(
+                            aio_mqtt.PublishableMessage(
+                                topic_name=state_topic,
+                                payload='OFF',
+                                qos=aio_mqtt.QOSLevel.QOS_1,
+                            ),
+                        )
             if cls == LIGHT_DOMAIN:
                 for entity in entities:
                     entity_name = entity['name']

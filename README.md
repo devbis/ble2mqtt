@@ -75,6 +75,10 @@
   The adapter uses holiday mode to control temperature as thermostat. You cannot 
   use this feature in the official app while ble2mqtt is working.
 
+### Vacuum cleaners
+
+- **Roidmi NEX2 Pro (type: roidmi_cleaner)**
+
 ### Battery voltage meters
 
 - **BM2 car battery voltage meter (type: voltage_bm2)**
@@ -197,7 +201,7 @@ The configuration file is a JSON with the following content:
         },
         {
             "address": "11:22:33:aa:bb:dd",
-            "type": "xiaomihtv1"
+            "type": "xiaomihtv1",
             "interval": 60
         },
         {
@@ -211,7 +215,7 @@ The configuration file is a JSON with the following content:
         },
         {
             "address": "11:22:33:aa:bb:ff",
-            "type": "xiaomilywsd_atc"
+            "type": "xiaomilywsd_atc",
             "interval": 60
         },
         {
@@ -236,6 +240,10 @@ The configuration file is a JSON with the following content:
             "address": "11:22:33:aa:aa:be",
             "type": "ruuvitag",
             "interval": 60
+        },
+        {
+            "address": "11:22:33:aa:aa:0a",
+            "type": "roidmi_cleaner"
         }
     ]
 }
