@@ -9,7 +9,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class GoveeTemperature(HumidityTemperatureSensor):
-    NAME = 'govee'
+    NAME = 'govee_ht'
     MANUFACTURER = 'Govee'
     SUPPORT_PASSIVE = True
     SUPPORT_ACTIVE = False

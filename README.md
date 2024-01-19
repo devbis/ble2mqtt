@@ -97,7 +97,7 @@ To use connection to the device provide `"passive": false` parameter.
 - Xiaomi MJ_HT_V1 (xiaomihtv1)
 - Xiaomi LYWSD03MMC with custom ATC firmware (xiaomilywsd_atc)
 - RuuviTag (ruuvitag/ruuvitag_pro_2in1/ruuvitag_pro_3in1)
-- Govee (govee)
+- Govee temperature/humidity sensors (govee_ht)
 - Any device as presence tracker
 
 ## Manual pairing in Linux
