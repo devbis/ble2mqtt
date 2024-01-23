@@ -3,8 +3,8 @@ import logging
 from bleak.backends.device import BLEDevice
 
 from ..utils import format_binary
-from .uuids import ENVIRONMENTAL_SENSING
 from .base import HumidityTemperatureSensor
+from .uuids import ENVIRONMENTAL_SENSING
 
 _LOGGER = logging.getLogger(__name__)
 

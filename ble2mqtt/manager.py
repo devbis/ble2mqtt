@@ -6,6 +6,8 @@ import typing as ty
 import aio_mqtt
 from bleak.backends.device import BLEDevice
 
+from ble2mqtt.__version__ import VERSION
+
 from .devices.base import (BINARY_SENSOR_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN,
                            DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN, SELECT_DOMAIN,
                            SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
@@ -14,7 +16,6 @@ from .exceptions import (BLUETOOTH_RESTARTING, ListOfConnectionErrors,
                          ListOfMQTTConnectionErrors, handle_ble_exceptions,
                          restart_bluetooth)
 from .tasks import handle_returned_tasks, run_tasks_and_cancel_on_first_return
-from ble2mqtt.__version__ import VERSION
 
 _LOGGER = logging.getLogger(__name__)
 

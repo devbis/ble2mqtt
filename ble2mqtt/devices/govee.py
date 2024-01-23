@@ -1,6 +1,7 @@
 import logging
 
 from bleak.backends.device import BLEDevice
+
 from ..devices.base import HumidityTemperatureSensor
 from ..protocols.govee import GoveeDecoder
 from ..utils import format_binary

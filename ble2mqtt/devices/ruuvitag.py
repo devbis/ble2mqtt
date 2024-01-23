@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 from bleak.backends.device import BLEDevice
 
-from ..devices.base import Sensor, SENSOR_DOMAIN
+from ..devices.base import SENSOR_DOMAIN, Sensor
 from ..protocols.ruuvi import DataFormat5Decoder
-from ..utils import format_binary, cr2477_voltage_to_percent
+from ..utils import cr2477_voltage_to_percent, format_binary
 
 _LOGGER = logging.getLogger(__name__)
 
