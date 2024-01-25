@@ -344,7 +344,7 @@ class RoidmiCleaner(Sensor):
         """
         sender.handle == 28
         """
-        _LOGGER.warning(
+        _LOGGER.debug(
             "voltage_notification_handler: {0} notification: {1}: {2}".format(
                 self,
                 sender,
@@ -358,7 +358,7 @@ class RoidmiCleaner(Sensor):
         """
         sender.handle == 32
         """
-        _LOGGER.warning(
+        _LOGGER.debug(
             "state_notification_handler: {0} notification: {1}: {2}".format(
                 self,
                 sender,
@@ -373,7 +373,7 @@ class RoidmiCleaner(Sensor):
         self._state.numeric_display_type = numeric_display_type
 
     def total_use_notification_handler(self, sender, data: bytearray):
-        _LOGGER.warning(
+        _LOGGER.debug(
             "total_use_notification_handler: {0} notification: {1}: {2}".format(
                 self,
                 sender,
@@ -387,7 +387,7 @@ class RoidmiCleaner(Sensor):
         self._state.hepa_used_seconds = hepa_used_seconds
 
     def error_notification_handler(self, sender, data: bytearray):
-        _LOGGER.warning(
+        _LOGGER.debug(
             "error_notification_handler: {0} notification: {1}: {2}".format(
                 self,
                 sender,
@@ -412,10 +412,10 @@ class RoidmiCleaner(Sensor):
 
         version_bytes = await self._read_with_timeout(VERSION_CHAR)
         self._version = self._parse_version_data(version_bytes)[1]
-        _LOGGER.warning(f'{self} name: {self._model}, version: {self._version}')
+        _LOGGER.debug(f'{self} name: {self._model}, version: {self._version}')
         self._state = await self._read_state_from_device()
 
-        _LOGGER.warning(f'{self} initial state: {self._state}')
+        _LOGGER.debug(f'{self} initial state: {self._state}')
         for ch, handler in (
             (self.VOLTAGE_CHAR, self.voltage_notification_handler),
             (self.STATE_CHAR, self.state_notification_handler),
@@ -465,7 +465,7 @@ class RoidmiCleaner(Sensor):
                     _LOGGER.warning(f'Unknown speed option: {value}')
                     continue
 
-                _LOGGER.warning(
+                _LOGGER.info(
                     f'[{self}] switch {LOW_SPEED_POWER} value={speed_power}',
                 )
                 while True:
@@ -491,9 +491,7 @@ class RoidmiCleaner(Sensor):
                 entity,
                 skip_unique_id=True,
             ):
-                _LOGGER.warning(
-                    f'[{self}] reset HEPA filter',
-                )
+                _LOGGER.info(f'[{self}] reset HEPA filter')
                 while True:
                     try:
                         await self._reset_hepa_filter()
