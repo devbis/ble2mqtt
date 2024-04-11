@@ -370,7 +370,9 @@ class Device(BaseDevice, abc.ABC):
         if not self.config_sent:
             await send_config()
         if self.client:  # in passive mode, client is None
-            self.rssi = await extract_rssi(self.client)
+            # For newer bleak versions rssi is not accessible in
+            # connection mode. Use previous values from scanning
+            self.rssi = (await extract_rssi(self.client)) or self.rssi
 
     def __str__(self):
         return self.unique_name
