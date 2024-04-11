@@ -74,7 +74,7 @@ async def restart_bluetooth(adapter: str):
             'hciconfig', adapter, 'up',
         )
         await proc.wait()
-        await aio.sleep(5)
+        await aio.sleep(15)
         _LOGGER.warning('Restarting bluetoothd finished')
 
 
