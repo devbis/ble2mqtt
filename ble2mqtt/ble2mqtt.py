@@ -6,6 +6,7 @@ from uuid import getnode
 
 import aio_mqtt
 from bleak.backends.device import BLEDevice
+from bleak.exc import BleakDBusError
 
 from .compat import get_scanner
 from .devices.base import ConnectionMode, Device, done_callback
@@ -213,7 +214,14 @@ class Ble2Mqtt:
                         _LOGGER.error('Scanner start failed with timeout')
                     await aio.sleep(3)
                     devices = scanner.discovered_devices
-                    await scanner.stop()
+                    for _ in range(3):
+                        try:
+                            await scanner.stop()
+                        except BleakDBusError as e:
+                            if 'InProgress' in str(e):
+                                await aio.sleep(1)
+                                continue
+                            raise
                     if not devices:
                         empty_scans += 1
                     else:
