@@ -7,6 +7,8 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
+from bleak.exc import BleakDBusError
+
 from ..devices.base import BaseDevice
 from ..utils import format_binary
 from .base import BaseCommand, BLEQueueMixin, SendAndWaitReplyMixin
@@ -309,10 +311,16 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             f'{format_binary(cmd)}',
         )
         self.clear_ble_queue()
-        cmd_resp = await aio.wait_for(
-            self.client.write_gatt_char(self.TX_CHAR, cmd, True),
-            timeout=command.timeout,
-        )
+        try:
+            cmd_resp = await aio.wait_for(
+                self.client.write_gatt_char(self.TX_CHAR, cmd, True),
+                timeout=command.timeout,
+            )
+        except BleakDBusError:
+            cmd_resp = await aio.wait_for(
+                self.client.write_gatt_char(self.TX_CHAR, cmd),
+                timeout=command.timeout,
+            )
         if not command.wait_reply:
             if command.answer.cancelled():
                 return
