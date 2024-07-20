@@ -8,7 +8,7 @@ from ..protocols.redmond import (COOKER_PREDEFINED_PROGRAMS, CookerRunState,
                                  CookerState, RedmondCookerProtocol,
                                  RedmondError)
 from .base import (SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
-                   Device)
+                   Device, NUMBER_DOMAIN, )
 from .uuids import DEVICE_NAME
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,6 +22,8 @@ SOUND_ENTITY = 'sound'
 PREDEFINED_PROGRAM_ENTITY = 'predefined_program'
 TEMPERATURE_ENTITY = 'temperature'
 MODE_ENTITY = 'mode'
+COOKING_MINUTES = 'cooking_minutes'
+TIMER_MINUTES = 'timer_minutes'
 
 
 def option_to_const(option):
@@ -85,6 +87,18 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                 },
                 {
                     'name': MODE_ENTITY,
+                },
+            ],
+            NUMBER_DOMAIN: [
+                {
+                    'name': COOKING_MINUTES,
+                    'unit_of_measurement': 'min',
+                    'icon': 'timer',
+                },
+                {
+                    'name': TIMER_MINUTES,
+                    'unit_of_measurement': 'min',
+                    'icon': 'timer',
                 },
             ],
             SELECT_DOMAIN: [
