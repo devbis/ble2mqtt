@@ -33,6 +33,7 @@ CLIMATE_DOMAIN = 'climate'
 COVER_DOMAIN = 'cover'
 DEVICE_TRACKER_DOMAIN = 'device_tracker'
 LIGHT_DOMAIN = 'light'
+NUMBER_DOMAIN = 'number'
 SELECT_DOMAIN = 'select'
 SENSOR_DOMAIN = 'sensor'
 SWITCH_DOMAIN = 'switch'
@@ -220,6 +221,7 @@ class Device(BaseDevice, abc.ABC):
             COVER_DOMAIN,
             DEVICE_TRACKER_DOMAIN,
             LIGHT_DOMAIN,
+            NUMBER_DOMAIN,
             SELECT_DOMAIN,
             SENSOR_DOMAIN,
             SWITCH_DOMAIN,
@@ -265,7 +267,7 @@ class Device(BaseDevice, abc.ABC):
             self.SET_POSTFIX:
                 [
                     BUTTON_DOMAIN, CLIMATE_DOMAIN, COVER_DOMAIN, LIGHT_DOMAIN,
-                    SELECT_DOMAIN, SWITCH_DOMAIN,
+                    NUMBER_DOMAIN, SELECT_DOMAIN, SWITCH_DOMAIN,
                 ],
             self.SET_POSITION_POSTFIX: [COVER_DOMAIN],
             self.SET_MODE_POSTFIX: [CLIMATE_DOMAIN],

@@ -310,17 +310,20 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             f'{format_binary(command.payload, delimiter="")}] '
             f'{format_binary(cmd)}',
         )
+        if hasattr(self._ble_queue, '_queue'):
+            _LOGGER.warning('queue: %s', self._ble_queue._queue)
         self.clear_ble_queue()
-        try:
-            cmd_resp = await aio.wait_for(
-                self.client.write_gatt_char(self.TX_CHAR, cmd, True),
-                timeout=command.timeout,
-            )
-        except BleakDBusError:
-            cmd_resp = await aio.wait_for(
-                self.client.write_gatt_char(self.TX_CHAR, cmd),
-                timeout=command.timeout,
-            )
+        # try:
+        cmd_resp = await aio.wait_for(
+            self.client.write_gatt_char(self.TX_CHAR, cmd),
+            timeout=command.timeout,
+        )
+        # except BleakDBusError:
+        #     await aio.sleep(5)
+        #     cmd_resp = await aio.wait_for(
+        #         self.client.write_gatt_char(self.TX_CHAR, cmd),
+        #         timeout=command.timeout,
+        #     )
         if not command.wait_reply:
             if command.answer.cancelled():
                 return

@@ -10,8 +10,9 @@ from ble2mqtt.__version__ import VERSION
 
 from .devices.base import (BINARY_SENSOR_DOMAIN, BUTTON_DOMAIN, CLIMATE_DOMAIN,
                            COVER_DOMAIN, DEVICE_TRACKER_DOMAIN, LIGHT_DOMAIN,
-                           SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN,
-                           ConnectionMode, ConnectionTimeoutError, Device)
+                           NUMBER_DOMAIN, SELECT_DOMAIN, SENSOR_DOMAIN,
+                           SWITCH_DOMAIN, ConnectionMode,
+                           ConnectionTimeoutError, Device)
 from .exceptions import (BLUETOOTH_RESTARTING, ListOfConnectionErrors,
                          ListOfMQTTConnectionErrors, handle_ble_exceptions,
                          restart_bluetooth)
@@ -184,8 +185,8 @@ class DeviceManager:
                             retain=True,
                         ),
                     )
-            if cls in {BUTTON_DOMAIN, SWITCH_DOMAIN}:
-                has_state = cls == SWITCH_DOMAIN
+            if cls in {BUTTON_DOMAIN, NUMBER_DOMAIN, SWITCH_DOMAIN}:
+                has_state = cls in {NUMBER_DOMAIN, SWITCH_DOMAIN}
                 for entity in entities:
                     entity_name = entity['name']
                     state_topic = self._get_topic(
