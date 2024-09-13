@@ -452,21 +452,24 @@ class Device(BaseDevice, abc.ABC):
             await self.client.disconnect()
         await super().close()
 
+    def get_linkquality_description(self):
+        return {
+            'name': 'linkquality',
+            'unit_of_measurement': 'lqi',
+            'icon': 'signal',
+            'entity_category': 'diagnostic',
+            **(
+                {'topic': self.LINKQUALITY_TOPIC}
+                if self.LINKQUALITY_TOPIC else {}
+            ),
+        }
+
     @property
     def entities_with_lqi(self):
-        sensor_entities = self.entities.get(SENSOR_DOMAIN, [])
-        sensor_entities.append(
-            {
-                'name': 'linkquality',
-                'unit_of_measurement': 'lqi',
-                'icon': 'signal',
-                'entity_category': 'diagnostic',
-                **(
-                    {'topic': self.LINKQUALITY_TOPIC}
-                    if self.LINKQUALITY_TOPIC else {}
-                ),
-            },
-        )
+        sensor_entities = [
+            *self.entities.get(SENSOR_DOMAIN, []),
+            self.get_linkquality_description(),
+        ]
         return {
             **self.entities,
             SENSOR_DOMAIN: sensor_entities,
@@ -628,13 +631,13 @@ class HumidityTemperatureSensor(Sensor, abc.ABC):
 
 
 class SubscribeAndSetDataMixin:
-    DATA_CHAR: uuid.UUID = None  # type: ignore
+    INDICATION_CHARS: ty.List[uuid.UUID] = []
     SENSOR_CLASS: ty.Any = None  # type: ignore
 
-    def filter_notifications(self, sender, data):
+    def filter_notifications(self, sender: int, data):
         return True
 
-    def process_data(self, data: bytearray):
+    def process_data(self, data: bytearray, sender: int):
         self._state = self.SENSOR_CLASS.from_data(data)
 
     def notification_handler(self, sender, data: bytearray):
@@ -643,15 +646,21 @@ class SubscribeAndSetDataMixin:
             sender,
             format_binary(data),
         ))
-        if self.filter_notifications(sender, data):
-            self.process_data(data)
+        int_sender = sender if isinstance(sender, int) else int(sender[-4:], 16)
+        if self.filter_notifications(int_sender, data):
+            self.process_data(data, int_sender)
+
+    def _get_indication_chars(self):
+        return self.INDICATION_CHARS
 
     async def get_device_data(self):
-        if self.DATA_CHAR:
-            await self.client.start_notify(
-                self.DATA_CHAR,
-                self.notification_handler,
-            )
+        chars = self._get_indication_chars()
+        if chars:
+            for char in chars:
+                await self.client.start_notify(
+                    char,
+                    self.notification_handler,
+                )
         await super().get_device_data()
 
 

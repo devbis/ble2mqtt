@@ -32,7 +32,7 @@ class SensorState:
 
 class AtomFast(SubscribeAndSetDataMixin, Sensor):
     NAME = 'atomfast'
-    DATA_CHAR = MAIN_DATA
+    INDICATION_CHARS = [MAIN_DATA]
     SENSOR_CLASS = SensorState
     CONNECTION_FAILURES_LIMIT = 10
     MANUFACTURER = 'Atom'
@@ -66,5 +66,5 @@ class AtomFast(SubscribeAndSetDataMixin, Sensor):
             ],
         }
 
-    def filter_notifications(self, sender, data):
+    def filter_notifications(self, sender: int, data):
         return sender == 0x24

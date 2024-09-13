@@ -33,7 +33,7 @@ class SensorState:
 
 class VoltageTesterBM2(SubscribeAndSetDataMixin, Sensor):
     NAME = 'voltage_bm2'
-    DATA_CHAR = UUID_KEY_READ
+    INDICATION_CHARS = [UUID_KEY_READ]
     MANUFACTURER = 'BM2'
     SENSOR_CLASS = SensorState
     REQUIRED_VALUES = ('voltage', )
@@ -51,7 +51,7 @@ class VoltageTesterBM2(SubscribeAndSetDataMixin, Sensor):
             ],
         }
 
-    def process_data(self, data: bytearray):
+    def process_data(self, data: bytearray, **kwargs):
         decrypted_data = create_aes().decrypt(data)
         if decrypted_data[0] == 0xf5:
             self._state = self.SENSOR_CLASS.from_data(decrypted_data)

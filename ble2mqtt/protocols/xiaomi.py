@@ -13,7 +13,6 @@ _LOGGER = logging.getLogger(__name__)
 # Xiaomi Humidity/Temperature sensors
 
 class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
-    DATA_CHAR: uuid.UUID = None  # type: ignore
     BATTERY_CHAR: uuid.UUID = None  # type: ignore
     MANUFACTURER = 'Xiaomi'
 
@@ -21,7 +20,7 @@ class XiaomiPoller(SubscribeAndSetDataMixin, Sensor, abc.ABC):
         super().__init__(*args, loop=loop, **kwargs)
         self._stack = aio.LifoQueue(**get_loop_param(loop))
 
-    def process_data(self, data):
+    def process_data(self, data, **kwargs):
         self._loop.call_soon_threadsafe(self._stack.put_nowait, data)
 
     async def read_and_send_data(self, publish_topic):
