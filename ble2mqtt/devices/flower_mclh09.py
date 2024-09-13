@@ -9,6 +9,8 @@ from .uuids import BATTERY
 
 _LOGGER = logging.getLogger(__name__)
 
+FLOWER_SENSOR_CHAR = uuid.UUID('55482920-eacb-11e3-918a-0002a5d5c51b')
+
 TEMPERATURE_VALUES = [68.8, 49.8, 24.3, 6.4, 1.0, -5.5, -20.5, -41.0]
 TEMPERATURE_READINGS = [1035, 909, 668, 424, 368, 273, 159, 0]
 MOISTURE_VALUES = [60.0, 58.0, 54.0, 22.0, 2.0, 0.0]
@@ -43,14 +45,14 @@ def calculate_temperature(raw_value):
 
 
 def calculate_moisture(raw_value):
-    humidity = _interpolate(raw_value, MOISTURE_VALUES, MOISTURE_READINGS)
+    moisture = _interpolate(raw_value, MOISTURE_VALUES, MOISTURE_READINGS)
 
-    if humidity > 60.0:
-        humidity = 60.0
-    if humidity < 0.0:
-        humidity = 0.0
+    if moisture > 100.0:
+        moisture = 100.0
+    if moisture < 0.0:
+        moisture = 0.0
 
-    return humidity
+    return moisture
 
 
 def calculate_illuminance(raw_value):
@@ -78,7 +80,7 @@ class SensorState:
 class FlowerMonitorMCLH09(Sensor):
     NAME = 'mclh09'
     MANUFACTURER = 'LifeControl'
-    DATA_CHAR = uuid.UUID('55482920-eacb-11e3-918a-0002a5d5c51b')
+    DATA_CHAR = FLOWER_SENSOR_CHAR
     BATTERY_CHAR = BATTERY
     ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT
     DEFAULT_RECONNECTION_SLEEP_INTERVAL = 300
