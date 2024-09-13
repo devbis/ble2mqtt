@@ -21,7 +21,7 @@ class SensorState:
 class QingpingTempRHMonitorLite(XiaomiHumidityTemperature):
     NAME = 'qingpingCGDK2'
     MANUFACTURER = 'Qingping'
-    DATA_CHAR = SERVICE_DATA_UUID
+    INDICATION_CHARS = [SERVICE_DATA_UUID]
     BATTERY_CHAR = BATTERY
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
@@ -29,13 +29,13 @@ class QingpingTempRHMonitorLite(XiaomiHumidityTemperature):
 
     PREAMBLE = b'\xcd\xfd'
 
-    def filter_notifications(self, sender, data):
+    def filter_notifications(self, sender: int, data):
         packet_start = data.find(self.PREAMBLE)
         if packet_start == -1:
             return False
         return data[packet_start + len(self.PREAMBLE) + 1] == 0x10
 
-    def process_data(self, data):
+    def process_data(self, data, **kwargs):
         packet_start = data.find(self.PREAMBLE)
         offset = packet_start + len(self.PREAMBLE)
         value_data = data[offset:]

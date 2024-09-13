@@ -31,7 +31,7 @@ class SensorState:
 
 class XiaomiHumidityTemperatureLYWSD(XiaomiHumidityTemperature):
     NAME = 'xiaomilywsd'
-    DATA_CHAR = LYWSD_DATA
+    INDICATION_CHARS = [LYWSD_DATA]
     BATTERY_CHAR = LYWSD_BATTERY
     SENSOR_CLASS = SensorState
     CONNECTION_FAILURES_LIMIT = 10

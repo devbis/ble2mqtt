@@ -41,19 +41,16 @@ class SensorState:
 
 class XiaomiHumidityTemperatureV1(XiaomiHumidityTemperature):
     NAME = 'xiaomihtv1'
-    DATA_CHAR = MJHT_DATA
+    INDICATION_CHARS = [MJHT_DATA]
     BATTERY_CHAR = BATTERY
     SENSOR_CLASS = SensorState
     SUPPORT_PASSIVE = True
     ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT
 
-    def filter_notifications(self, sender, data):
+    def filter_notifications(self, sender: int, data):
         # sender is 0xd or several requests it becomes
         # /org/bluez/hci0/dev_58_2D_34_32_E0_69/service000c/char000d
-        return (
-            sender == 0xd or
-            isinstance(sender, str) and sender.endswith('000d')
-        )
+        return sender == 0xd
 
     def handle_advert(self, scanned_device: BLEDevice, adv_data):
         service_data = adv_data.service_data
