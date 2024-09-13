@@ -242,13 +242,12 @@ class DeviceManager:
                         entity_name,
                         'config',
                     ))
+                    color_mode = entity['color_mode']
                     payload = json.dumps({
                         **get_generic_vals(entity),
                         'schema': 'json',
-                        'color_mode': bool(entity.get('color_mode', True)),
                         'supported_color_modes': entity.get(
-                            'color_mode',
-                            ['rgb'],
+                            'supported_color_modes', [color_mode],
                         ),
                         'brightness': entity.get('brightness', True),
                         'state_topic': state_topic,
