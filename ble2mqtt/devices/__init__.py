@@ -9,6 +9,7 @@ from .flower_miflora import FlowerMonitorMiFlora  # noqa: F401
 from .govee import GoveeTemperature  # noqa: F401
 from .kettle_redmond import RedmondKettle  # noqa: F401
 from .kettle_xiaomi import XiaomiKettle  # noqa: F401
+from .oregon_ht import OregonScientificWeatherStation  # noqa: F401
 from .presence import Presence  # noqa: F401
 from .qingping_cgdk2 import QingpingTempRHMonitorLite  # noqa: F401
 from .roidmi_cleaner import RoidmiCleaner  # noqa: F401
