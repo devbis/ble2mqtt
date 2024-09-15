@@ -35,7 +35,7 @@
   adjustments for the list of available programs, it depends
   on the device panel.*
 
-### Humidity sensors
+### Temperature/Humidity sensors
 - **Xiaomi MJ_HT_V1 (type: xiaomihtv1)**
 - **Xiaomi LYWSD02MMC (type: xiaomihtv1)**
 - **Xiaomi LYWSD03MMC (type: xiaomilywsd)** (due to the connection to the device on 
@@ -49,6 +49,7 @@
 - **RuuviTag Pro 3in1 (type: ruuvitag_pro_3in1)**
 - **RuuviTag Pro 4in1 (type: ruuvitag)**
 - **Govee H5074 (type: govee_ht)**
+- **Oregon Scientific weather station (RAR213HG) (type: oregon_weather)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
@@ -235,6 +236,11 @@ The configuration file is a JSON with the following content:
             "address": "11:22:33:aa:aa:bd",
             "type": "miflora",
             "interval": 500
+        },
+        {
+            "address": "11:22:33:aa:aa:bf",
+            "type": "oregon_weather",
+            "interval": 120
         },
         {
             "address": "11:22:33:aa:aa:be",
