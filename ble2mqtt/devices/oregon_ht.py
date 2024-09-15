@@ -1,3 +1,4 @@
+import asyncio as aio
 import logging
 import struct
 import typing as ty
@@ -148,6 +149,7 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
         )
         self._device_properties = set()
         self._state = SensorState()
+        self._state_ready = aio.Event()
         self._notification_cache = defaultdict(dict)
 
     @property
@@ -254,3 +256,7 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
         if dev_props[1]:
             self._device_properties.add('indoor')
         await super().get_device_data()
+
+    async def do_active_loop(self, publish_topic):
+        await aio.wait_for(self._state_ready.wait(), 5)
+        await self._notify_state(publish_topic)
