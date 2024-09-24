@@ -251,10 +251,10 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
         self._state.battery = (
             await self._read_with_timeout(self.BATTERY_CHAR)
         )[0]
-        dev_props = await self._read_with_timeout(DEVICE_INFORMATION_UUID)
-        _LOGGER.warning(f'[{self}] Device properties: {dev_props}')
-        if dev_props[1]:
-            self._device_properties.add('indoor')
+        # dev_props = await self._read_with_timeout(DEVICE_INFORMATION_UUID)
+        # _LOGGER.warning(f'[{self}] Device properties: {dev_props}')
+        # if dev_props[1]:
+        #     self._device_properties.add('indoor')
         await super().get_device_data()
 
     async def do_active_loop(self, publish_topic):
