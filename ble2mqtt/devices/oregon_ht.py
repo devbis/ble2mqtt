@@ -234,10 +234,17 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
         # we omit it for subscribing
         try:
             # TODO: test code. Remove
-            return [
+            result = [
                 ch for ch in self.INDICATION_CHARS
                 if self.client.services.get_characteristic(ch)
             ]
+            _LOGGER.info('Subscribing to %s', result)
+            if result:
+                return result
+            _LOGGER.warning(
+                'No indication chars found, use default list. Available chars: %s',
+                getattr(self.client.services, 'characteristics', 'MISSING')
+            )
         except Exception as e:
             _LOGGER.warning('FIXME! Failed to get indication chars: %s', e)
         return self.INDICATION_CHARS
