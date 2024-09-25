@@ -165,6 +165,7 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
             ],
         }
 
+    @property
     def entities_with_lqi(self):
         sensor_entities = [
             *self.entities.get(SENSOR_DOMAIN, []),
