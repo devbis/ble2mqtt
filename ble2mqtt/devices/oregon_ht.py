@@ -230,13 +230,15 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
     def _get_indication_chars(self):
         # some models don't expose pressure characteristic,
         # we omit it for subscribing
-        return [
-            ch for ch in self.INDICATION_CHARS
-            if any(
-                ch == uuid.UUID(cch.uuid)
-                for cch in self.client.characteristics
-            )
-        ]
+        try:
+            # TODO: test code. Remove
+            return [
+                ch for ch in self.INDICATION_CHARS
+                if self.client.services.get_characteristic(ch)
+            ]
+        except Exception as e:
+            _LOGGER.warning('FIXME! Failed to get indication chars: %s', e)
+        return self.INDICATION_CHARS
 
     async def get_device_data(self):
         manufacturer = await self._read_with_timeout(MANUFACTURER)
