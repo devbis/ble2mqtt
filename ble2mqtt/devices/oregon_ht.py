@@ -221,6 +221,7 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
                         packets_by_type[FIRST_PACKET],
                         packets_by_type[SECOND_PACKET],
                     )
+                    self._state_ready.set()
                 elif sndr == SENDER_4_7:
                     pass
                 elif sndr == SENDER_8_11:
@@ -261,5 +262,8 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
         await super().get_device_data()
 
     async def do_active_loop(self, publish_topic):
-        await aio.wait_for(self._state_ready.wait(), 5)
+        try:
+            await aio.wait_for(self._state_ready.wait(), 5)
+        except aio.TimeoutError:
+            _LOGGER.warning('[%s] Did not receive data for 5 seconds', self)
         await self._notify_state(publish_topic)
