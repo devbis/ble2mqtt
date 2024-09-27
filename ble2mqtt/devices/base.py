@@ -641,7 +641,7 @@ class SubscribeAndSetDataMixin:
         self._state = self.SENSOR_CLASS.from_data(data)
 
     def notification_handler(self, sender, data: bytearray):
-        _LOGGER.debug("{0} notification: {1}: {2}".format(
+        _LOGGER.warning("{0} notification: {1}: {2}".format(
             self,
             sender,
             format_binary(data),

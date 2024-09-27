@@ -207,6 +207,7 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
         }
 
     def filter_notifications(self, sender: int, data: bytes):
+        _LOGGER.info('Filtering data from %s: %s, accepts: %s', sender, data.hex(' '), [SENDER_0_3, SENDER_4_7, SENDER_8_11])
         return sender in [SENDER_0_3, SENDER_4_7, SENDER_8_11]
 
     def process_data(self, data: bytearray, sender: int):
