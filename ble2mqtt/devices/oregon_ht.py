@@ -124,9 +124,14 @@ class OregonScientificWeatherStation(SubscribeAndSetDataMixin, Sensor):
     NAME = 'oregon_weather'
     MANUFACTURER = 'Oregon'
     INDICATION_CHARS = [
+        uuid.UUID('74e78e01-c6a4-11e2-b7a9-0002a5d5c51b'),
+        DEVICE_INFORMATION_UUID,
+        uuid.UUID('74e78e03-c6a4-11e2-b7a9-0002a5d5c51b'),
+        uuid.UUID('74e78e04-c6a4-11e2-b7a9-0002a5d5c51b'),
         INDOOR_AND_CH1_TO_3_TH_DATA_UUID,
-        # CH4_TO_7_TH_DATA,
-        # PRESSURE_DATA,
+        CH4_TO_7_TH_DATA,
+        PRESSURE_DATA,
+        uuid.UUID('74e78e2c-c6a4-11e2-b7a9-0002a5d5c51b'),
     ]
     BATTERY_CHAR = BATTERY
     ACTIVE_CONNECTION_MODE = ConnectionMode.ACTIVE_POLL_WITH_DISCONNECT
