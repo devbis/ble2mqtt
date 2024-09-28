@@ -26,13 +26,24 @@ class ActiveMode(Enum):
     VACATION = 3
 
 
+class ActiveHeatingMode(Enum):
+    FLOOR = 1
+    ROOM = 2
+    COMBINATION = 3
+    POWER = 4
+    FORCE = 5
+
+
 @dataclass
 class Measurements:
     target_temperature: float
     temperature: float
+    floor_temperature: float
+    room_temperature: float
     relay_is_on: bool
     alarm_code: int
     active_mode: ActiveMode
+    active_heating_mode: ActiveHeatingMode
     boost_is_on: bool
     potentiometer: int
     boost_minutes: int = 0
@@ -100,20 +111,37 @@ class EnstoProtocol(BLEQueueMixin, BaseDevice, abc.ABC):
         # first part of reporting data
         target_temperature = \
             int.from_bytes(data[1:3], byteorder='little') / 10
-        temperature = \
+        room_temperature = \
             int.from_bytes(data[4:6], byteorder='little', signed=True) / 10
+        floor_temperature = \
+            int.from_bytes(data[6:8], byteorder='little', signed=True) / 10
         relay_is_on = data[8] == 1
         alarm_code = int.from_bytes(data[9:13], byteorder='little')
 
         # 1 - manual, 2 - calendar, 3 - vacation
         active_mode = ActiveMode(data[13])
+        active_heating_mode = ActiveHeatingMode(data[14])
         boost_is_on = data[15] == 1
         boost_minutes = int.from_bytes(data[16:18], byteorder='little')
         boost_minutes_left = int.from_bytes(data[18:20], byteorder='little')
         potentiometer = data[20]
+
+        if active_heating_mode == ActiveHeatingMode.FLOOR:
+            temperature = floor_temperature
+        elif active_heating_mode == ActiveHeatingMode.ROOM:
+            temperature = room_temperature
+        elif room_temperature == -0.1 and floor_temperature != -0.1:
+            temperature = floor_temperature
+        elif room_temperature != -0.1 and floor_temperature == -0.1:
+            temperature = room_temperature
+        else:
+            temperature = room_temperature
+
         return Measurements(
             target_temperature=target_temperature,
             temperature=temperature,
+            floor_temperature=floor_temperature,
+            room_temperature=room_temperature,
             relay_is_on=relay_is_on,
             alarm_code=alarm_code,
             boost_is_on=boost_is_on,
@@ -121,6 +149,7 @@ class EnstoProtocol(BLEQueueMixin, BaseDevice, abc.ABC):
             boost_minutes_left=boost_minutes_left,
             potentiometer=potentiometer,
             active_mode=active_mode,
+            active_heating_mode=active_heating_mode
         )
 
     async def read_measurements(self) -> Measurements:

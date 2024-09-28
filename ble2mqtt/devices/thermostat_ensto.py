@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from ble2mqtt.protocols.ensto import ActiveMode, EnstoProtocol, Measurements
 
 from ..utils import format_binary
-from .base import (BINARY_SENSOR_DOMAIN, BaseClimate, ClimateMode,
+from .base import (BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, BaseClimate, ClimateMode,
                    ConnectionMode)
 from .uuids import DEVICE_NAME, SOFTWARE_VERSION
 
@@ -22,13 +22,17 @@ UUID_FACTORY_RESET = uuid.UUID('f366dddb-ebe2-43ee-83c0-472ded74c8fa')
 
 
 RELAY_ENTITY = 'relay'
-
+TARGET_TEMPERATURE_ENTITY = 'target_temperature'
+FLOOR_TEMPERATURE_ENTITY = 'floor_temperature'
+ROOM_TEMPERATURE_ENTITY = 'room_temperature'
 
 @dataclass
 class EnstoState:
     mode: ClimateMode = ClimateMode.OFF
     temperature: ty.Optional[float] = None
     target_temperature: ty.Optional[float] = None
+    floor_temperature: ty.Optional[float] = None
+    room_temperature: ty.Optional[float] = None
     relay_is_on: bool = False
     target_temperature_with_offset: ty.Optional[float] = None
 
@@ -67,7 +71,24 @@ class EnstoThermostat(EnstoProtocol, BaseClimate):
                     'name': RELAY_ENTITY,
                     'device_class': 'power',
                     'entity_category': 'diagnostic',
+                }
+            ],
+            SENSOR_DOMAIN: [
+                {
+                    'name': TARGET_TEMPERATURE_ENTITY,
+                    'device_class': 'temperature',
+                    'unit_of_measurement': '\u00b0C',
                 },
+                {
+                    'name': FLOOR_TEMPERATURE_ENTITY,
+                    'device_class': 'temperature',
+                    'unit_of_measurement': '\u00b0C',
+                },
+                {
+                    'name': ROOM_TEMPERATURE_ENTITY,
+                    'device_class': 'temperature',
+                    'unit_of_measurement': '\u00b0C',
+                }
             ],
         }
 
@@ -130,6 +151,15 @@ class EnstoThermostat(EnstoProtocol, BaseClimate):
             },
             RELAY_ENTITY: {
                 'relay': 'ON' if self._state.relay_is_on else 'OFF',
+            },
+            TARGET_TEMPERATURE_ENTITY: {
+                'target_temperature': self._state.target_temperature,
+            },
+            FLOOR_TEMPERATURE_ENTITY: {
+                'floor_temperature': self._state.floor_temperature,
+            },
+            ROOM_TEMPERATURE_ENTITY: {
+                'room_temperature': self._state.room_temperature,
             }
         }
 
@@ -157,6 +187,8 @@ class EnstoThermostat(EnstoProtocol, BaseClimate):
         _LOGGER.debug(f'{self} parsed measurements: {values}')
         self._state.temperature = values.temperature
         self._state.target_temperature_with_offset = values.target_temperature
+        self._state.floor_temperature = values.floor_temperature
+        self._state.room_temperature = values.room_temperature
         self._state.relay_is_on = values.relay_is_on
         vacation_data = await self.read_vacation_mode()
         _LOGGER.debug(f'{self} vacation_data: {format_binary(vacation_data)}')
