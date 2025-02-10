@@ -48,7 +48,7 @@
 - **RuuviTag Pro 2in1 (type: ruuvitag_pro_2in1)**
 - **RuuviTag Pro 3in1 (type: ruuvitag_pro_3in1)**
 - **RuuviTag Pro 4in1 (type: ruuvitag)**
-- **Govee H5074 (type: govee_ht)**
+- **Govee H5074, H5075 (type: govee_ht)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
@@ -438,6 +438,6 @@ services:
 
 ```
 
-You do not need sharing `/var/run/dbus`, because `dbus` will start in the container.
+You do not need to share `/var/run/dbus`, because `dbus` will start in the container.
 
 NOTE: `--net=host` and `--cap-add=NET_ADMIN` is required as it needs to use and control the bluetooth interface
