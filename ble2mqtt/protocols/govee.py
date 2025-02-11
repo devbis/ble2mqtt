@@ -37,7 +37,7 @@ class GoveeDecoder:
             self.part_number = PartNumber.H5075
 
         else:
-            raise ValueError("Govee data must be 7 bytes long")
+            raise ValueError("Govee data must be 6 or 7 bytes long")
 
     @property
     def temperature_celsius(self) -> ty.Optional[float]:
