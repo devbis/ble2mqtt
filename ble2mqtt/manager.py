@@ -25,13 +25,14 @@ FAILURE_LIMIT = 5
 
 class DeviceManager:
     def __init__(self, device, *, hci_adapter, mqtt_client, base_topic,
-                 config_prefix, global_availability_topic):
+                 config_prefix, global_availability_topic, legacy_color_mode):
         self.device: Device = device
         self._hci_adapter = hci_adapter
         self._mqtt_client = mqtt_client
         self._base_topic = base_topic
         self._config_prefix = config_prefix
         self._global_availability_topic = global_availability_topic
+        self._legacy_color_mode = legacy_color_mode
         self.manage_task = None
         self.last_connection_successful = True
 
@@ -246,6 +247,11 @@ class DeviceManager:
                     payload = json.dumps({
                         **get_generic_vals(entity),
                         'schema': 'json',
+                        **(
+                            {'color_mode': bool(color_mode)}
+                            if self._legacy_color_mode
+                            else {}
+                        ),
                         'supported_color_modes': entity.get(
                             'supported_color_modes', [color_mode],
                         ),

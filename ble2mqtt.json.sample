@@ -2,6 +2,7 @@
     "mqtt_host": "localhost",
     "mqtt_user": "",
     "mqtt_password": "",
+    "legacy_color_mode": false,
     "devices": [
         {
             "address": "11:22:33:aa:cc:aa",

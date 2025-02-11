@@ -7,8 +7,13 @@ from dataclasses import dataclass
 from ble2mqtt.protocols.ensto import ActiveMode, EnstoProtocol, Measurements
 
 from ..utils import format_binary
-from .base import (BINARY_SENSOR_DOMAIN, SENSOR_DOMAIN, BaseClimate, ClimateMode,
-                   ConnectionMode)
+from .base import (
+    BINARY_SENSOR_DOMAIN,
+    SENSOR_DOMAIN,
+    BaseClimate,
+    ClimateMode,
+    ConnectionMode,
+)
 from .uuids import DEVICE_NAME, SOFTWARE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,6 +30,7 @@ RELAY_ENTITY = 'relay'
 TARGET_TEMPERATURE_ENTITY = 'target_temperature'
 FLOOR_TEMPERATURE_ENTITY = 'floor_temperature'
 ROOM_TEMPERATURE_ENTITY = 'room_temperature'
+
 
 @dataclass
 class EnstoState:
