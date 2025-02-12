@@ -111,6 +111,7 @@ async def amain(config):
         base_topic=config['base_topic'],
         mqtt_config_prefix=config['mqtt_config_prefix'],
         hci_adapter=config['hci_adapter'],
+        legacy_color_mode=config['legacy_color_mode'],
     )
 
     loop.set_exception_handler(
