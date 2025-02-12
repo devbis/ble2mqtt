@@ -8,6 +8,10 @@ from ..utils import format_binary
 
 _LOGGER = logging.getLogger(__name__)
 
+def valid_data_length(raw_data):
+    valid_lengths = [6, 7]
+    return len(raw_data) in valid_lengths
+
 
 class GoveeTemperature(HumidityTemperatureSensor):
     NAME = 'govee_ht'
@@ -24,7 +28,7 @@ class GoveeTemperature(HumidityTemperatureSensor):
             )
             return
 
-        if len(raw_data) != 7:
+        if not valid_data_length(raw_data):
             _LOGGER.debug(
                 'Unexpected raw data length '
                 f'{len(raw_data)} ({repr(raw_data)})',

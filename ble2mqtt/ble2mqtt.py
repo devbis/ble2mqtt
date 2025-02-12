@@ -41,6 +41,7 @@ class Ble2Mqtt:
             hci_adapter: str,
             base_topic,
             mqtt_config_prefix,
+            legacy_color_mode,
     ) -> None:
         self._hci_adapter = hci_adapter
         self._mqtt_host = host
@@ -50,6 +51,7 @@ class Ble2Mqtt:
         self._ssl = ssl
         self._base_topic = base_topic
         self._mqtt_config_prefix = mqtt_config_prefix
+        self._legacy_color_mode = legacy_color_mode
 
         self._reconnection_interval = reconnection_interval
         self._loop = loop or aio.get_event_loop()
@@ -236,6 +238,7 @@ class Ble2Mqtt:
                     base_topic=self._base_topic,
                     config_prefix=self._mqtt_config_prefix,
                     global_availability_topic=self.availability_topic,
+                    legacy_color_mode=self._legacy_color_mode,
                 )
         _LOGGER.debug("Wait for network interruptions...")
 

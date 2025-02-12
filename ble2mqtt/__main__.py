@@ -157,6 +157,7 @@ def main():
         'mqtt_config_prefix': 'b2m_',
         'log_level': 'INFO',
         'hci_adapter': 'hci0',
+        'legacy_color_mode': False,
         **config,
     }
 

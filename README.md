@@ -48,7 +48,7 @@
 - **RuuviTag Pro 2in1 (type: ruuvitag_pro_2in1)**
 - **RuuviTag Pro 3in1 (type: ruuvitag_pro_3in1)**
 - **RuuviTag Pro 4in1 (type: ruuvitag)**
-- **Govee H5074 (type: govee_ht)**
+- **Govee H5074, H5075 (type: govee_ht)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
@@ -169,6 +169,7 @@ The configuration file is a JSON with the following content:
     "mqtt_user": "",
     "mqtt_password": "",
     "log_level": "INFO",
+    "legacy_color_mode": false, // remove this comment and set to true if you have HA <2024.4
     "devices": [
         {
             "address": "11:22:33:aa:cc:aa",
@@ -256,6 +257,7 @@ Extra configuration parameters:
 - `"mqtt_prefix"`- a prefix to distinguish ble devices from other instances and
   programs. The default value is 'b2m_'.
 - `"hci_adapter"` - an adapter to use. The default value is "hci0"
+- `"legacy_color_mode"` - set to true if you have Home Assistant version < 2024.4. For example, if you use HomeAssistant on OpenWrt script.
 
 Devices accept `friendly_name` parameter to replace mac address in device
 names for Home Assistant.
@@ -438,6 +440,6 @@ services:
 
 ```
 
-You do not need sharing `/var/run/dbus`, because `dbus` will start in the container.
+You do not need to share `/var/run/dbus`, because `dbus` will start in the container.
 
 NOTE: `--net=host` and `--cap-add=NET_ADMIN` is required as it needs to use and control the bluetooth interface
