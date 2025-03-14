@@ -169,7 +169,9 @@ The configuration file is a JSON with the following content:
     "mqtt_user": "",
     "mqtt_password": "",
     "log_level": "INFO",
-    "legacy_color_mode": false, // remove this comment and set to true if you have HA <2024.4
+  
+    "// remove this comment. Set next line to true if you have HA <2024.4": "",
+    "legacy_color_mode": false, 
     "devices": [
         {
             "address": "11:22:33:aa:cc:aa",
