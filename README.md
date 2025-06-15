@@ -49,6 +49,7 @@
 - **RuuviTag Pro 3in1 (type: ruuvitag_pro_3in1)**
 - **RuuviTag Pro 4in1 (type: ruuvitag)**
 - **Govee H5074, H5075 (type: govee_ht)**
+- **SwitchBot Meter Plus (type: switchbot_ht)**
 
 ### Air sensors
 - **Vson WP6003 (type: wp6003)**
