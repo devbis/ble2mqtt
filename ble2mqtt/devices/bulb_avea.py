@@ -37,6 +37,7 @@ class AveaBulb(AveaProtocol, Device):
             LIGHT_DOMAIN: [
                 {
                     'name': 'light',
+                    'color_mode': 'rgb',
                 },
             ],
         }
@@ -58,7 +59,6 @@ class AveaBulb(AveaProtocol, Device):
                     'g': self._color[1],
                     'b': self._color[2],
                 },
-                'color_mode': 'rgb',
             },
         }
 

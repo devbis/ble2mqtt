@@ -87,6 +87,7 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                 {
                     'name': LIGHT_ENTITY,
                     'topic': LIGHT_ENTITY,
+                    'color_mode': 'rgb',
                 },
             ],
         }
@@ -109,7 +110,6 @@ class RedmondKettle(RedmondKettle200Protocol, Device):
                     'g': self._color[1],
                     'b': self._color[2],
                 },
-                'color_mode': 'rgb',
             },
         }
 
