@@ -273,13 +273,13 @@ Put the following content to the unit file `/etc/systemd/system/ble2mqtt.service
 ```
 [Unit]
 Description=ble2mqtt bridge
+Wants=bluetooth.target
 
 [Service]
-Type=Simple
+Type=simple
 ExecStart=/usr/local/bin/ble2mqtt
 User=ble2mqtt
 Group=ble2mqtt
-Wants=bluetooth.target
 
 [Install]
 WantedBy=multi-user.target
