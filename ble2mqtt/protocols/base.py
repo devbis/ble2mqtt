@@ -5,9 +5,14 @@ import typing as ty
 
 from ..compat import get_loop_param
 from ..devices.base import BaseDevice
+from ..exceptions import ListOfConnectionErrors
 from ..utils import format_binary
 
 _LOGGER = logging.getLogger(__name__)
+
+# connection-class errors that are expected on a flaky link / adapter and are
+# handled by the command's awaiter (reconnect/retry) - not real bugs.
+CONNECTION_ERRORS = (*ListOfConnectionErrors, ConnectionError)
 
 
 class BLEQueueMixin(BaseDevice, abc.ABC):
@@ -90,9 +95,17 @@ class SendAndWaitReplyMixin(BaseDevice, abc.ABC):
             except Exception as e:
                 if command and not command.answer.done():
                     command.answer.set_exception(e)
-                _LOGGER.exception(
-                    f'{self} raise an error in handle_queue, ignore it',
-                )
+                # connection errors are expected and handled upstream (the
+                # command's awaiter reconnects/retries); don't spam the log
+                # with a full traceback for them.
+                if isinstance(e, CONNECTION_ERRORS):
+                    _LOGGER.debug(
+                        f'{self} connection error in handle_queue: {e}',
+                    )
+                else:
+                    _LOGGER.exception(
+                        f'{self} raise an error in handle_queue, ignore it',
+                    )
 
     async def process_command(self, command):
         raise NotImplementedError()

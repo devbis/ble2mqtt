@@ -441,7 +441,9 @@ class Device(BaseDevice, abc.ABC):
         _LOGGER.info(f'Connected to {self.client.address}')
 
     def _on_disconnect(self, client, *args):
-        _LOGGER.debug(f'Client {client.address} disconnected, device={self}')
+        # symmetric with the "Connected to ..." INFO line so disconnects are
+        # visible in the logs without enabling debug.
+        _LOGGER.info(f'Disconnected from {client.address}, device={self}')
         self.disconnected_event.set()
 
     async def close(self):

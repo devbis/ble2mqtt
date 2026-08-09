@@ -414,6 +414,13 @@ class DeviceManager:
             # don't wait for RECONNECTION_SLEEP_INTERVAL seconds
             not self.last_connection_successful
         ):
+            # Clear the flag before waiting: it is only cleared on a
+            # successful connect (Device.connect), so after a failed attempt
+            # (e.g. BleakDeviceNotFoundError) it stays set from an earlier
+            # sighting and wait() would return instantly, busy-looping the
+            # reconnection attempts. Clearing here makes us wait for the next
+            # real advertisement (or RECONNECTION_SLEEP_INTERVAL).
+            device._advertisement_seen.clear()
             try:
                 await aio.wait_for(
                     device._advertisement_seen.wait(),
@@ -517,10 +524,12 @@ class DeviceManager:
                     f'[{device}] connection problem, '
                     f'attempts={missing_device_count}',
                 )
-            except (ConnectionError, TimeoutError, aio.TimeoutError):
+            except (ConnectionError, TimeoutError, aio.TimeoutError) as e:
                 missing_device_count += 1
-                _LOGGER.exception(
-                    f'[{device}] connection problem, '
+                # expected on a flaky link/adapter - log concisely without a
+                # full traceback.
+                _LOGGER.error(
+                    f'[{device}] connection problem: {e}, '
                     f'attempts={missing_device_count}',
                 )
             except ListOfConnectionErrors as e:

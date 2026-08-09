@@ -287,9 +287,11 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             cmd,
             self.MAGIC_END,
         )
-        self._cmd_counter += 1
-        if self._cmd_counter > 100:
-            self._cmd_counter = 0
+        # wrap naturally at the byte boundary (255 -> 0), like the reference
+        # C gateway (r4sGate.c). Wrapping at an arbitrary value (e.g. 100)
+        # makes the counter jump backwards, which the device firmware does not
+        # expect and eventually locks up on.
+        self._cmd_counter = (self._cmd_counter + 1) & 0xFF
         return bytearray(b'%b%b%b' % (container[:3], payload, container[3:]))
 
     async def send_command(self, cmd: Command, payload: bytes = b'',
@@ -311,19 +313,27 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             f'{format_binary(cmd)}',
         )
         if hasattr(self._ble_queue, '_queue'):
-            _LOGGER.warning('queue: %s', self._ble_queue._queue)
+            _LOGGER.debug('queue: %s', self._ble_queue._queue)
         self.clear_ble_queue()
-        # try:
-        cmd_resp = await aio.wait_for(
-            self.client.write_gatt_char(self.TX_CHAR, cmd),
-            timeout=command.timeout,
-        )
-        # except BleakDBusError:
-        #     await aio.sleep(5)
-        #     cmd_resp = await aio.wait_for(
-        #         self.client.write_gatt_char(self.TX_CHAR, cmd),
-        #         timeout=command.timeout,
-        #     )
+        try:
+            cmd_resp = await aio.wait_for(
+                self.client.write_gatt_char(self.TX_CHAR, cmd, response=True),
+                timeout=command.timeout,
+            )
+        except BleakDBusError as e:
+            # The device sometimes rejects a write with a transient ATT error
+            # (e.g. 0x0e "Unlikely Error") while it is busy. Retry once if the
+            # link is still up instead of tearing down the whole session; if
+            # the link is gone ('Not connected'), let it propagate so the
+            # manager reconnects.
+            if not self.client or not self.client.is_connected:
+                raise
+            _LOGGER.warning(f'{self} write failed ({e}), retrying once')
+            await aio.sleep(1)
+            cmd_resp = await aio.wait_for(
+                self.client.write_gatt_char(self.TX_CHAR, cmd, response=True),
+                timeout=command.timeout,
+            )
         if not command.wait_reply:
             if command.answer.cancelled():
                 return
@@ -333,7 +343,14 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
         ble_notification = await self.ble_get_notification(command.timeout)
 
         # extract payload from container
-        cmd_resp = bytes(ble_notification[1][3:-1])
+        frame = ble_notification[1]
+        cmd_resp = bytes(frame[3:-1])
+        # On successful auth continue the counter from the value reported by
+        # the device (frame[1]), like the reference C gateway
+        # (r4sGate.c: r4scounter = notify.value[1] + 1). The device is the
+        # source of truth for the sequence number.
+        if command.cmd == Command.AUTH and cmd_resp and cmd_resp[0]:
+            self._cmd_counter = (frame[1] + 1) & 0xFF
         if command.answer.cancelled():
             return
         command.answer.set_result(cmd_resp)

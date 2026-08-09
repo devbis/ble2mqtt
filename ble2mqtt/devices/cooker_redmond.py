@@ -4,6 +4,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 from ..compat import get_loop_param
+from ..exceptions import ListOfConnectionErrors
 from ..protocols.redmond import (COOKER_PREDEFINED_PROGRAMS, CookerRunState,
                                  CookerState, RedmondCookerProtocol,
                                  RedmondError)
@@ -12,6 +13,10 @@ from .base import (SELECT_DOMAIN, SENSOR_DOMAIN, SWITCH_DOMAIN, ConnectionMode,
 from .uuids import DEVICE_NAME
 
 _LOGGER = logging.getLogger(__name__)
+
+# transient connection errors (flaky link/adapter, dbus EOF, etc.) that should
+# not tear the process down - reconnect/skip instead.
+CONNECTION_ERRORS = (*ListOfConnectionErrors, ConnectionError)
 
 UUID_NORDIC_TX = uuid.UUID("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
 UUID_NORDIC_RX = uuid.UUID("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
@@ -46,6 +51,11 @@ class RedmondCooker(RedmondCookerProtocol, Device):
 
     SEND_DATA_PERIOD = 5  # seconds when boiling
     STANDBY_SEND_DATA_PERIOD_MULTIPLIER = 12  # 12 * 5 seconds in standby mode
+    # how often the device state is actually polled over BLE. Matches the
+    # reference C gateway, which polls Redmond appliances every ~4s
+    # (r4sGate.c: t_rspdel = 40 * 100ms). Polling more aggressively (e.g. every
+    # second) can eventually lock up the multicooker firmware.
+    POLL_INTERVAL = 4  # seconds
 
     def __init__(self, mac, key='ffffffffffffffff', default_program='express',
                  *args, **kwargs):
@@ -192,13 +202,36 @@ class RedmondCooker(RedmondCookerProtocol, Device):
 
     async def handle(self, publish_topic, send_config, *args, **kwargs):
         counter = 0
+        poll_timer = 0
         while True:
             await self.update_device_data(send_config)
-            # if boiling notify every 5 seconds, 60 sec otherwise
-            new_state = await self.get_mode()
-            await self.notify_run_state(new_state, publish_topic)
-            counter += 1
 
+            # poll the device state only every POLL_INTERVAL seconds to avoid
+            # locking up the multicooker firmware (see POLL_INTERVAL). The loop
+            # still runs every ACTIVE_SLEEP_INTERVAL for timing granularity.
+            poll_timer += self.ACTIVE_SLEEP_INTERVAL
+            if poll_timer >= self.POLL_INTERVAL:
+                poll_timer = 0
+                try:
+                    new_state = await self.get_mode()
+                except CONNECTION_ERRORS as e:
+                    # if the link is gone, end the session cleanly and let the
+                    # manager reconnect (no scary traceback); if it is still up
+                    # this was a transient rejection - skip this poll and keep
+                    # the connection.
+                    if not self.client or not self.client.is_connected:
+                        _LOGGER.warning(
+                            f'[{self}] connection lost while polling: {e}',
+                        )
+                        return
+                    _LOGGER.warning(
+                        f'[{self}] transient poll error, skipping: {e}',
+                    )
+                else:
+                    await self.notify_run_state(new_state, publish_topic)
+
+            counter += 1
+            # if boiling notify every 5 seconds, 60 sec otherwise
             if counter > (
                     self.SEND_DATA_PERIOD * self._send_data_period_multiplier
             ):
@@ -250,7 +283,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                         **get_loop_param(self._loop),
                     )
                     break
-                except ConnectionError as e:
+                except CONNECTION_ERRORS as e:
                     _LOGGER.exception(str(e))
                 await aio.sleep(5)
 
@@ -321,7 +354,7 @@ class RedmondCooker(RedmondCookerProtocol, Device):
                             **get_loop_param(self._loop),
                         )
                         break
-                    except ConnectionError as e:
+                    except CONNECTION_ERRORS as e:
                         _LOGGER.exception(str(e))
                     await aio.sleep(5)
                 continue
