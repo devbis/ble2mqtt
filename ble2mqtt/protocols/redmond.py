@@ -287,11 +287,12 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             cmd,
             self.MAGIC_END,
         )
-        # wrap naturally at the byte boundary (255 -> 0), like the reference
-        # C gateway (r4sGate.c). Wrapping at an arbitrary value (e.g. 100)
-        # makes the counter jump backwards, which the device firmware does not
-        # expect and eventually locks up on.
-        self._cmd_counter = (self._cmd_counter + 1) & 0xFF
+        # Match the official "Ready for Sky" app: local counter starting at 0,
+        # wrapping at >100 back to 0, not seeded from the device. The device
+        # just echoes this value back in its reply (used to match answers).
+        self._cmd_counter += 1
+        if self._cmd_counter > 100:
+            self._cmd_counter = 0
         return bytearray(b'%b%b%b' % (container[:3], payload, container[3:]))
 
     async def send_command(self, cmd: Command, payload: bytes = b'',
@@ -340,17 +341,40 @@ class RedmondBaseProtocol(SendAndWaitReplyMixin, BLEQueueMixin, BaseDevice,
             command.answer.set_result(cmd_resp)
             return
 
-        ble_notification = await self.ble_get_notification(command.timeout)
+        # Match the reply to this request like the official app does: accept a
+        # notification only if it starts with MAGIC_START and echoes the same
+        # counter (byte 1) and command id (byte 2). Frames starting with 0x56
+        # are unsolicited device notifications, and stale/mismatched frames can
+        # arrive on a flaky link - skip them instead of pairing them with the
+        # wrong command, which would desync every subsequent request/response.
+        sent_counter = cmd[1]
+        sent_op = cmd[2]
+        deadline = time.monotonic() + command.timeout
+        frame = None
+        while frame is None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ConnectionError(
+                    f'{self} no matching reply for cmd '
+                    f'{command.cmd.value:#04x}',
+                )
+            ble_notification = await self.ble_get_notification(remaining)
+            candidate = ble_notification[1]
+            if (
+                len(candidate) >= 4
+                and candidate[0] == self.MAGIC_START
+                and candidate[1] == sent_counter
+                and candidate[2] == sent_op
+            ):
+                frame = candidate
+            else:
+                _LOGGER.debug(
+                    f'{self} skip non-matching notification '
+                    f'{format_binary(candidate)}',
+                )
 
         # extract payload from container
-        frame = ble_notification[1]
         cmd_resp = bytes(frame[3:-1])
-        # On successful auth continue the counter from the value reported by
-        # the device (frame[1]), like the reference C gateway
-        # (r4sGate.c: r4scounter = notify.value[1] + 1). The device is the
-        # source of truth for the sequence number.
-        if command.cmd == Command.AUTH and cmd_resp and cmd_resp[0]:
-            self._cmd_counter = (frame[1] + 1) & 0xFF
         if command.answer.cancelled():
             return
         command.answer.set_result(cmd_resp)
