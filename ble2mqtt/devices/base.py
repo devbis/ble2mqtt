@@ -442,7 +442,8 @@ class Device(BaseDevice, abc.ABC):
 
     def _on_disconnect(self, client, *args):
         # symmetric with the "Connected to ..." INFO line so disconnects are
-        # visible in the logs without enabling debug.
+        # visible in the logs without enabling debug. This fires for
+        # remote/link-initiated drops (and for our own disconnect() call).
         _LOGGER.info(f'Disconnected from {client.address}, device={self}')
         self.disconnected_event.set()
 
@@ -453,6 +454,12 @@ class Device(BaseDevice, abc.ABC):
         except AttributeError:
             connected = True
         if connected:
+            # log our own (local) disconnect so it can be told apart from a
+            # remote/link-initiated drop in _on_disconnect.
+            _LOGGER.info(
+                f'Closing connection to {self.client.address} '
+                f'(local disconnect), device={self}',
+            )
             await self.client.disconnect()
         await super().close()
 

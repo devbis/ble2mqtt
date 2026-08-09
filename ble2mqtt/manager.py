@@ -329,6 +329,11 @@ class DeviceManager:
                     config_params = {
                         **get_generic_vals(entity),
                         'state_topic': state_topic,
+                        # state is published as JSON on the shared state topic,
+                        # extract this entity's value so HA gets a plain option
+                        # instead of the whole JSON object.
+                        'value_template':
+                            f'{{{{ value_json.{entity_name} }}}}',
                         'command_topic': set_topic,
                     }
                     payload = json.dumps(config_params)

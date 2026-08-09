@@ -217,10 +217,16 @@ class Ble2Mqtt:
                     for _ in range(3):
                         try:
                             await scanner.stop()
+                            break
                         except BleakDBusError as e:
                             if 'InProgress' in str(e):
                                 await aio.sleep(1)
                                 continue
+                            # scanning already stopped (or the controller was
+                            # reset) - nothing to stop, don't spam a traceback
+                            # and don't issue extra scan-enable commands.
+                            if 'No discovery started' in str(e):
+                                break
                             raise
                     if not devices:
                         empty_scans += 1
