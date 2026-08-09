@@ -1,7 +1,9 @@
 import asyncio as aio
+import contextlib
 import json
 import logging
 import os
+import signal
 
 from ble2mqtt.__version__ import VERSION
 from ble2mqtt.ble2mqtt import Ble2Mqtt
@@ -133,11 +135,41 @@ async def amain(config):
             **device,
         )
 
+    # Handle SIGINT/SIGTERM ourselves so shutdown is ordered: while the event
+    # loop is still fully alive we disconnect all devices cleanly (sending a
+    # proper GATT terminate) BEFORE any task-cancellation storm. Relying on the
+    # default KeyboardInterrupt behaviour tears the loop down while the BLE
+    # disconnect is still in flight, leaving the device thinking it is still
+    # connected - which locks up e.g. the multicooker keypad.
+    stop_event = aio.Event()
+
+    def _request_stop(sig_name):
+        _LOGGER.info(f'Received exit signal {sig_name}, shutting down...')
+        stop_event.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, _request_stop, sig.name)
+        except NotImplementedError:
+            # add_signal_handler is not available on some platforms (Windows)
+            pass
+
+    start_task = aio.ensure_future(service.start())
+    stop_task = aio.ensure_future(stop_event.wait())
     try:
-        await service.start()
-    except KeyboardInterrupt:
-        _LOGGER.info('Exiting...')
+        await aio.wait(
+            {start_task, stop_task},
+            return_when=aio.FIRST_COMPLETED,
+        )
     finally:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            with contextlib.suppress(NotImplementedError, ValueError):
+                loop.remove_signal_handler(sig)
+        stop_task.cancel()
+        start_task.cancel()
+        with contextlib.suppress(aio.CancelledError):
+            await start_task
+        # loop is still alive here, so device disconnects can complete cleanly
         await service.close()
 
 
